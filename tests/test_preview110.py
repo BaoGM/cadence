@@ -31,7 +31,7 @@ def test_native_presets_and_decoder_quality_change(tmp_path,monkeypatch,source4k
             m['id']='same-project-media'
             assert reader.read(m,0).shape[:2]==(m['proxy_height'],m['proxy_width'])
         assert len(ids)==5
-        small=prepare_media(Path(__file__).parent/'assets/Demonstration.mp4',quality='4k')
+        small=prepare_media(Path(__file__).resolve().parents[1]/'assets/Demonstration.mp4',quality='4k')
         assert (small['proxy_width'],small['proxy_height'])==(960,540)
     finally: reader.close()
 

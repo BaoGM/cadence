@@ -30,7 +30,7 @@ def test_explicit_rate_after_refusal_and_all_media_undo(link, monkeypatch):
     from media import prepare_media
     from model import Document
     w=link.window
-    media=prepare_media(Path(__file__).parent/'assets/Demonstration.mp4',quality='480p')
+    media=prepare_media(Path(__file__).resolve().parents[1]/'assets/Demonstration.mp4',quality='480p')
     other=dict(media,id=media['id']+'-second')
     w.doc=Document(); w.doc.append_media([media,other]); baseline=w.doc.state
     w.preferences={'preview_quality':'480p'}

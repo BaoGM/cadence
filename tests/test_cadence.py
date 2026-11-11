@@ -5,7 +5,7 @@ from fractions import Fraction
 from dataclasses import replace
 import numpy as np
 import pytest
-sys.path.insert(0,str(Path(__file__).parent))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from model import Document,State,Segment,slice_segments,locate,sample_at,TimelinePCM
 from media import prepare_media,PreviewReader,export_video,exposure_lut,ffmpeg,exposure_filter
 
@@ -59,7 +59,7 @@ def test_exposure_ffmpeg_parity(tmp_path):
 def prepared(tmp_path_factory):
     root=tmp_path_factory.mktemp('media')
     os.environ['CADENCE_CACHE']=str(root/'cache')
-    m=prepare_media(Path(__file__).parent/'assets'/'Demonstration.mp4')
+    m=prepare_media(Path(__file__).resolve().parents[1]/'assets'/'Demonstration.mp4')
     return m,root
 
 def test_import_and_precise_seek(prepared):

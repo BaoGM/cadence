@@ -22,7 +22,7 @@ def test_invalid_preferences_do_not_prevent_launch(application,tmp_path,monkeypa
 def test_mux_failure_preserves_other_recordings_and_cleans_own_temp(tmp_path,monkeypatch):
     import capture_audio
     video=tmp_path/'recording.mp4'
-    shutil.copy(Path(__file__).parent/'assets/Demonstration.mp4',video)
+    shutil.copy(Path(__file__).resolve().parents[1]/'assets/Demonstration.mp4',video)
     original=video.read_bytes()
     neighbour=tmp_path/'recording-avec-son.mp4'; neighbour.write_bytes(b'existing recording')
     outputs=[]
@@ -42,7 +42,7 @@ def test_mux_failure_preserves_other_recordings_and_cleans_own_temp(tmp_path,mon
 def test_non_object_cache_manifest_is_regenerated(tmp_path,monkeypatch):
     from media import prepare_media
     monkeypatch.setenv('CADENCE_CACHE',str(tmp_path/'cache'))
-    source=Path(__file__).parent/'assets/Demonstration.mp4'
+    source=Path(__file__).resolve().parents[1]/'assets/Demonstration.mp4'
     first=prepare_media(source)
     manifest=Path(first['proxy']).parent/'media.json'
     manifest.write_text('[]',encoding='utf-8')

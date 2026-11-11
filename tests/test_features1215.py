@@ -89,7 +89,7 @@ def test_all_shortcuts_under_windows_layout(window,application,layout):
 
 
 def test_prefetch_budget_both_directions_and_cancellation():
- media=dict(proxy=str(Path(__file__).parent/'assets/Demonstration.mp4'),fps='24',frames=192,width=960,height=540)
+ media=dict(proxy=str(Path(__file__).resolve().parents[1]/'assets/Demonstration.mp4'),fps='24',frames=192,width=960,height=540)
  targets=prefetch_frames(media,80,0,192,64*1024*1024)
  assert any(i<80 for _,i in targets) and any(i>80 for _,i in targets)
  assert len(targets)<=96

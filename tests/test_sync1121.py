@@ -108,7 +108,7 @@ def test_setup_idempotent_and_existing_startup_preserved(application, isolated):
     assert not install_connector('blender')
     assert (isolated / 'blender-scripts/startup/cadence_timeline_startup.py').is_file()
     for name in ('cadence_bridge.py', 'cadence_autostart.py'):
-        assert (isolated / 'integrations' / name).read_text(encoding='utf-8') == (Path(__file__).parent / 'integrations' / name).read_text(encoding='utf-8')
+        assert (isolated / 'integrations' / name).read_text(encoding='utf-8') == (Path(__file__).resolve().parents[1] / 'integrations' / name).read_text(encoding='utf-8')
 
 
 def test_startup_monitor_stops_when_disabled_or_owner_exits(isolated, monkeypatch):

@@ -33,7 +33,7 @@ def test_visible_keys_keep_boundary_and_long_exposures():
 def test_decoder_closes_old_sources_and_reopens_exact_frame(tmp_path):
     import shutil
     from media import PreviewReader
-    source=Path(__file__).parent/'assets/Demonstration.mp4'
+    source=Path(__file__).resolve().parents[1]/'assets/Demonstration.mp4'
     reader=PreviewReader(budget=0,max_containers=3);medias=[];expected=None
     try:
         for i in range(20):

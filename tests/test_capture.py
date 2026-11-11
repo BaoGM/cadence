@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 import sys,os,time,subprocess
 from pathlib import Path
-sys.path.insert(0,str(Path(__file__).parent))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import pytest
 from PySide6.QtCore import QRect,Qt
 from PySide6.QtWidgets import QApplication,QDialog,QMessageBox

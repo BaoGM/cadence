@@ -207,7 +207,7 @@ def test_rate_offer_once_and_explicit_accept(link, application, monkeypatch):
 def test_media_adaptation_preserves_duration_and_undo(link):
     from media import prepare_media
     w = link.window
-    media = prepare_media(Path(__file__).parent / 'assets' / 'Demonstration.mp4', quality='480p')
+    media = prepare_media(Path(__file__).resolve().parents[1] / 'assets' / 'Demonstration.mp4', quality='480p')
     w.doc = Document(); w.doc.append_media([media]); baseline = w.doc.state
     original_fps = w.doc.fps
     w.preferences = {'preview_quality': '480p'}

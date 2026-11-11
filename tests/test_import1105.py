@@ -30,7 +30,7 @@ def test_direct_rate_matches_ffmpeg(tmp_path,monkeypatch,source_rate,target):
 
 def test_deferred_audio_updates_mapped_playback_and_cache(tmp_path,monkeypatch):
     monkeypatch.setenv('CADENCE_CACHE',str(tmp_path/'cache'))
-    media=prepare_media(Path(__file__).parent/'assets/Demonstration.mp4',defer_audio=True)
+    media=prepare_media(Path(__file__).resolve().parents[1]/'assets/Demonstration.mp4',defer_audio=True)
     assert media['audio_pending'] and 'waveform' not in media
     pcm=TimelinePCM((Segment(media['id'],0,media['frames']),),{media['id']:media},Fraction(media['fps']))
     try:
@@ -45,7 +45,7 @@ def test_deferred_audio_updates_mapped_playback_and_cache(tmp_path,monkeypatch):
 
 def test_audio_cancel_is_not_a_valid_completed_cache(tmp_path,monkeypatch):
     monkeypatch.setenv('CADENCE_CACHE',str(tmp_path/'cache'))
-    media=prepare_media(Path(__file__).parent/'assets/Demonstration.mp4',defer_audio=True)
+    media=prepare_media(Path(__file__).resolve().parents[1]/'assets/Demonstration.mp4',defer_audio=True)
     cancel=threading.Event(); cancel.set()
     with pytest.raises(Cancelled): prepare_audio(media,cancel=cancel)
     assert json.loads(Path(media['audio']).with_name('media.json').read_text(encoding='utf-8'))['audio_pending']
@@ -55,7 +55,7 @@ def test_audio_cancel_is_not_a_valid_completed_cache(tmp_path,monkeypatch):
 
 def test_audio_interrupted_write_retries_without_replacing_mapped_file(tmp_path,monkeypatch):
     monkeypatch.setenv('CADENCE_CACHE',str(tmp_path/'cache'))
-    media=prepare_media(Path(__file__).parent/'assets/Demonstration.mp4',defer_audio=True)
+    media=prepare_media(Path(__file__).resolve().parents[1]/'assets/Demonstration.mp4',defer_audio=True)
     cancel=threading.Event()
     pcm=TimelinePCM((Segment(media['id'],0,media['frames']),),{media['id']:media},Fraction(media['fps']))
     try:
@@ -68,7 +68,7 @@ def test_audio_interrupted_write_retries_without_replacing_mapped_file(tmp_path,
 
 def test_export_finishes_pending_audio(tmp_path,monkeypatch):
     monkeypatch.setenv('CADENCE_CACHE',str(tmp_path/'cache'))
-    media=prepare_media(Path(__file__).parent/'assets/Demonstration.mp4',defer_audio=True)
+    media=prepare_media(Path(__file__).resolve().parents[1]/'assets/Demonstration.mp4',defer_audio=True)
     state=State((Segment(media['id'],0,24),)); output=tmp_path/'export.mp4'
     export_video(state,{media['id']:media},Fraction(media['fps']),output)
     assert not json.loads(Path(media['audio']).with_name('media.json').read_text(encoding='utf-8'))['audio_pending']
@@ -80,7 +80,7 @@ def test_background_audio_arrives_without_pausing_window(tmp_path,monkeypatch,wi
     from model import Document
     import time
     monkeypatch.setenv('CADENCE_CACHE',str(tmp_path/'cache'))
-    media=prepare_media(Path(__file__).parent/'assets/Demonstration.mp4',defer_audio=True)
+    media=prepare_media(Path(__file__).resolve().parents[1]/'assets/Demonstration.mp4',defer_audio=True)
     doc=Document(Fraction(media['fps'])); doc.append_media([media]); window.install_doc(doc)
     calls=[]; monkeypatch.setattr(window,'pause',lambda *args,**kwargs:calls.append('pause'))
     stop=time.monotonic()+15
@@ -94,7 +94,7 @@ def test_background_audio_arrives_without_pausing_window(tmp_path,monkeypatch,wi
 def test_export_waits_for_shared_background_audio(tmp_path,monkeypatch):
     from concurrent.futures import ThreadPoolExecutor
     monkeypatch.setenv('CADENCE_CACHE',str(tmp_path/'cache'))
-    media=prepare_media(Path(__file__).parent/'assets/Demonstration.mp4',defer_audio=True)
+    media=prepare_media(Path(__file__).resolve().parents[1]/'assets/Demonstration.mp4',defer_audio=True)
     writing=threading.Event(); release=threading.Event(); waiting=threading.Event()
     def progress(value,message):
         if value>0 and not writing.is_set():
@@ -117,7 +117,7 @@ def test_background_queue_cancels_removed_media_and_retries(tmp_path,monkeypatch
     import time
     from audio_jobs import AudioJobs
     monkeypatch.setenv('CADENCE_CACHE',str(tmp_path/'cache'))
-    media=prepare_media(Path(__file__).parent/'assets/Demonstration.mp4',defer_audio=True)
+    media=prepare_media(Path(__file__).resolve().parents[1]/'assets/Demonstration.mp4',defer_audio=True)
     entered=threading.Event(); calls=[]; real=prepare_audio
     def prepare(data,progress,cancel):
         calls.append(data['id'])
@@ -151,5 +151,5 @@ assert check_native_import(Path(sys.argv[1]))['background_audio']
 window.close(); app.processEvents()
 '''
     env=dict(os.environ,QT_QPA_PLATFORM='offscreen',CADENCE_CACHE=str(tmp_path/'cache'))
-    result=subprocess.run([sys.executable,'-c',script,str(tmp_path)],cwd=Path(__file__).parent,env=env,capture_output=True,timeout=30,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    result=subprocess.run([sys.executable,'-c',script,str(tmp_path)],cwd=Path(__file__).resolve().parents[1],env=env,capture_output=True,timeout=30,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     assert result.returncode==0,(result.returncode,result.stdout,result.stderr)

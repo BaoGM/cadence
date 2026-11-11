@@ -5,7 +5,7 @@ from dataclasses import replace,asdict
 from fractions import Fraction
 import numpy as np
 import pytest
-sys.path.insert(0,str(Path(__file__).parent))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from drawing import Mark,DrawingKey,put_key,active_key,render_marks,render_layer,load_keys
 from model import Document,State,Segment
 from PySide6.QtCore import Qt,QPointF,QEvent

@@ -21,7 +21,7 @@ With a portable toolchain, the MSVC root contains `VC/Tools/MSVC/14.44.35207` an
 
 The build script generates the synthetic eight-second, 24 fps test video, rebuilds the C++ DLL in a fresh directory, runs the maintained headless test list, builds the application and runs its complete self-test in French and English. It isolates preferences and uses software display for these tests. Success produces `.build/verification.json`, binding source file hashes, tool versions, test results and every payload file.
 
-The remaining historical tests are retained for focused regression investigation. They are not all asserted to be current CI tests. GPU performance, capture devices, network shares, Blender and Maya require additional validation on real systems.
+Application tests are grouped under `tests/`. The maintained CI selection is listed in `packaging/headless-tests.json`; packaging checks stay beside the packaging tools. The remaining historical tests are retained for focused regression investigation. They are not all asserted to be current CI tests. GPU performance, capture devices, network shares, Blender and Maya require additional validation on real systems.
 
 ## Distribution inputs
 

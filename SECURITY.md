@@ -1,6 +1,6 @@
 # Security
 
-This is a local publication candidate. A private vulnerability reporting channel has not yet been configured. Do not post credentials, private media, exploit details or personal diagnostic logs in public issues. Private reporting must be configured before public release.
+Report vulnerabilities through [GitHub private vulnerability reporting](https://github.com/BaoGM/cadence/security/advisories/new). Do not post credentials, private media, exploit details or personal diagnostic logs in public issues. Review diagnostic files before sharing them privately.
 
 Only open media and projects from sources you trust. Cadence delegates media parsing to PyAV and FFmpeg. Keep the application and its dependencies updated.
 

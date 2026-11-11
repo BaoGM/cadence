@@ -29,7 +29,7 @@ The [French guide](assets/guide_fr.txt) and [English guide](assets/guide_en.txt)
 
 See [BUILD.txt](BUILD.txt), [build and release verification](docs/BUILD.md), and [contribution guidelines](CONTRIBUTING.md). Automated tests use a synthetic video generated from source; personal media and the former demonstration video are excluded.
 
-The current candidate is 1.15.1. Windows CI and code signing still need remote validation and approval. A repeatable build procedure does not imply byte-for-byte identical binaries.
+The current candidate is 1.15.1. The [Windows build](https://github.com/BaoGM/cadence/actions/workflows/windows-unsigned.yml) has passed on GitHub Actions, including C++ compilation and French/English application checks. Artifacts are unsigned; code signing still requires review and approval. A repeatable build procedure does not imply byte-for-byte identical binaries.
 
 ## License
 

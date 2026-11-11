@@ -25,7 +25,7 @@ Application tests are grouped under `tests/`. The maintained CI selection is lis
 
 ## Distribution inputs
 
-Full packaging requires the matching third-party source and notice bundle. The bundle's complete file manifest and hashes are in packaging/third-party.lock.json. Public hosting is pending; no download URL is invented in this candidate.
+Full packaging requires the matching third-party source and notice bundle. The bundle's complete file manifest and hashes are in packaging/third-party.lock.json. The approved input bundle is available in [Sources des dépendances 1.15.1](https://github.com/BaoGM/cadence/releases/tag/dependencies-1.15.1); its SHA-256 is `15aaffdf5f93cc95bb27ba6ebc47560670e33b426d199a3025dfcbcd950593ea`.
 
 ```powershell
 .deps/build-venv/Scripts/python packaging/fetch_release_inputs.py --archive "C:/path/to/third-party-sources.zip" --sha256 THE_VERIFIED_ARCHIVE_SHA256
@@ -38,7 +38,7 @@ The release script rejects stale test results, changed sources or changed payloa
 
 ## Reproducibility limits
 
-The Windows workflow is a local draft pending its first authorised remote run. Action commits, upstream download hashes and Windows Python wheels were verified on 2026-11-11. The windows-2022 inventory lists Visual Studio 2022 and Windows SDK 10.0.26100.0, but does not prove the exact compiler folder and binary revision used here. The first authorised run must verify this and may require installing the pinned toolset. The runner image itself is managed by GitHub and can change; tool versions and hashes are therefore recorded.
+The Windows workflow was validated on a fresh GitHub-hosted windows-2022 runner on 2026-11-11. It verified the pinned toolchain, compiled the native library, ran the maintained tests, built the application, passed its French and English checks, and produced the unsigned packages. The runner image itself is managed by GitHub and can change; tool versions and hashes are therefore checked and recorded for each build.
 
 The build aims at a reconstructible, verifiable result. It does not claim byte-for-byte identity: PE timestamps, compression, upstream wheels and later signatures may differ. Third-party source manifests include upstream recipes and patches; they have not all been independently rebuilt. The original Qt translation binary is retained with its sources and notices.
 

@@ -1,0 +1,10 @@
+Construire Cadence / Build Cadence
+
+Voir docs/BUILD.md pour les outils exacts, les tests et la livraison.
+See docs/BUILD.md for exact tools, tests and release preparation.
+
+Le point d'entrée est packaging/build_windows.py.
+The build entry point is packaging/build_windows.py.
+
+Les sources tierces et leurs notices sont vérifiées par packaging/third-party.lock.json.
+Third-party sources and notices are verified against packaging/third-party.lock.json.

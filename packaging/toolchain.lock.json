@@ -1,0 +1,23 @@
+{
+  "python": "3.12.14",
+  "qt": "6.12.0",
+  "msvc": "14.44.35207",
+  "windows_sdk": "10.0.26100.0",
+  "cmake": "4.4.4",
+  "inno": "6.7.4",
+  "downloads": {
+    "qtbase.7z": {
+      "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_64/qt.qt6.6120.win64_msvc2022_64/6.12.0-0-202609280346qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+      "sha256": "219d1b86def3be418e31d704572bc4acc91b2ec373c65595c9fb12b42bf098dc"
+    },
+    "innosetup-6.7.4.exe": {
+      "url": "https://github.com/jrsoftware/issrc/releases/download/is-6_7_4/innosetup-6.7.4.exe",
+      "sha256": "a549929319f9120716677c685535ca4671e4b937b5fdc87e2585f32d8eb30e8c"
+    },
+    "python-3.12.14-windows.tar.gz": {
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260825/cpython-3.12.14%2B20260825-x86_64-pc-windows-msvc-install_only.tar.gz",
+      "sha256": "15d25c455ea25d6b24d7e58eabdf744fd0db3cfb977934ae08fd2237acd8ccc1"
+    }
+  },
+  "status": "Downloads verified against official upstream on 2026-11-11. First hosted Windows build remains pending authorisation."
+}

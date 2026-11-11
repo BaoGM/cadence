@@ -1,0 +1,13 @@
+cmake_minimum_required(VERSION 3.24)
+project(cadence_native VERSION 1.0 LANGUAGES CXX)
+find_package(Qt6 6.12.0 EXACT REQUIRED COMPONENTS Core Gui)
+add_library(cadence_native SHARED graphics.cpp render.cpp gpu.cpp)
+if(WIN32)
+    target_sources(cadence_native PRIVATE d3d.cpp)
+    target_link_libraries(cadence_native PRIVATE d3d11 dxgi d3dcompiler user32)
+endif()
+target_compile_features(cadence_native PRIVATE cxx_std_17)
+target_link_libraries(cadence_native PRIVATE Qt6::Core Qt6::Gui)
+set_target_properties(cadence_native PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/bin")

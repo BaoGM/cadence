@@ -1,0 +1,149 @@
+Cadence 1.15.1 - Quick guide
+
+These are the default shortcuts. The complete list is at the end of the guide; customize them in File > Options > Shortcuts.
+
+----------------------------------------
+Open, save and export
+
+File > Open media appends videos, WAV files or MP3 files to the timeline. You can also drop files into the window. Double-click the empty welcome screen to open the file picker. Audio-only files leave the picture black.
+
+Ctrl+S updates the current project. The first save asks for a filename. Ctrl+Shift+S (Save as…) chooses another file and makes it the current project.
+
+Ctrl+S saves a .cadence project: edit, drawings and comparison references. Media files stay in their original folders; keep them available when reopening the project. Ctrl+N creates an empty timeline. Session recovery at startup does not replace saving a project.
+
+Ctrl+E exports MP4, MOV, GIF, WAV or MP3. WAV and MP3 export only the edited audio track, including cuts and silent gaps. WAV keeps uncompressed sound (48 kHz, 16-bit stereo); MP3 uses 192 kbit/s. GIF has no sound. Drawings and enabled onion skins are included when Include drawings in export is checked. The output folder opens when export finishes.
+
+----------------------------------------
+Play and select
+
+Space: play / pause. Left and Right: one frame. Home and End: timeline boundaries. Comma and Period: previous / next keyframe or marker, wrapping at either end.
+
+K switches the keyframe commands and their buttons between keyframe and frame stepping. Left and Right always step one frame. The loop button changes mode without interrupting playback.
+
+Drag on the timeline to scrub. With Pointer (Q), you can also drag on the video; Shift makes this more precise. Playback resumes on release if it was running; otherwise it stays paused.
+
+Shift-drag selects a range while displaying the current frame. You can press Shift during a drag already in progress. Release the mouse before Shift to keep the selection; the opposite order returns to scrubbing.
+
+Shift-double-click a media segment to select its whole range, including on the simplified timeline. I and O set boundaries at the playhead; Escape clears the selection. Playback is limited to the selected range, whose length appears at its center.
+
+----------------------------------------
+Edit the timeline
+
+Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste the current frame or selected range. Delete removes the range. Sound is copied only when Copy/paste audio is checked in the top panel. Ctrl+Z undoes; Ctrl+Y redoes.
+
+Alt-drag moves a segment or range. Alt+Shift-drag duplicates it with sound. Drop before or after a segment, or inside a gap. The gap is filled; only the portion exceeding it shifts later content. Leave a gap preserves the original empty position. Linking options control whether audio and drawings follow video.
+
+Right-click for Split, Duplicate, Disable / Enable and deletion commands. Delete media removes video and audio and closes the gap. Deleting only video or audio preserves the positions of other elements.
+
+Mouse wheel: zoom. Ctrl + middle-button drag, or the scrollbar: horizontal navigation. Ctrl+0: fit the whole timeline. T or the context menu switches timecode / frames. The context menu also switches between simplified and detailed timelines.
+
+In the playlist, Ctrl-click or Shift-click selects multiple entries; right-click > Delete removes them from the edit without deleting the original files.
+
+----------------------------------------
+Draw and manage keyframes
+
+The Tools menu and toolbar activate drawing tools directly: brush, eraser, lasso, text, color picker, arrow, rectangle and ellipse. Q returns to the normal pointer. A drawing applies to the current frame or the entire selected range.
+
+Color, size and opacity control the stroke. Tablet pressure affects size; Sensitivity adjusts its response. Shift + left-button drag horizontally changes size before drawing. P selects the color picker. With the brush, arrow, rectangle, ellipse or text tool, hold Ctrl and click to sample a color; release Ctrl to return to the tool.
+
+While drawing a shape, Alt moves it, Shift constrains proportions or the arrow angle, Ctrl transforms from the center and Alt+Ctrl rotates it. Modifiers can be combined. Start drawing before pressing Shift or Ctrl to use them as constraints.
+
+With Text, drag a box: the text fits its size. Choose a font and style in the panel. Double-click text to edit it; hold Alt to move it.
+
+The lasso selects and moves objects. Changing color or opacity updates the selection for its entire keyframe range. Delete removes these objects first; their context menu offers copy, cut, paste and delete.
+
+On the Drawing track, Shift-drag selects multiple keyframes, Alt-drag moves them and handles adjust duration. C copies, X cuts, V pastes at the playhead and D deletes keyframes while keeping the selection. Shift+K duplicates a keyframe at the playhead. These commands are also in the context menu and Drawing menu.
+
+S adds a turquoise marker independent of drawings; press S on it again to remove it. Drawing keyframes are yellow. Show drawing layer controls visibility; Include drawings in export controls their inclusion in exported files.
+
+Onion skinning extends drawings over the chosen number of video frames before and after their keyframe, retaining their color and fading from the adjacent frame. A range of 0 disables that direction. It works while paused, playing and exporting.
+
+----------------------------------------
+Transform and crop
+
+Ctrl+T transforms objects selected with the lasso; otherwise, it transforms the current clip. Drag a handle to resize, hold Alt to move, Ctrl to scale from the center and Shift to preserve proportions. Multiple objects share the same center.
+
+Drag outside a corner to rotate; Shift snaps to 15-degree increments. Enter applies, Escape cancels. Alt+C crops with handles. These changes also affect export; Ctrl+Z undoes them.
+
+----------------------------------------
+Compare videos
+
+A is the working edit; B is one or more reference videos. Comparison > Add B references appends them in sequence. The playlist's References tab lets you reorder them by dragging or remove them with the context menu.
+
+Modes are Side by side, Top / bottom, Overlay, Difference, Wipe and Foreground. Shift+X or the comparison button cycles through them, then returns to A alone. Alt+X swaps A and B.
+
+Opacity controls the overlay, Gain amplifies differences and Reference offset shifts B in timeline frames. In Wipe mode, drag the divider. Drawings stay on A; sound and export always come from edit A.
+
+----------------------------------------
+Frame rate and quality
+
+Media with different frame rates can coexist. The first media sets the timeline frame rate; later media are read at their own rate and adapted to it.
+
+Right-click media > Change frame rate affects the chosen clip without changing the timeline rate. Keep duration drops or repeats frames according to their timestamps, leaving sound unchanged. Speed up or slow down changes duration; audio follows, with Preserve audio pitch checked by default. Linked drawings follow too. Ctrl+Z undoes it.
+
+File > Options > Preferences sets preview resolution to native, 480p, 720p, 1080p or 4K, without reducing export resolution. HDR playback is not supported.
+
+----------------------------------------
+View and panels
+
+Over the video, mouse wheel: zoom; middle-button drag: pan; Ctrl + horizontal middle-button drag: zoom; Shift + vertical middle-button drag: rotate. 0 resets the view and mirrors. F11 or double-click enters fullscreen; Escape exits.
+
+View zoom, pan and rotation do not affect export. Mirrors H and Shift+V do, as does exposure when Apply to export is checked.
+
+Timecode stays anchored to the video panel. Drag it to reposition it, lock its position with the context menu, and show or hide it with Ctrl+6. It is not exported.
+
+The View menu and a right-click on the background show or hide panels. Edit panel layout enables moving and resizing them. Reset panel layout restores the current mode.
+
+Playback and Editing modes are fully configurable in View > Playback / editing mode settings: choose panels and the simplified timeline separately for each. The Editing mode checkbox switches modes. Each mode retains its layout. File > Options > Preferences > Restore interface resets both modes to their initial state.
+
+----------------------------------------
+Synchronize Blender or Maya
+
+3D synchronization > Enable synchronization (Ctrl+Alt+S): choose Blender or Maya on the first activation. No application is selected by default; the choice applies to this Cadence window only. Cadence installs its connector automatically and displays a restart reminder; start or restart the 3D application once. After that, checking or unchecking the option starts or stops the link without copying any command. If Maya's security settings request approval for a startup script, allow the Cadence connector.
+
+Ctrl+Alt+L opens the settings. Choose the direction: 3D application to Cadence, Cadence to 3D application, or both. The link controls the current time during manual navigation and playback; it does not share media, audio or drawings. One Cadence window and one 3D application can be linked at a time, on the same computer.
+
+By default, the 3D range start maps to frame 0 in Cadence. The offset uses Cadence timeline frames: +10 maps that start to frame 10. Offset and direction are remembered; synchronization remains disabled at startup and you will choose the application again. The active link uses up to about 30 updates per second. When disabled, the connector only checks a local file once a second, without reading or changing the scene.
+
+Positions are mapped using both frame rates to preserve elapsed time. If the current media frame rate differs from the 3D application's rate, Cadence offers to adapt it while preserving its duration, by repeating or dropping frames. This change supports undo and does not alter the shared timeline frame rate. Declining keeps the media unchanged. You can change your mind in the settings: Adapt current media frame rate (Ctrl+Alt+R) or Adapt all timeline media frame rates (Ctrl+Alt+Shift+R). Neither the source file nor the 3D scene is modified.
+
+Updates are limited to 30 per second; the latest position replaces outdated requests. A heavy 3D scene may therefore display fewer intermediate frames during a drag. Disabling the link automatically stops the active connector.
+
+----------------------------------------
+
+Capture the screen
+
+File > Record screen selects a screen or region, frame rate, pointer and MP4 or GIF format. An outline identifies the capture area. Include > Cadence keeps the application visible; unchecked by default, it minimizes Cadence. Keyboard briefly shows pressed keys at the bottom of the recording area. Click adds a yellow halo while a left, middle or right mouse button is held. Both options are disabled by default. Key display runs only during recording and creates no keystroke log. Computer audio and microphone can be enabled separately; GIF remains silent.
+
+Ctrl+Shift+F8 starts capture with the last settings, then stops it, even from another application. A visual and audible countdown announces the start. The recording then opens in Cadence.
+
+Unless you choose a folder, captures go into the Windows temporary folder. Move recordings you want to keep before using them long-term in a project.
+
+----------------------------------------
+Customize and troubleshoot
+
+File > Options > Shortcuts groups commands into tabs. Click a field, enter a key combination or use its clear button. Changes apply immediately and are saved. If there is a conflict, Reassign removes the previous assignment. Import, Export and Reset manage your settings.
+
+View and navigation controls gestures, their axes, inversion and scrubbing sensitivity. Numeric fields accept direct typing followed by Enter, or horizontal dragging; Shift makes adjustments finer.
+
+Preferences controls language, video rendering, RAM and disk caches, scrub audio and tooltips. Save these preferences; language and rendering changes take effect at the next startup.
+
+If an error occurs, Help > Log folder opens the diagnostic files to include with your report.
+
+The window can be reduced to 640 × 400 logical pixels. In limited space, panels scroll and playback controls use two rows when needed.
+
+Drawings to Blender or Maya
+--------------------------
+In 3D synchronization > Settings, enable the link and choose a camera. Refresh reloads the camera list. Send drawings transfers keys and their exposure ranges; Ctrl+Alt+D sends them again. The link frame rate and offset determine timing. A key shorter than one 3D frame may disappear when resampled.
+
+Blender 4.3 or later: Grease Pencil creates editable brush strokes, arrows, rectangles and circles. A key containing text, erasing, a group or a non-uniform transform becomes a transparent image. Transparent images applies this to every key. Text, images and onion skins remain visible with Blender overlays disabled. Sending drawings switches Solid viewports to Texture color mode to display them. They also appear in renders. Images are packed into the .blend file when saved.
+
+Maya: Blue Pencil creates an animated layer on the selected camera. Each image is flattened: it can be retouched with Blue Pencil painting tools, but text and shapes do not remain separate objects. This mode is for the viewport and playblasts, not final rendering. Transparent images creates a single animated image plane. Its files are copied into sourceimages/Cadence in the Maya project and must be kept with the scene.
+
+Include onion skins requires onion skins to be enabled in Cadence. Transfer uses their ranges, fading opacity and original colors. Maya disables native Blue Pencil ghosting to avoid duplicating ghosts already baked into the images. In Blender, stacking may differ when several ghosts overlap.
+
+Sending again replaces this Cadence project's previous transfer to that camera, even when changing formats, including edits made to those elements. Other objects and drawings are preserved. Transfer is manual and one-way. Drawings follow camera framing, not 3D surfaces. Images are limited to 4096 pixels on the longest side without enlargement. Blue Pencil and image sequences are limited to 25,000 image changes and 2 GB per transfer.
+
+Delete drawings asks for confirmation, then removes all elements transferred by Cadence in the scene, across all projects, cameras and formats. Elements created directly in the 3D application are preserved. Image files on disk remain available for older scene saves.
+
+In Maya, images are compensated for the view transform active when they are sent. Send them again if that transform changes. Semi-transparent areas composite in the scene's color space: slight differences may remain over colored backgrounds or with custom view transforms.

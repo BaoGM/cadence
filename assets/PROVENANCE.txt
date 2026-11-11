@@ -1,0 +1,11 @@
+Logo
+The project owner authorised redistribution and modification of cadence.png and cadence.ico under GPL-3.0-only on 2026-11-11. The original files are preserved. See LICENSING.txt and the complete license in COPYING.txt. This is not a public domain dedication.
+
+Fonts
+Each font family retains its original OFL.txt. sources.json records upstream locations, revision and SHA-256 values.
+
+Qt translation
+qtbase_fr.qm is a Qt translation resource. Qt translation sources and licenses are provided with the third-party source bundle.
+
+Test video
+The previous Demonstration.mp4 is excluded pending rights clarification. Tests generate a new, synthetic video using packaging/generate_fixture.py. This generated fixture is never included in the Windows application package.

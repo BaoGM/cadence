@@ -1,0 +1,17 @@
+Cadence - Module graphique C++
+
+Environnement de compilation
+Windows x64, MSVC 14.44.35207, Windows SDK 10.0.26100.0, Qt 6.12.0 MSVC 2022 x64.
+Le module utilise les DLL Qt déjà fournies par PySide6 6.12.0. Ne pas ajouter une autre copie de Qt au dossier de livraison.
+
+Depuis un terminal développeur MSVC, avec CMake installé et Qt dans CMAKE_PREFIX_PATH :
+cmake -S native -B native/build -DCMAKE_BUILD_TYPE=Release
+cmake --build native/build --config Release
+
+Le résultat est native/bin/cadence_native.dll. Le fichier Cadence.spec l'inclut dans la livraison Windows. Compiler ce module avant PyInstaller.
+
+cadence_prepare_graphics reçoit une QOffscreenSurface créée sur le thread principal. Le contexte OpenGL est créé, utilisé et détruit sur le thread de travail C++. L'appel ctypes libère le verrou Python pendant cette opération. Les versions de l'interface native et de Qt sont vérifiées au chargement. Une erreur conserve l'affichage compatible et est inscrite au journal.
+
+Le mode accéléré utilise ensuite une QOpenGLWindow intégrée dans la zone vidéo. La fenêtre principale conserve son identité native pendant la transition. Les données du projet, les dessins et les paramètres d'affichage restent dans les mêmes objets Python.
+
+graphics.cpp gère la préparation graphique. render.cpp contient les traitements d'images et de tracés. gpu.cpp et d3d.cpp fournissent les chemins graphiques accélérés. L'interface et la gestion du projet restent en Python ; l'application contrôle le choix du moteur et les replis.

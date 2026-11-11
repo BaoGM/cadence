@@ -1,0 +1,19 @@
+[
+  "test_cadence.py",
+  "test_cadence180.py",
+  "test_drawing.py",
+  "test_progress1215.py",
+  "test_native150.py",
+  "test_timecode_overlay.py",
+  "test_navigation_modes.py",
+  "test_audio_export1112.py",
+  "test_sync1120.py",
+  "test_sync1121.py",
+  "test_drawing_transfer1140.py",
+  "test_transfer1141.py",
+  "test_transfer1150.py",
+  "test_transfer1151.py",
+  "test_translation1110.py",
+  "test_release1130.py",
+  "packaging/test_release_pipeline.py"
+]

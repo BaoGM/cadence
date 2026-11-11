@@ -1,0 +1,149 @@
+Cadence 1.15.1 - Guide rapide
+
+Les raccourcis indiqués sont ceux par défaut. Leur liste complète figure à la fin du guide ; ils se personnalisent dans Fichier > Options > Raccourcis.
+
+----------------------------------------
+Ouvrir, enregistrer et exporter
+
+Fichier > Ouvrir des médias ajoute une ou plusieurs vidéos, pistes WAV ou MP3 à la suite de la timeline. On peut aussi déposer les fichiers dans la fenêtre. Sur l'accueil vide, un double-clic ouvre le sélecteur de fichiers. Un fichier audio seul laisse l'image noire.
+
+Ctrl+S met à jour le projet courant. Lors de la première sauvegarde, il demande un nom. Ctrl+Maj+S (Enregistrer sous…) choisit un autre fichier et en fait le projet courant.
+
+Ctrl+S enregistre le projet .cadence : montage, dessins et références de comparaison. Les médias restent dans leurs dossiers d'origine ; conservez-les pour rouvrir le projet. Ctrl+N crée une timeline vide. La restauration de session au démarrage ne remplace pas l'enregistrement d'un projet.
+
+Ctrl+E exporte en MP4, MOV, GIF, WAV ou MP3. WAV et MP3 exportent uniquement la piste audio montée, avec ses coupes et ses silences. WAV conserve le son sans compression (48 kHz, 16 bits, stéréo) ; MP3 utilise 192 kbit/s. Le GIF ne contient pas de son. Dessins et pelures activées sont inclus si « Inclure les dessins à l'export » est coché. Le dossier du résultat s'ouvre à la fin.
+
+----------------------------------------
+Lire et sélectionner
+
+Espace : lecture / pause. Gauche et Droite : une image. Début et Fin : extrémités de la timeline. Virgule et Point : clé ou marqueur précédent / suivant, avec retour à l'autre extrémité.
+
+K bascule les commandes de clé et leurs boutons entre un pas de clé et un pas d'image. Gauche et Droite restent toujours image par image. Le bouton de boucle change le mode sans interrompre la lecture.
+
+Glissez sur la timeline pour déplacer la lecture. Avec l'outil Curseur (Q), glissez aussi sur la vidéo ; Maj affine le déplacement. Si la lecture était active, elle reprend au relâchement ; sinon elle reste en pause.
+
+Maj + glisser sélectionne une plage tout en affichant l'image courante. On peut appuyer sur Maj pendant un glissement déjà commencé. Relâchez la souris avant Maj pour garder la sélection ; l'ordre inverse repasse en déplacement de lecture.
+
+Maj + double-clic sur un média sélectionne tout son bloc, y compris sur la timeline allégée. I et O posent les bornes au curseur ; Échap efface la sélection. La lecture se limite à la plage sélectionnée, dont la longueur apparaît au centre.
+
+----------------------------------------
+Modifier la timeline
+
+Ctrl+C, Ctrl+X et Ctrl+V copient, coupent et collent l'image courante ou la plage sélectionnée. Suppr supprime la plage. Le son est copié seulement si « Copier/coller le son » est coché dans le bandeau supérieur. Ctrl+Z annule ; Ctrl+Y rétablit.
+
+Alt + glisser déplace un bloc ou une plage. Alt+Maj + glisser duplique avec le son. Le dépôt se fait avant ou après un média, ou dans un vide. Le vide est rempli ; seule la partie qui le dépasse décale la suite. « Laisser un vide » conserve l'emplacement quitté. Les options de liaison règlent si le son et les dessins suivent la vidéo.
+
+Le clic droit propose Scinder, Dupliquer, Désactiver / Activer et les suppressions. Supprimer le média retire vidéo et son et referme l'espace. Supprimer uniquement la vidéo ou l'audio conserve la position des autres éléments.
+
+Molette : zoom. Ctrl + clic molette + glisser, ou barre de défilement : déplacement horizontal. Ctrl+0 : toute la timeline. T ou le clic droit choisit code temporel / images. Le clic droit permet aussi de passer de la timeline allégée à la détaillée.
+
+Dans la liste de lecture, Ctrl+clic ou Maj+clic sélectionne plusieurs entrées ; clic droit > Supprimer les retire du montage sans effacer les fichiers d'origine.
+
+----------------------------------------
+Dessiner et gérer les clés
+
+Les outils du menu Outils et de la barre d'outils activent directement le dessin : pinceau, gomme, lasso, texte, pipette, flèche, carré et cercle. Q revient au curseur normal. Un dessin est posé sur l'image courante ou sur toute la plage sélectionnée.
+
+Couleur, taille et opacité règlent le tracé. La pression d'une tablette agit sur la taille ; Sensibilité ajuste sa réponse. Maj + clic gauche + glisser horizontalement change la taille avant de tracer. P active la pipette. Avec le pinceau, la flèche, le carré, le cercle ou le texte, maintenez Ctrl puis cliquez pour prélever une couleur ; relâchez Ctrl pour retrouver l'outil.
+
+Pendant le tracé d'une forme : Alt déplace, Maj contraint les proportions ou l'angle de la flèche, Ctrl transforme depuis le centre et Alt+Ctrl fait tourner. Ces modificateurs se combinent. Commencez le tracé avant d'enfoncer Maj ou Ctrl pour les utiliser comme contraintes.
+
+Avec Texte, tracez un cadre : le texte s'adapte à sa taille. Choisissez police et style dans le panneau. Double-cliquez le texte pour le modifier ; Alt permet de le déplacer.
+
+Le lasso sélectionne et déplace les objets. Changer couleur ou opacité modifie la sélection sur toute la durée de sa clé. Suppr efface ces objets en priorité ; leur clic droit propose copier, couper, coller et supprimer.
+
+Sur la piste Dessin, Maj + glisser sélectionne plusieurs clés, Alt + glisser les déplace et les poignées règlent leur durée. C copie, X coupe, V colle au curseur et D supprime les clés sans perdre la sélection. Maj+K duplique une clé au curseur. Ces commandes existent aussi au clic droit et dans Dessin.
+
+S ajoute un marqueur turquoise indépendant des dessins ; S sur ce marqueur le supprime. Les clés de dessin sont jaunes. « Afficher le calque de dessins » règle la visibilité ; « Inclure les dessins à l'export » règle leur présence à l'export.
+
+La pelure d'oignon prolonge les dessins sur le nombre d'images vidéo choisi avant et après leur clé, avec leur couleur et une opacité décroissante dès l'image voisine. Une portée de 0 désactive le côté concerné. Elle fonctionne à l'arrêt, en lecture et à l'export.
+
+----------------------------------------
+Transformer et recadrer
+
+Ctrl+T transforme les objets sélectionnés au lasso ; sinon, le clip courant. Tirez une poignée pour redimensionner, maintenez Alt pour déplacer, Ctrl pour partir du centre et Maj pour conserver les proportions. Plusieurs objets partagent le même centre.
+
+Glissez à l'extérieur d'un coin pour faire tourner ; Maj impose des pas de 15°. Entrée valide, Échap annule. Alt+C recadre le clip avec des poignées. Ces transformations modifient aussi l'export ; Ctrl+Z les annule.
+
+----------------------------------------
+Comparer des vidéos
+
+A est le montage de travail ; B est une ou plusieurs vidéos de référence. Comparaison > Ajouter des références B les charge à la suite. L'onglet Références de la liste de lecture permet de les réordonner par glissement ou de les retirer au clic droit.
+
+Les modes sont Côte à côte, Dessus / dessous, Superposition, Différence, Révélateur et Premier plan. Maj+X ou le bouton de comparaison les fait défiler, puis revient à A seule. Alt+X intervertit A et B.
+
+Opacité règle la superposition, Gain amplifie les différences et Décalage référence décale B en images de la timeline. En mode Révélateur, glissez la séparation. Les dessins restent sur A ; le son et l'export proviennent toujours du montage A.
+
+----------------------------------------
+Cadence et qualité
+
+Des médias de cadences différentes peuvent coexister. Le premier fixe la cadence de la timeline ; les suivants sont lus à leur cadence et adaptés à celle-ci.
+
+Clic droit sur un média > Changer la cadence agit sur le clip choisi, sans changer la cadence de la timeline. « Conserver la durée » retire ou répète des images selon leur position temporelle, sans changer le son. « Accélérer ou ralentir » change la durée ; le son suit, avec conservation de sa hauteur cochée par défaut. Les dessins liés suivent aussi. Ctrl+Z annule.
+
+Fichier > Options > Préférences règle la résolution de l'aperçu : native, 480p, 720p, 1080p ou 4K, sans réduire celle de l'export. La lecture HDR n'est pas prise en charge.
+
+----------------------------------------
+Affichage et panneaux
+
+Sur la vidéo, molette : zoom ; clic molette + glisser : déplacement ; Ctrl + clic molette + glisser horizontalement : zoom ; Maj + clic molette + glisser verticalement : rotation. 0 réinitialise la vue et les miroirs. F11 ou double-clic passe en plein écran ; Échap en sort.
+
+Zoom, déplacement et rotation de la vue ne modifient pas l'export. Les miroirs H et Maj+V sont exportés, ainsi que l'exposition si « Appliquer à l'export » est coché.
+
+Le code temporel reste ancré au panneau vidéo. Glissez-le pour le déplacer, verrouillez sa position au clic droit, affichez-le ou cachez-le avec Ctrl+6. Il n'est pas exporté.
+
+Le menu Affichage et le clic droit sur le fond affichent ou cachent les panneaux. « Modifier la disposition des panneaux » autorise leur déplacement et leur redimensionnement. « Réinitialiser la disposition des panneaux » restaure le mode courant.
+
+Les modes Lecture et Édition sont entièrement personnalisables dans Affichage > Options des modes Lecture / Édition : choisissez les panneaux et la timeline allégée séparément pour chacun. Le bouton Mode édition change de mode. Chaque mode conserve sa disposition. Fichier > Options > Préférences > Restaurer l'interface remet les deux modes à leur état initial.
+
+----------------------------------------
+Synchroniser Blender ou Maya
+
+Synchronisation 3D > Activer la synchronisation (Ctrl+Alt+S) : choisissez Blender ou Maya lors de la première activation. Aucun logiciel n'est présélectionné et le choix reste valable pour cette fenêtre Cadence uniquement. Cadence installe son connecteur automatiquement et affiche un rappel de redémarrage ; démarrez ou redémarrez le logiciel 3D une première fois. Ensuite, cocher ou décocher suffit pour démarrer ou arrêter la liaison, sans commande à copier. Dans Maya, si une autorisation de script de démarrage est demandée par ses réglages de sécurité, autorisez le connecteur Cadence.
+
+Ctrl+Alt+L ouvre les réglages. Choisissez le sens : logiciel 3D vers Cadence, Cadence vers logiciel 3D, ou les deux. La liaison agit sur la position, en déplacement manuel comme en lecture ; elle ne partage ni les médias, ni le son, ni les dessins. Une seule fenêtre Cadence et un seul logiciel 3D sont reliés à la fois, sur le même ordinateur.
+
+Par défaut, le début de la plage 3D correspond à l'image 0 de Cadence. Le décalage est exprimé en images de la timeline Cadence : +10 fait correspondre ce début à l'image 10. Le décalage et le sens sont mémorisés ; la liaison reste désactivée au démarrage et le logiciel sera à choisir à nouveau. La synchronisation active utilise au maximum environ 30 mises à jour par seconde. Désactivé, le connecteur se limite à une vérification locale par seconde, sans lire ni modifier la scène.
+
+Les positions sont converties selon les cadences pour conserver le temps écoulé. Si la cadence du média courant diffère de celle du logiciel 3D, Cadence propose de l'adapter en conservant sa durée, avec répétition ou retrait d'images. Cette opération est annulable et ne change pas la cadence commune de la timeline. Refuser conserve le média tel quel. Vous pouvez revenir sur ce choix dans les réglages : Adapter la cadence du média courant (Ctrl+Alt+R) ou Adapter la cadence de tous les médias de la timeline (Ctrl+Alt+Maj+R). Le fichier source et la scène 3D ne sont pas modifiés.
+
+Les échanges sont limités à 30 mises à jour par seconde ; la dernière position remplace les demandes dépassées. Une scène 3D lourde peut donc afficher moins d'étapes pendant un glissement. Désactiver la liaison arrête automatiquement le connecteur actif.
+
+----------------------------------------
+
+Capturer l'écran
+
+Fichier > Capturer l'écran choisit un écran ou une zone, la cadence, le curseur et le format MP4 ou GIF. Le cadre indique la zone capturée. Inclure > Cadence laisse l'application visible ; décoché par défaut, Cadence se réduit. Clavier affiche brièvement les touches en bas de la zone enregistrée. Clic ajoute un halo jaune pendant un appui gauche, central ou droit. Ces deux options sont désactivées par défaut. L'affichage des touches fonctionne uniquement pendant la capture et ne crée pas de journal de frappe. Son de l'ordinateur et microphone sont activables séparément ; un GIF reste muet.
+
+Ctrl+Maj+F8 démarre avec les derniers réglages, puis arrête la capture, même depuis une autre application. Un décompte visuel et sonore annonce le départ. La vidéo s'ouvre ensuite dans Cadence.
+
+Sans dossier choisi, les captures vont dans le dossier temporaire Windows. Déplacez celles à conserver avant de les utiliser durablement dans un projet.
+
+----------------------------------------
+Personnaliser et dépanner
+
+Fichier > Options > Raccourcis regroupe les commandes par onglets. Cliquez dans une case, saisissez une combinaison ou utilisez le bouton d'effacement. Les changements sont immédiats et mémorisés. En cas de conflit, Réattribuer retire l'ancienne affectation. Importer, Exporter et Réinitialiser gèrent vos réglages.
+
+Vue et navigation règle les gestes, leurs axes, leur inversion et la précision du déplacement de lecture. Les champs numériques acceptent la saisie directe puis Entrée, ou un glissement horizontal ; Maj affine le réglage.
+
+Préférences règle la langue, l'affichage vidéo, les caches RAM et disque, le son pendant le déplacement de lecture et les infobulles. Enregistrez ces préférences ; langue et affichage vidéo prennent effet au prochain démarrage.
+
+En cas d'erreur, Aide > Dossier des journaux ouvre les fichiers de diagnostic à joindre au signalement.
+
+La fenêtre peut être réduite jusqu'à 640 × 400 pixels logiques. Dans un espace restreint, les panneaux défilent et les commandes de lecture se répartissent sur deux lignes si nécessaire.
+
+Dessins vers Blender ou Maya
+---------------------------
+Dans Synchronisation 3D > Réglages, activez la liaison puis choisissez une caméra. Actualiser relit la liste des caméras. Envoyer les dessins transfère les clés et leurs plages ; Ctrl+Alt+D répète l'envoi. La cadence et le décalage de la liaison déterminent leur position. Une clé plus courte qu'une image 3D peut disparaître lors du rééchantillonnage.
+
+Blender 4.3 ou ultérieur : Grease Pencil crée des traits modifiables pour le pinceau, les flèches, rectangles et cercles. Une clé contenant du texte, de la gomme, un groupe ou une déformation non uniforme devient une image transparente. Images transparentes applique ce traitement à toutes les clés. Les textes, images et pelures restent visibles avec les superpositions de Blender désactivées. À l’envoi, les vues en mode Solide passent en couleur Texture pour les afficher. Ils apparaissent aussi au rendu. Les images sont intégrées au fichier .blend à sa sauvegarde.
+
+Maya : Blue Pencil crée un calque animé dans la caméra choisie. Chaque image est aplatie : elle peut être retouchée avec les outils de peinture Blue Pencil, mais le texte et les formes ne restent pas des objets séparés. Ce mode sert à la vue et au playblast, pas au rendu final. Images transparentes crée un seul plan animé. Ses fichiers sont copiés dans sourceimages/Cadence du projet Maya, à conserver avec la scène.
+
+Inclure les pelures d'oignon nécessite leur activation dans Cadence. Le transfert reprend leurs portées, leur opacité décroissante et les couleurs d'origine. Maya désactive les pelures natives de Blue Pencil pour éviter de les doubler avec celles déjà intégrées. Dans Blender, l'empilement peut différer si plusieurs pelures se recouvrent.
+
+Un nouvel envoi remplace le transfert précédent de ce projet Cadence vers cette caméra, même en changeant de format, ainsi que les retouches faites sur ces éléments. Les autres objets et dessins sont conservés. L'envoi est manuel et à sens unique. Les dessins suivent le cadrage de la caméra, pas les surfaces 3D. Les images sont limitées à 4096 pixels sur le plus grand côté, sans agrandissement. Blue Pencil et les séquences d'images sont limités à 25 000 changements d'image et 2 Go par envoi.
+
+Supprimer les dessins retire, après confirmation, tous les éléments transférés par Cadence dans la scène, pour tous les projets, caméras et formats. Les éléments créés directement dans le logiciel 3D sont conservés. Les fichiers d'images sur disque restent disponibles pour les anciennes sauvegardes de la scène.
+
+Dans Maya, les images sont compensées pour la transformation de vue active lors de l'envoi. Renvoyez-les si cette transformation change. Les zones semi-transparentes se composent dans l'espace couleur de la scène : de légers écarts peuvent subsister sur un fond coloré ou avec une transformation personnalisée.

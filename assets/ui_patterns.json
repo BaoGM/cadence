@@ -1,0 +1,267 @@
+[
+  [
+    "",
+    " Mo libérés."
+  ],
+  [
+    "",
+    " Mo libérés.\n",
+    " médias en cours conservés.\n",
+    " dossiers occupés ou inaccessibles."
+  ],
+  [
+    "",
+    " au premier plan"
+  ],
+  [
+    "",
+    " dossiers occupés ou inaccessibles."
+  ],
+  [
+    "",
+    " en haut / ",
+    " en bas"
+  ],
+  [
+    "",
+    " images copiées"
+  ],
+  [
+    "",
+    " images coupées ; Ctrl+V pour coller."
+  ],
+  {
+    "parts": [
+      "",
+      " images · ",
+      ""
+    ],
+    "translate": [
+      1
+    ]
+  },
+  [
+    "",
+    " médias en cours conservés."
+  ],
+  [
+    "",
+    " × ",
+    " · ",
+    " i/s"
+  ],
+  {
+    "parts": [
+      "",
+      "/",
+      " médias · ",
+      ""
+    ],
+    "translate": [
+      2
+    ]
+  },
+  [
+    " · ",
+    " éléments"
+  ],
+  [
+    "Cache : ",
+    " Mo"
+  ],
+  {
+    "parts": [
+      "Clic : ",
+      ""
+    ],
+    "translate": [
+      0
+    ]
+  },
+  {
+    "parts": [
+      "Comparaison : ",
+      ""
+    ],
+    "translate": [
+      0
+    ]
+  },
+  {
+    "parts": [
+      "Comparaison : ",
+      "\nClic : ",
+      ""
+    ],
+    "translate": [
+      0,
+      1
+    ]
+  },
+  {
+    "parts": [
+      "Conflit de raccourcis : ",
+      " et ",
+      "."
+    ],
+    "translate": [
+      0,
+      1
+    ]
+  },
+  [
+    "Démarrage dans ",
+    "…"
+  ],
+  [
+    "Export terminé : ",
+    ""
+  ],
+  [
+    "FFmpeg : erreur ",
+    ""
+  ],
+  [
+    "IMAGE ",
+    " / ",
+    ""
+  ],
+  [
+    "Image ",
+    " indisponible."
+  ],
+  [
+    "Image ",
+    " non trouvée dans l’aperçu (",
+    ")."
+  ],
+  [
+    "Image courante : ",
+    ""
+  ],
+  [
+    "Intervertir A / B · ordre actuel : ",
+    ""
+  ],
+  [
+    "Le média source a changé depuis l’import : ",
+    ". Réimportez-le dans un nouveau projet."
+  ],
+  [
+    "Média source introuvable : ",
+    ""
+  ],
+  [
+    "Overlay ",
+    " + ",
+    ""
+  ],
+  [
+    "Plage active : ",
+    " → ",
+    ""
+  ],
+  [
+    "Volume : ",
+    " %"
+  ],
+  [
+    "Zone : ",
+    " × ",
+    ""
+  ],
+  [
+    "",
+    " images"
+  ],
+  [
+    "Insertion : image ",
+    ""
+  ],
+  [
+    "Copie : image ",
+    ""
+  ],
+  {
+    "parts": [
+      "Réinitialiser « ",
+      " » ?"
+    ],
+    "translate": [
+      0
+    ]
+  },
+  {
+    "parts": [
+      "Copie · ",
+      " images · ",
+      ""
+    ],
+    "translate": [
+      1
+    ]
+  },
+  [
+    "Insertion : image ",
+    " · vide conservé"
+  ],
+  [
+    "Copie : image ",
+    " · vide conservé"
+  ],
+  {
+    "parts": [
+      "Décodage : ",
+      ""
+    ],
+    "translate": [
+      0
+    ]
+  },
+  {
+    "parts": [
+      "Référence B : ",
+      ""
+    ],
+    "translate": [
+      0
+    ]
+  },
+  {
+    "parts": [
+      "Référence B indisponible : ",
+      ""
+    ],
+    "translate": [
+      0
+    ]
+  },
+  {
+    "parts": [
+      "Raccourci invalide : ",
+      ""
+    ],
+    "translate": [
+      0
+    ]
+  },
+  {
+    "parts": [
+      "Capture audio interrompue : ",
+      ""
+    ],
+    "translate": [
+      0
+    ]
+  },
+  {
+    "parts": [
+      "Volume : ",
+      " % · ",
+      ""
+    ],
+    "translate": [
+      1
+    ]
+  }
+]

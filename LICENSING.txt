@@ -1,0 +1,37 @@
+Cadence
+Copyright (C) 2026 Cadence contributors
+SPDX-License-Identifier: GPL-3.0-only
+
+FRANÇAIS
+--------
+
+Le code original de Cadence hybride, y compris ses composants Python et C++ et les scripts de construction et de distribution, est sous licence GNU GPL version 3 uniquement.
+
+Le logo Cadence fourni dans assets/cadence.png et assets/cadence.ico est également sous licence GNU GPL version 3 uniquement. Sa modification et sa redistribution sont autorisées dans les conditions de cette licence.
+
+Vous pouvez utiliser, modifier et redistribuer Cadence, y compris à des fins commerciales, dans les conditions de cette licence. Les versions dérivées distribuées doivent préserver les droits accordés par la GPLv3 et l'accès au code source correspondant.
+
+Cadence est fourni sans aucune garantie, y compris de qualité marchande ou d'adéquation à un usage particulier. Le texte officiel complet de la licence est conservé sans modification, en anglais, dans COPYING.txt : https://www.gnu.org/licenses/gpl-3.0.html. Le présent document explique son application à Cadence et ne remplace pas la licence.
+
+Les composants tiers, bibliothèques et polices conservent leurs propres licences. Cette notice ne les place pas sous une autre licence. Leurs notices figurent dans le dossier Licences de la livraison Windows et, pour les polices incluses, dans assets/fonts.
+
+Les sources de Cadence sont dans Cadence-<version>-sources.zip et dans Licences/Cadence-sources.zip de la livraison Windows. Les instructions de construction figurent dans BUILD.txt et native/BUILD.txt.
+
+Les sources, recettes de construction et modifications des bibliothèques tierces sont fournies séparément dans Cadence-<version>-third-party-sources.zip. Lors d'une redistribution en téléchargement, proposer également cette archive au même emplacement, sans coût supplémentaire. Elle n'est pas nécessaire au fonctionnement de Cadence.
+
+ENGLISH
+-------
+
+The original Cadence hybrid source code, including its Python and C++ components and the build and distribution scripts, is licensed under the GNU General Public License, version 3 only.
+
+The Cadence logo provided in assets/cadence.png and assets/cadence.ico is also licensed under the GNU General Public License, version 3 only. Modification and redistribution are permitted under the terms of this license.
+
+You may use, modify and redistribute Cadence, including commercially, under the terms of this license. Distributed derivative versions must preserve the rights granted by the GPLv3 and access to the corresponding source code.
+
+Cadence is provided without any warranty, including the implied warranties of merchantability or fitness for a particular purpose. The complete official license text is preserved verbatim in English in COPYING.txt: https://www.gnu.org/licenses/gpl-3.0.html. This document explains its application to Cadence and does not replace the license.
+
+Third-party components, libraries and fonts retain their own licenses. This notice does not relicense them. Their notices accompany the Windows distribution in Licences and, for bundled fonts, assets/fonts.
+
+Cadence sources are provided in Cadence-<version>-sources.zip and in Licences/Cadence-sources.zip within the Windows distribution. Build instructions are in BUILD.txt and native/BUILD.txt.
+
+Third-party sources, build recipes and patches are supplied separately in Cadence-<version>-third-party-sources.zip. When distributing downloads, offer this archive alongside the program at the same location, at no additional charge. It is not required to run Cadence.

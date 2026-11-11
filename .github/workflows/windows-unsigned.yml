@@ -1,0 +1,57 @@
+name: Windows unsigned candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      dependency_bundle_url:
+        description: Approved HTTPS URL of the matching third-party source and notice bundle
+        required: true
+        type: string
+      dependency_bundle_sha256:
+        description: Approved SHA-256 of that bundle
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      PYTHONUTF8: '1'
+      INPUT_BUNDLE_URL: ${{ inputs.dependency_bundle_url }}
+      INPUT_BUNDLE_SHA256: ${{ inputs.dependency_bundle_sha256 }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Prepare verified Python runtime
+        shell: pwsh
+        run: ./packaging/bootstrap_python.ps1
+      - name: Install pinned Python dependencies
+        run: python -m pip install --only-binary=:all: --require-hashes -r requirements-build.lock
+      - name: Prepare verified Windows toolchain
+        shell: pwsh
+        run: ./packaging/bootstrap_windows.ps1
+      - name: Fetch corresponding source and notice bundle
+        shell: pwsh
+        run: python packaging/fetch_release_inputs.py --url "$env:INPUT_BUNDLE_URL" --sha256 "$env:INPUT_BUNDLE_SHA256"
+      - name: Fetch verified FFmpeg binary
+        run: python packaging/fetch_ffmpeg.py
+      - name: Compile and verify current sources
+        shell: pwsh
+        run: python packaging/build_windows.py --msvc-root "$env:CADENCE_MSVC_ROOT" --qt-root "$env:CADENCE_QT_ROOT"
+      - name: Assemble unsigned artifacts
+        run: python packaging/release.py --dependency-root .deps/release-inputs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cadence-unsigned-${{ github.sha }}
+          path: |
+            dist/unsigned/*.exe
+            dist/unsigned/*.zip
+            dist/unsigned/*-sha256.json
+            dist/unsigned/*-provenance.json
+          if-no-files-found: error
+          retention-days: 14

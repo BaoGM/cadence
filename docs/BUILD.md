@@ -42,4 +42,8 @@ The Windows workflow was validated on a fresh GitHub-hosted windows-2022 runner 
 
 The build aims at a reconstructible, verifiable result. It does not claim byte-for-byte identity: PE timestamps, compression, upstream wheels and later signatures may differ. Third-party source manifests include upstream recipes and patches; they have not all been independently rebuilt. The original Qt translation binary is retained with its sources and notices.
 
-Installer upgrade/removal must be tested with the private test identifier before a public release, then on a clean Windows machine. Never use a production install merely as an automated test. Signing is a separate, approval-gated stage and is not configured yet.
+Installer upgrade/removal must first be tested with the private test identifier, then in a disposable clean Windows environment. Do not run a production installer as an automated test against a developer's existing Windows installation.
+
+The published 1.15.1 installer was additionally verified on 2026-11-12 in a fresh Windows Sandbox (Windows build 26100), with networking disabled. Administrative silent installation used the default Program Files directory. Upgrade from 1.15.0, reinstallation, file associations, Start Menu shortcut, French/English packaged self-tests and uninstallation passed. All 1,238 installed payload files matched the portable release. Preferences, a user project and a modified user file were preserved. This test used a SYSTEM session and software rendering; interactive UAC prompts and hardware graphics were not covered by it. The Sandbox was stopped after verification.
+
+Signing is a separate, approval-gated stage and is not configured yet.

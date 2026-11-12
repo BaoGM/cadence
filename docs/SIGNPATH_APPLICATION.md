@@ -1,6 +1,6 @@
-# SignPath application draft
+# SignPath application status
 
-Status: not submitted. Official eligibility criteria and the application form were reviewed at https://signpath.org/terms and https://signpath.org/apply on 2026-11-12. Recheck them before submission.
+Status: submitted on 2026-11-12; receipt confirmed by the application form. SignPath Foundation's decision is pending. Official eligibility criteria and the application form were reviewed at https://signpath.org/terms and https://signpath.org/apply on the same date. Cadence's published binaries remain unsigned.
 
 - Project: Cadence, Windows video review and annotation.
 - Purpose: a free and open-source application developed for practical animation review needs that available paid tools did not fully meet in the maintainer's workflow.
@@ -18,6 +18,6 @@ Status: not submitted. Official eligibility criteria and the application form we
 - Installer validation: production installer tested in a fresh offline Windows Sandbox on 2026-11-12, including administrative installation in Program Files, upgrade, reinstallation, French/English application self-tests and uninstallation. See docs/BUILD.md for scope and remaining limits.
 - Reputation: recently published project, with no independent coverage, public testimonials or established adoption statistics claimed. Build and release evidence is not a claim of widespread use.
 
-Personal contact details and the completed application remain outside this public repository. The project has not submitted an application, installed the SignPath GitHub integration or configured signing credentials.
+Personal contact details and the completed application remain outside this public repository. The application was submitted with the maintainer's explicit approval. The SignPath GitHub integration has not been installed, and no signing credentials have been configured.
 
-Before submission, show the complete final application to the maintainer. Do not submit this draft or install a GitHub integration without explicit approval. The future Foundation certificate does not identify the maintainer personally or Cadence as certificate holder.
+Signing integration will proceed only after acceptance by SignPath Foundation and separate approval from the maintainer. If approved, the Foundation certificate will identify SignPath Foundation, not the maintainer personally or Cadence as certificate holder.

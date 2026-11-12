@@ -198,6 +198,7 @@ tests/test_task150.py
 tests/test_timecode_overlay.py
 tests/test_timeline102.py
 tests/test_timeline1101.py
+tests/test_timeline1152.py
 tests/test_toolbar_layout.py
 tests/test_tools0160.py
 tests/test_tools0170.py
@@ -205,6 +206,7 @@ tests/test_transfer1141.py
 tests/test_transfer1150.py
 tests/test_transfer1151.py
 tests/test_translation1110.py
+tests/test_updates1160.py
 tests/test_wipe1217.py
 timecode_overlay.py
 timeline_index.py
@@ -212,6 +214,8 @@ tool_icons.py
 transform_frame.py
 ui_style.py
 ui_text.py
+update_ui.py
+updates.py
 version_info.txt
 video_surface.py
 video_surface_d3d.py

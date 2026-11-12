@@ -1,6 +1,12 @@
 # Privacy
 
-Cadence processes media locally. The reviewed application code has no telemetry or automatic update submission. This statement describes Cadence's code, not Windows, graphics drivers, connected 3D applications or a future download host.
+Cadence processes media locally and has no analytics or telemetry. This statement describes Cadence's code, not Windows, graphics drivers or connected 3D applications.
+
+## Update checks
+
+Starting with 1.16.0, the packaged application checks the public BaoGM/cadence releases on GitHub at startup, at most once every 24 hours after a successful check. This option is enabled by default and can be disabled in File > Options > Preferences. Prereleases are excluded unless the user enables them. Help also provides a manual check.
+
+These HTTPS requests disclose the network address and a generic Cadence user-agent to GitHub. No media, project, paths, logs, identifiers or preferences are sent. A package is downloaded only after confirmation and its size and SHA-256 are verified. Installed copies ask again before launching the Windows installer. Portable copies offer an archive to extract manually. The downloaded files remain in the local application-data updates directory.
 
 ## Local data
 

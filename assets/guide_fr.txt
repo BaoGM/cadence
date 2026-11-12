@@ -1,4 +1,4 @@
-Cadence 1.15.1 - Guide rapide
+Cadence 1.16.0 - Guide rapide
 
 Les raccourcis indiqués sont ceux par défaut. Leur liste complète figure à la fin du guide ; ils se personnalisent dans Fichier > Options > Raccourcis.
 
@@ -52,7 +52,7 @@ Avec Texte, tracez un cadre : le texte s'adapte à sa taille. Choisissez police 
 
 Le lasso sélectionne et déplace les objets. Changer couleur ou opacité modifie la sélection sur toute la durée de sa clé. Suppr efface ces objets en priorité ; leur clic droit propose copier, couper, coller et supprimer.
 
-Sur la piste Dessin, Maj + glisser sélectionne plusieurs clés, Alt + glisser les déplace et les poignées règlent leur durée. C copie, X coupe, V colle au curseur et D supprime les clés sans perdre la sélection. Maj+K duplique une clé au curseur. Ces commandes existent aussi au clic droit et dans Dessin.
+Les clés apparaissent sous les graduations de la timeline. Sur cette bande, Maj + glisser sélectionne plusieurs clés et Alt + glisser les déplace. Une clé d'une image possède une poignée unique : tirez-la à gauche ou à droite pour l'étendre. Les clés plus longues gardent deux poignées. C copie, X coupe, V colle au curseur et D supprime les clés sans perdre la sélection. Maj+K duplique une clé au curseur. Ces commandes existent aussi au clic droit sur la règle et dans Dessin.
 
 S ajoute un marqueur turquoise indépendant des dessins ; S sur ce marqueur le supprime. Les clés de dessin sont jaunes. « Afficher le calque de dessins » règle la visibilité ; « Inclure les dessins à l'export » règle leur présence à l'export.
 
@@ -147,3 +147,10 @@ Un nouvel envoi remplace le transfert précédent de ce projet Cadence vers cett
 Supprimer les dessins retire, après confirmation, tous les éléments transférés par Cadence dans la scène, pour tous les projets, caméras et formats. Les éléments créés directement dans le logiciel 3D sont conservés. Les fichiers d'images sur disque restent disponibles pour les anciennes sauvegardes de la scène.
 
 Dans Maya, les images sont compensées pour la transformation de vue active lors de l'envoi. Renvoyez-les si cette transformation change. Les zones semi-transparentes se composent dans l'espace couleur de la scène : de légers écarts peuvent subsister sur un fond coloré ou avec une transformation personnalisée.
+
+----------------------------------------
+Mises à jour
+
+Cadence vérifie les nouvelles versions au démarrage, au plus une fois par jour. Fichier > Options > Préférences permet de désactiver cette vérification et d'inclure les préversions. Aide > Rechercher des mises à jour lance une vérification manuelle.
+
+Votre accord est demandé avant le téléchargement, puis avant l'installation. Le fichier téléchargé est contrôlé avec son empreinte SHA-256. La version installée propose l'installateur Windows et l'enregistrement du projet avant fermeture. La version portable ouvre le dossier de l'archive vérifiée : extrayez-la dans un nouveau dossier. Les préférences et les projets restent conservés. Une connexion indisponible ne bloque pas le démarrage.

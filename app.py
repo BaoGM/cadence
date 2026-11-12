@@ -33,7 +33,7 @@ from comparison import ComparisonMixin
 from draw_ui import DrawController
 from PySide6.QtWidgets import QGridLayout
 
-VERSION='1.15.1'
+VERSION='1.16.0'
 STYLE='''
 QMainWindow, QWidget { background:#11161d; color:#dce4ee; font-family:"Segoe UI"; font-size:13px; }
 QMenuBar { background:#11161d; color:#91a1b5; padding:3px; }
@@ -282,7 +282,7 @@ class MainWindow(ComparisonMixin,QMainWindow):
 
         for key,panel in self.panel_widgets().items():
             if isinstance(panel,QDockWidget) or panel is self.timecode_overlay: panel.visibilityChanged.connect(lambda visible,k=key:self.sync_panel_action(k,visible))
-        helpmenu=self.menuBar().addMenu(tr('Aide')); self.action(helpmenu,'Guide rapide',self.help); self.action(helpmenu,'Dossier des journaux',self.open_logs); self.action(helpmenu,'À propos',self.about)
+        helpmenu=self.menuBar().addMenu(tr('Aide')); self.action(helpmenu,'Guide rapide',self.help); self.action(helpmenu,'Dossier des journaux',self.open_logs); self.action(helpmenu,'Rechercher des mises à jour…',self.check_updates); self.action(helpmenu,'À propos',self.about)
         from sync3d import install as install_sync3d
         install_sync3d(self)
         from menu_layout import organize_menus
@@ -933,6 +933,9 @@ class MainWindow(ComparisonMixin,QMainWindow):
             self.timecode_overlay.set_frame(frame,self.doc.state.length,self.doc.fps); self.update_media_info(frame); self.request_frame()
         if done:
             self.pause(); self.doc.state=replace(self.doc.state,position=frame); self.refresh(); self.play_completed=True
+    def check_updates(self):
+        from update_ui import manager
+        manager(self,VERSION).check_now()
     def about(self):
         from dialogs import ButtonStyle
         from PySide6.QtGui import QShortcut
@@ -960,7 +963,8 @@ class MainWindow(ComparisonMixin,QMainWindow):
     def closeEvent(self,e):
         if self.job:
             self.job.cancel.set(); self.notify('Annulation en cours ; fermez la fenêtre une fois terminée.'); e.ignore(); return
-        if not self.confirm_discard(): e.ignore(); return
+        if not getattr(self,'_update_close_approved',False) and not self.confirm_discard(): e.ignore(); return
+        if hasattr(self,'update_manager'): self.update_manager.stop()
         self.sync3d.stop()
         self.audio_jobs.stop()
         if self.viewer.graphics_startup is not None: self.viewer.graphics_startup.cancel()
@@ -995,6 +999,8 @@ def main():
     stamp=_startup_time.perf_counter(); win=MainWindow(); logging.info('Startup window construction: %.3fs',_startup_time.perf_counter()-stamp)
     stamp=_startup_time.perf_counter(); win.show(); logging.info('Startup window show: %.3fs; total Python startup: %.3fs',_startup_time.perf_counter()-stamp,_startup_time.perf_counter()-_STARTUP)
     QTimer.singleShot(0,lambda:startup_ready(_STARTUP))
+    from update_ui import manager
+    manager(win,VERSION).start()
     if len(sys.argv)>1 and Path(sys.argv[1]).is_file(): QTimer.singleShot(150,lambda:win.open_path(sys.argv[1]))
     else: QTimer.singleShot(150,win.session.offer)
     code=app.exec(); sys.exit(code)

@@ -28,7 +28,7 @@ def preferred_renderer(data):
     return renderer if renderer in ('direct3d','opengl','software') else default_renderer()
 
 def defaults(registry):
-    return dict(format='cadence-shortcuts',version=1,shortcut_defaults_revision=REVISION,shortcuts={key:value[1] for key,value in registry.items()},canvas=default_canvas(),scrub_pixels=4.,language='fr',clear_cache_on_exit=False,preview_quality='native',scrub_audio=True,tooltips=True,video_renderer=default_renderer(),video_renderer_version=2,ram_cache_mb=default_cache_mb())
+    return dict(format='cadence-shortcuts',version=1,shortcut_defaults_revision=REVISION,shortcuts={key:value[1] for key,value in registry.items()},canvas=default_canvas(),scrub_pixels=4.,language='fr',clear_cache_on_exit=False,preview_quality='native',scrub_audio=True,tooltips=True,auto_update_check=True,update_previews=False,video_renderer=default_renderer(),video_renderer_version=2,ram_cache_mb=default_cache_mb())
 
 def validate(data,registry):
     if not isinstance(data,dict) or data.get('format')!='cadence-shortcuts' or data.get('version')!=1: raise ValueError('Format de raccourcis incompatible.')
@@ -96,6 +96,8 @@ def validate(data,registry):
     result['preview_quality']=quality if quality in ('native','480p','720p','1080p','4k') else 'native'
     result['scrub_audio']=data.get('scrub_audio',True) is not False
     result['tooltips']=data.get('tooltips',True) is not False
+    result['auto_update_check']=data.get('auto_update_check',True) is not False
+    result['update_previews']=data.get('update_previews',False) is True
     result['video_renderer']=preferred_renderer(data)
     ram=data.get('ram_cache_mb',default_cache_mb())
     result['ram_cache_mb']=max(64,min(maximum_cache_mb(),ram)) if type(ram) is int else default_cache_mb()
@@ -149,6 +151,10 @@ class ShortcutDialog(QDialog):
         interface=section('Interface'); interface_col=QVBoxLayout(interface); maintenance.addWidget(interface,1)
         self.tooltips=QCheckBox(tr('Afficher les infobulles')); interface_col.addWidget(self.tooltips)
         restore=QPushButton(tr('Restaurer l’interface')); restore.setEnabled(hasattr(parent,'workspaces')); restore.clicked.connect(lambda:parent.workspaces.reset(True)); interface_col.addWidget(restore,0,Qt.AlignmentFlag.AlignLeft); interface_col.addStretch()
+        updates=section('Mises à jour'); updates_col=QVBoxLayout(updates); general.addWidget(updates)
+        self.auto_update_check=QCheckBox(tr('Vérifier automatiquement les mises à jour')); updates_col.addWidget(self.auto_update_check)
+        self.update_previews=QCheckBox(tr('Inclure les préversions')); updates_col.addWidget(self.update_previews)
+        update_note=QLabel(tr('Votre accord est demandé avant tout téléchargement et toute installation.')); update_note.setWordWrap(True); updates_col.addWidget(update_note)
         general.addStretch(); tabs.addTab(prefs,tr('Préférences')); self.cache_probe=CacheProbe(self); self.cache_probe.ready.connect(self.cache_ready); self.cache_generation=0
         QTimer.singleShot(0,self.update_cache_label)
         keys=QWidget(); self.keys_layout=QVBoxLayout(keys); tabs.addTab(keys,tr('Raccourcis'))
@@ -232,6 +238,7 @@ class ShortcutDialog(QDialog):
         self.language.setCurrentIndex(self.language.findData(data.get('language','fr'))); self.clear_on_exit.setChecked(data.get('clear_cache_on_exit',False))
         self.preview_quality.setCurrentIndex(self.preview_quality.findData(data.get('preview_quality','native'))); self.scrub_audio.setChecked(data.get('scrub_audio',True))
         self.tooltips.setChecked(data.get('tooltips',True))
+        self.auto_update_check.setChecked(data.get('auto_update_check',True)); self.update_previews.setChecked(data.get('update_previews',False))
         self._key_values=dict(data['shortcuts'])
         for key,edit in self._editors.items(): edit.setKeySequence(QKeySequence(data['shortcuts'].get(key,self.registry[key][1])))
         for name,config in data['canvas'].items(): self.populate_gesture(name,config)
@@ -246,6 +253,7 @@ class ShortcutDialog(QDialog):
         data['language']=self.language.currentData(); data['clear_cache_on_exit']=self.clear_on_exit.isChecked()
         data['preview_quality']=self.preview_quality.currentData(); data['scrub_audio']=self.scrub_audio.isChecked()
         data['tooltips']=self.tooltips.isChecked()
+        data['auto_update_check']=self.auto_update_check.isChecked(); data['update_previews']=self.update_previews.isChecked()
         data['video_renderer']=self.video_renderer.currentData()
         data['ram_cache_mb']=self.ram_cache.value()
         return validate(data,self.registry)
@@ -334,7 +342,7 @@ class ShortcutDialog(QDialog):
         if self.confirm_reset('Réinitialiser TOUS les raccourcis, gestes du canvas et réglages du scrub ?'):
             data=defaults(self.registry); data.update(self.general_preferences()); self.populate(data)
     def general_preferences(self):
-        return dict(ram_cache_mb=self.ram_cache.value(),language=self.language.currentData(),clear_cache_on_exit=self.clear_on_exit.isChecked(),preview_quality=self.preview_quality.currentData(),scrub_audio=self.scrub_audio.isChecked(),tooltips=self.tooltips.isChecked(),video_renderer=self.video_renderer.currentData(),video_renderer_version=2)
+        return dict(auto_update_check=self.auto_update_check.isChecked(),update_previews=self.update_previews.isChecked(),ram_cache_mb=self.ram_cache.value(),language=self.language.currentData(),clear_cache_on_exit=self.clear_on_exit.isChecked(),preview_quality=self.preview_quality.currentData(),scrub_audio=self.scrub_audio.isChecked(),tooltips=self.tooltips.isChecked(),video_renderer=self.video_renderer.currentData(),video_renderer_version=2)
     def import_file(self):
         path,_=QFileDialog.getOpenFileName(self,tr('Importer les raccourcis'),'',tr('Raccourcis Cadence (*.json)'))
         if not path: return

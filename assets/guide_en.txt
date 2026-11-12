@@ -1,4 +1,4 @@
-Cadence 1.15.1 - Quick guide
+Cadence 1.16.0 - Quick guide
 
 These are the default shortcuts. The complete list is at the end of the guide; customize them in File > Options > Shortcuts.
 
@@ -52,7 +52,7 @@ With Text, drag a box: the text fits its size. Choose a font and style in the pa
 
 The lasso selects and moves objects. Changing color or opacity updates the selection for its entire keyframe range. Delete removes these objects first; their context menu offers copy, cut, paste and delete.
 
-On the Drawing track, Shift-drag selects multiple keyframes, Alt-drag moves them and handles adjust duration. C copies, X cuts, V pastes at the playhead and D deletes keyframes while keeping the selection. Shift+K duplicates a keyframe at the playhead. These commands are also in the context menu and Drawing menu.
+Keyframes appear below the timeline ticks. On this strip, Shift-drag selects multiple keyframes and Alt-drag moves them. A one-frame key has a single handle: drag left or right to extend it. Longer keys keep two handles. C copies, X cuts, V pastes at the playhead and D deletes keyframes while keeping the selection. Shift+K duplicates a keyframe at the playhead. These commands are also in the ruler context menu and Drawing menu.
 
 S adds a turquoise marker independent of drawings; press S on it again to remove it. Drawing keyframes are yellow. Show drawing layer controls visibility; Include drawings in export controls their inclusion in exported files.
 
@@ -147,3 +147,10 @@ Sending again replaces this Cadence project's previous transfer to that camera, 
 Delete drawings asks for confirmation, then removes all elements transferred by Cadence in the scene, across all projects, cameras and formats. Elements created directly in the 3D application are preserved. Image files on disk remain available for older scene saves.
 
 In Maya, images are compensated for the view transform active when they are sent. Send them again if that transform changes. Semi-transparent areas composite in the scene's color space: slight differences may remain over colored backgrounds or with custom view transforms.
+
+----------------------------------------
+Updates
+
+Cadence checks for new versions at startup, at most once a day. File > Options > Preferences lets you disable this check and include prereleases. Help > Check for updates starts a manual check.
+
+Your approval is requested before downloading and again before installation. Downloads are checked against their SHA-256 checksum. The installed version offers the Windows installer and a chance to save your project before closing. The portable version opens the verified archive's folder: extract it into a new folder. Preferences and projects are preserved. An unavailable connection does not block startup.

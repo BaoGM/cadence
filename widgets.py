@@ -407,7 +407,7 @@ class Timeline(QWidget):
             self.drag_animation.stop(); self.drag_animation.setStartValue(self.animated_x if self.animated_x is not None else end); self.drag_animation.setEndValue(end); self.drag_animation.start()
         self.ghost_x=x-self.grab_offset; self.update()
     def set_document(self,state,media,fps):
-        self.state=state; self.setFixedHeight(44 if getattr(self,"simple",False) else 126 if state.drawings else 100); self.media=media; self.fps=float(fps); self.clamp_view(); self.update()
+        self.state=state; self.setFixedHeight(44 if getattr(self,"simple",False) else 100); self.media=media; self.fps=float(fps); self.clamp_view(); self.update()
     def set_units(self,units):
         self.units=units; self.update(); self.unitsChanged.emit(units)
     def tick_label(self,frame):
@@ -423,7 +423,7 @@ class Timeline(QWidget):
             self.clamp_view(); self.update()
     def clamp_view(self): self.view_start=max(0,min(self.view_start,max(0,(self.state.length if self.state else 0)-self.span()))); self.viewportChanged.emit()
     def reset_view(self): self.zoom=1.; self.view_start=0.; self.clamp_view(); self.update()
-    def track_y(self,track): return {'video':47,'audio':73,'drawing':99}[track]
+    def track_y(self,track): return {'video':47,'audio':73,'drawing':40}[track]
     def track_rect(self,track): return QRectF(self.track_left(),self.track_y(track),self.track_width(),19)
     def simple_track_rect(self): return QRectF(self.track_left(),24,self.track_width(),12)
     def track_left(self): return 20 if getattr(self,'simple',False) else 78
@@ -517,7 +517,7 @@ class Timeline(QWidget):
                 p.setPen(QColor('#647384' if large else '#3a4653')); p.drawLine(QPointF(x,38-(7 if large else 3)),QPointF(x,38))
             if large:
                 p.setPen(MUTED); label=self.tick_label(f); width=p.fontMetrics().horizontalAdvance(label)+8
-                p.drawText(QRectF(max(left,min(x-width/2,right-width)),1 if simple else 7,width,20),Qt.AlignmentFlag.AlignCenter,tr(label))
+                p.drawText(QRectF(max(left,min(x-width/2,right-width)),1,width,20),Qt.AlignmentFlag.AlignCenter,tr(label))
         if simple:
             p.save()
             if bar_path is not None: p.setClipPath(bar_path,Qt.ClipOperation.IntersectClip)
@@ -528,7 +528,7 @@ class Timeline(QWidget):
         for f in self.state.frame_markers:
             x=self.x_for(f)
             if left<=x<=right:
-                y=self.simple_track_rect().center().y() if simple else 35
+                y=self.simple_track_rect().center().y() if simple else 30
                 p.drawPolygon(QPolygonF([QPointF(x,y-4),QPointF(x+4,y),QPointF(x,y+4),QPointF(x-4,y)]))
         p.restore()
     def selection_label(self):
@@ -676,6 +676,8 @@ class Timeline(QWidget):
             action=menu.addAction(tr(title)); action.setData('units_'+units); action.setCheckable(True); action.setChecked(self.units==units)
             action.triggered.connect(lambda checked=False,u=units:self.set_units(u))
     def context_menu(self,pos):
+        if not self.simple and pos.y()<self.track_y('video') and self.state and self.state.length:
+            return self.drawing_track.context_menu(pos.x())
         menu=QMenu(tr(self)); simple=getattr(self,'simple',False)
         self.add_units(menu); menu.addSeparator(); self.add_timeline_mode(menu)
         if not simple and pos.y()<38: self.add_delete_keys(menu,pos.x()); return menu

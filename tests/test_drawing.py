@@ -229,7 +229,7 @@ def test_drawing_timeline_gestures_and_canvas_cursor(window,application):
     w.refresh(); application.processEvents()
     def drag(x1,x2,mod):
         for kind,x,button in ((QEvent.Type.MouseButtonPress,x1,Qt.MouseButton.LeftButton),(QEvent.Type.MouseMove,x2,Qt.MouseButton.NoButton),(QEvent.Type.MouseButtonRelease,x2,Qt.MouseButton.LeftButton)):
-            pos=QPointF(x,158); event=QMouseEvent(kind,pos,QPointF(t.mapToGlobal(pos.toPoint())),button,Qt.MouseButton.LeftButton,mod); QApplication.sendEvent(t,event)
+            pos=QPointF(x,t.track_y('drawing')+2); event=QMouseEvent(kind,pos,QPointF(t.mapToGlobal(pos.toPoint())),button,Qt.MouseButton.LeftButton,mod); QApplication.sendEvent(t,event)
     drag(t.x_for(5),t.x_for(15),Qt.KeyboardModifier.AltModifier)
     assert [(k.start,k.end) for k in w.doc.state.drawings]==[(13,18),(23,26)]
     assert t.selection_track=='drawing'

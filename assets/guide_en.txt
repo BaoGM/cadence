@@ -1,4 +1,4 @@
-Cadence 1.16.0 - Quick guide
+Cadence 1.16.1 - Quick guide
 
 These are the default shortcuts. The complete list is at the end of the guide; customize them in File > Options > Shortcuts.
 

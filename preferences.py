@@ -153,8 +153,7 @@ class ShortcutDialog(QDialog):
         restore=QPushButton(tr('Restaurer l’interface')); restore.setEnabled(hasattr(parent,'workspaces')); restore.clicked.connect(lambda:parent.workspaces.reset(True)); interface_col.addWidget(restore,0,Qt.AlignmentFlag.AlignLeft); interface_col.addStretch()
         updates=section('Mises à jour'); updates_col=QVBoxLayout(updates); general.addWidget(updates)
         self.auto_update_check=QCheckBox(tr('Vérifier automatiquement les mises à jour')); updates_col.addWidget(self.auto_update_check)
-        self.update_previews=QCheckBox(tr('Inclure les préversions')); updates_col.addWidget(self.update_previews)
-        update_note=QLabel(tr('Votre accord est demandé avant tout téléchargement et toute installation.')); update_note.setWordWrap(True); updates_col.addWidget(update_note)
+        self.update_previews=QCheckBox(tr('Proposer les versions de test')); updates_col.addWidget(self.update_previews)
         general.addStretch(); tabs.addTab(prefs,tr('Préférences')); self.cache_probe=CacheProbe(self); self.cache_probe.ready.connect(self.cache_ready); self.cache_generation=0
         QTimer.singleShot(0,self.update_cache_label)
         keys=QWidget(); self.keys_layout=QVBoxLayout(keys); tabs.addTab(keys,tr('Raccourcis'))

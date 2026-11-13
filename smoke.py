@@ -11,7 +11,9 @@ def run(directory):
     os.environ['CADENCE_CACHE']=str(output/'cache')
     os.environ['CADENCE_PREFS']=str(output/'preferences.json')
     os.environ['TEMP']=str(output); os.environ['TMP']=str(output)
-    import sys,av
+    import sys,av,ssl
+    tls_context = ssl.create_default_context()
+    assert tls_context.check_hostname and tls_context.verify_mode == ssl.CERT_REQUIRED
     from PySide6.QtWidgets import QApplication
     from PySide6.QtGui import QFontDatabase
     from PySide6.QtTest import QTest
@@ -827,3 +829,23 @@ def check_timecode_overlay(window):
         assert chosen==[(expected,label)] and overlay.locked!=expected and window.video_fullscreen
     window.toggle_fullscreen(); overlay.set_position(old); overlay.set_locked(locked); window.set_panel('timecode',shown)
     return dict(timecode_overlay=True,timecode_drag=True,timecode_fullscreen=True,timecode_viewport_anchor=True,timecode_lock=True)
+
+
+def run_updates(directory):
+    import ssl
+    import sys
+    from updates import read_json, RELEASES_URL, select_release
+    from app import VERSION
+    output = Path(directory).resolve()
+    output.mkdir(parents=True, exist_ok=True)
+    context = ssl.create_default_context()
+    assert context.check_hostname and context.verify_mode == ssl.CERT_REQUIRED
+    releases = read_json(RELEASES_URL)
+    assert isinstance(releases, list)
+    for installed in (False, True):
+        for previews in (False, True):
+            select_release(releases, VERSION, installed, previews)
+    result = dict(status='passed', frozen=bool(getattr(sys, 'frozen', False)),
+                  tls=ssl.OPENSSL_VERSION, certificate_verification=True,
+                  github_release_count=len(releases), version=VERSION)
+    (output/'result.json').write_text(json.dumps(result, indent=2), encoding='utf-8')

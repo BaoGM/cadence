@@ -1,5 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
+import ssl
+import sys
 root = Path(SPECPATH)
 
 datas = [(str(root / 'assets' / name), 'assets') for name in (
@@ -13,10 +15,22 @@ datas += [(str(root / 'integrations' / name), 'integrations') for name in (
 datas += [(str(root/'vendor'/'ffmpeg.exe'),'vendor')]
 
 
+# Some Python distributions require an additional CA file when constructing SSLContext.
+ssl_ca = Path(ssl.__file__).with_name('codex-rejected-cas.pem')
+if ssl_ca.is_file():
+    datas.append((str(ssl_ca), '.'))
+ssl_binaries = []
+if sys.platform == 'win32':
+    for name in ('libssl-3-x64.dll', 'libcrypto-3-x64.dll'):
+        library = Path(sys.base_prefix) / 'DLLs' / name
+        if not library.is_file():
+            raise FileNotFoundError(f'Python TLS dependency missing: {library}')
+        ssl_binaries.append((str(library), '.'))
+
 a = Analysis(
     [str(root / 'app.py')],
     pathex=[],
-    binaries=[(str(root/'native'/'bin'/'cadence_native.dll'),'native/bin')],
+    binaries=[(str(root/'native'/'bin'/'cadence_native.dll'),'native/bin'), *ssl_binaries],
     datas=datas,
     hiddenimports=[],
     hookspath=[],

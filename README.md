@@ -16,7 +16,7 @@ Cadence is a Windows video review and annotation application for animation. Its 
 
 ## Installation
 
-Windows 10 or 11, 64-bit. The [1.15.1 Windows preview](https://github.com/BaoGM/cadence/releases/tag/v1.15.1) includes an installer, a portable archive, corresponding sources, checksums and build provenance. It is unsigned and marked as a prerelease. SignPath Foundation acceptance is not claimed; see the [code signing policy](CODE_SIGNING_POLICY.md).
+Windows 10 or 11, 64-bit. The [1.16.1 Windows preview](https://github.com/BaoGM/cadence/releases/tag/v1.16.1) includes an installer, a portable archive, corresponding sources, checksums and build provenance. It is unsigned and marked as a prerelease. SignPath Foundation acceptance is not claimed; see the [code signing policy](CODE_SIGNING_POLICY.md).
 
 The installer requires administrator permission to install in Program Files. For the portable edition, extract the whole archive and run `Cadence.exe`; keep `_internal` and `Licences` beside it. Third-party source archives accompany full releases but are not needed to run the application.
 

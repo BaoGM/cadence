@@ -84,7 +84,11 @@ class UpdateManager(QObject):
             self.window.settings.setValue('updates/last_check', time.time())
             if result is None:
                 if self.manual:
-                    QMessageBox.information(self.window, tr('Mises à jour'), tr('Aucune nouvelle version disponible pour le canal choisi.'))
+                    message = QMessageBox(self.window)
+                    message.setWindowTitle(tr('Mises à jour'))
+                    message.setText(tr('Aucune nouvelle version disponible.'))
+                    message.setStandardButtons(QMessageBox.StandardButton.Ok)
+                    message.exec()
                 return
             self.pending = result; self.timer.start(0)
         else:

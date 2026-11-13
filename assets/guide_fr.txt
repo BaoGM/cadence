@@ -1,4 +1,4 @@
-Cadence 1.16.0 - Guide rapide
+Cadence 1.16.1 - Guide rapide
 
 Les raccourcis indiqués sont ceux par défaut. Leur liste complète figure à la fin du guide ; ils se personnalisent dans Fichier > Options > Raccourcis.
 

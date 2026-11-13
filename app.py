@@ -14,6 +14,7 @@ if __name__=='__main__' and not any(arg.startswith('--self-test') for arg in sys
     from diagnostics import initialize
     initialize()
 from ui_text import tr
+from platform_support import WINDOWS
 import logging, sys, json
 from dataclasses import replace
 from fractions import Fraction
@@ -106,7 +107,13 @@ class MainWindow(ComparisonMixin,QMainWindow):
         startup.checkpoint('language and styles')
         self.display_frame=-1; self.selection_anchor=None; self.last_pass=1; self.playback_mode='once'; self.exp_pending=0; self.rendered_token=-1; self.play_completed=False
         self.setAcceptDrops(True)
-        self.settings=QSettings('CadenceStudio','CadenceStudio'); self.video_fullscreen=False
+        import os
+        isolated=os.environ.get('CADENCE_PREFS')
+        if isolated:
+            from PySide6.QtCore import QSettings as SettingsType
+            self.settings=QSettings(str(Path(isolated).with_name('settings.ini')),SettingsType.Format.IniFormat)
+        else: self.settings=QSettings('CadenceStudio','CadenceStudio')
+        self.video_fullscreen=False
         self.setWindowIcon(QIcon(str(Path(getattr(sys,'_MEIPASS',Path(__file__).parent))/'assets'/'cadence.ico')))
         self.setWindowTitle(tr('Cadence')); self.resize(1360,890); self.setMinimumSize(640,400)
         from cache_ram import FrameCache
@@ -289,6 +296,12 @@ class MainWindow(ComparisonMixin,QMainWindow):
         organize_menus(self)
         from navigation_modes import install
         install(self)
+        if not WINDOWS:
+            unavailable={'Capturer l’écran…','Démarrer / arrêter la capture','Associer les vidéos et projets à cette version','Rechercher des mises à jour…'}
+            for key,(action,shortcut) in self.action_registry.items():
+                if key.startswith('Synchronisation 3D/') or key.split('/',1)[-1] in unavailable:
+                    action.setEnabled(False)
+                    action.setToolTip(tr('Cette fonction n’est pas encore disponible sous Linux.'))
 
     def createPopupMenu(self):
         from menu_layout import panel_menu
@@ -522,6 +535,7 @@ class MainWindow(ComparisonMixin,QMainWindow):
         if ok:
             self.pause(); self.commit_exposure(); self.doc.insert_gap(frames); self.refresh(); self.request_frame()
     def associate_files(self):
+        if not WINDOWS: return
         try:
             from association import register
             register()
@@ -643,6 +657,7 @@ class MainWindow(ComparisonMixin,QMainWindow):
         if not self.job and self.confirm_discard():
             self.install_doc(Document()); self.timeline.reset_view(); self.viewer.reset_view()
     def capture_screen(self,quick=False):
+        if not WINDOWS: return
         if self.job: return
         if getattr(self,'capture_dialog',None):
             d=self.capture_dialog

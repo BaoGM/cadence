@@ -2,7 +2,11 @@
 """Optional Windows output-loopback / microphone capture and timed MP4 muxing."""
 import subprocess, tempfile, time, wave, logging
 from pathlib import Path
-import pyaudiowpatch as pa
+from platform_support import WINDOWS
+if WINDOWS:
+    import pyaudiowpatch as pa
+else:
+    pa=None
 from media import ffmpeg
 
 class AudioTrack:
@@ -52,6 +56,7 @@ class AudioTrack:
 
 class AudioCapture:
     def __init__(self,system=False,microphone=False):
+        if not WINDOWS: raise RuntimeError('Audio capture is not available on Linux yet.')
         self.tracks=[]; self.manager=None; self.temp=tempfile.TemporaryDirectory(prefix='cadence-audio-')
         try:
             self.manager=pa.PyAudio(); host=self.manager.get_host_api_info_by_type(pa.paWASAPI)

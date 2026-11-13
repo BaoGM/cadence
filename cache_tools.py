@@ -1,18 +1,21 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Remove only Cadence-generated cache entries, preserving sources and active media."""
 from pathlib import Path
-import re,stat
+import os,re,stat
 from media import cache_root
+
+def linked(path):
+    return path.is_symlink() or (os.name=='nt' and path.stat().st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
 
 def cache_entries():
     root=cache_root().resolve()
     for folder in root.iterdir():
         if not re.fullmatch('[0-9a-f]{24}',folder.name) or not folder.is_dir(): continue
-        if folder.is_symlink() or folder.stat().st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT: continue
+        if linked(folder): continue
         if folder.resolve().parent!=root: continue
         files=list(folder.iterdir())
         allowed={'media.json','preview.avi','audio.s16','waveform-v1.npy'}
-        if any(not p.is_file() or p.is_symlink() or p.stat().st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT or (p.name not in allowed and not re.fullmatch(r'(?:waveform-v1\.npy|media\.json)\.[0-9a-f]+\.tmp',p.name)) for p in files): continue
+        if any(not p.is_file() or linked(p) or (p.name not in allowed and not re.fullmatch(r'(?:waveform-v1\.npy|media\.json)\.[0-9a-f]+\.tmp',p.name)) for p in files): continue
         yield folder,files
 
 def clear_cache(protected=()):

@@ -11,3 +11,12 @@ target_link_libraries(cadence_native PRIVATE Qt6::Core Qt6::Gui)
 set_target_properties(cadence_native PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin"
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/bin")
+if(UNIX AND NOT APPLE)
+    find_package(Threads REQUIRED)
+    target_link_libraries(cadence_native PRIVATE Threads::Threads)
+    set_target_properties(cadence_native PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
+    if(CADENCE_QT_RUNTIME_DIR)
+        set_target_properties(cadence_native PROPERTIES BUILD_RPATH "${CADENCE_QT_RUNTIME_DIR}")
+    endif()
+endif()

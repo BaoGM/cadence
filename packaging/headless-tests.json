@@ -17,5 +17,6 @@
   "tests/test_release1130.py",
   "packaging/test_release_pipeline.py",
   "tests/test_updates1160.py",
-  "tests/test_timeline1152.py"
+  "tests/test_timeline1152.py",
+  "tests/test_platform_support.py"
 ]

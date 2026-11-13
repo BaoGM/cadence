@@ -7,9 +7,13 @@ from PySide6.QtCore import qVersion
 
 
 def load_library():
-    path=Path(__file__).resolve().parent/'native'/'bin'/'cadence_native.dll'
-    qt_directory=Path(PySide6.__file__).resolve().parent
-    with os.add_dll_directory(str(qt_directory)):
+    name='cadence_native.dll' if os.name=='nt' else 'libcadence_native.so'
+    path=Path(__file__).resolve().parent/'native'/'bin'/name
+    if os.name=='nt':
+        qt_directory=Path(PySide6.__file__).resolve().parent
+        with os.add_dll_directory(str(qt_directory)):
+            library=ctypes.CDLL(str(path))
+    else:
         library=ctypes.CDLL(str(path))
     library.cadence_native_abi.argtypes=[]
     library.cadence_native_abi.restype=ctypes.c_int

@@ -5,6 +5,6 @@ av==19.0.2
 numpy==2.5.4
 pyinstaller==6.22.3
 pytest==9.1.1
-PyAudioWPatch==0.2.12.9
+PyAudioWPatch==0.2.12.9; sys_platform == 'win32'
 psutil==7.2.2
-pefile==2024.8.26
+pefile==2024.8.26; sys_platform == 'win32'

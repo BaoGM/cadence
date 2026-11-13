@@ -61,7 +61,7 @@ def run(directory):
         import shutil,wave,numpy as np
         from types import SimpleNamespace
         from capture_audio import mux_audio,pa
-        assert pa.get_portaudio_version()>0
+        if os.name=='nt': assert pa.get_portaudio_version()>0
         from clip_geometry import apply_geometry
         storage=np.zeros((350,640,3),np.uint8); capture_rgb=storage[:,:638]; capture_rgb[:,:,0]=230
         assert not capture_rgb.flags.c_contiguous
@@ -316,7 +316,7 @@ def run(directory):
             win.set_exposure(ev); assert win.exp_spin.value()==ev and doc.state.exposure==ev
             path=output/f'exposure-{ev}.cadence'; doc.save(path); assert Document.load(path).state.exposure==ev
         win.set_exposure(0)
-        result={'system_microphone_mix':True,'wasapi_bundled':True,'trimmed_panels':True,'context_workspace_mode':True,'organized_menus':True,'panel_context_menu':True,'reset_mirrors':True,'comparison_buttons':True,'compact_playback_layout':True,'clip_geometry':True,'workspace_modes':True,'text_auto_fit':True,'linked_drawings':True,'drawing_resize':True,'lasso':True,'text_move':True,'cut_paste':True,'draw_over':True,'drawing_save_export':True,'duplicate_media':True,'comparison_modes':len(MODES),'dual_preview':True,'loop_toggle':True,'status':'passed' ,'frozen':bool(getattr(sys,'frozen',False)),'import_frames':media['frames'],'export_frames':count,'undo_redo':True,'exposure_export':True,'preview_rendered':True,'ffmpeg_bundled':Path(ffmpeg()).exists()}
+        result={'system_microphone_mix':True,'wasapi_bundled':os.name=='nt','trimmed_panels':True,'context_workspace_mode':True,'organized_menus':True,'panel_context_menu':True,'reset_mirrors':True,'comparison_buttons':True,'compact_playback_layout':True,'clip_geometry':True,'workspace_modes':True,'text_auto_fit':True,'linked_drawings':True,'drawing_resize':True,'lasso':True,'text_move':True,'cut_paste':True,'draw_over':True,'drawing_save_export':True,'duplicate_media':True,'comparison_modes':len(MODES),'dual_preview':True,'loop_toggle':True,'status':'passed' ,'frozen':bool(getattr(sys,'frozen',False)),'import_frames':media['frames'],'export_frames':count,'undo_redo':True,'exposure_export':True,'preview_rendered':True,'ffmpeg_bundled':Path(ffmpeg()).exists()}
         result.update(drawing_clipboard_menu=True,drawing_clipboard_undo=True)
         result.update(comparison_cycle_shortcut=True,key_step_toggle=True)
         result.update(reference_sequence=True,reference_project_format=15,simple_media_boundaries=True)
@@ -593,7 +593,9 @@ def capture_surface(surface):
 def run_gpu(directory,renderer='opengl'):
     import sys,numpy as np
     output=Path(directory).resolve(); output.mkdir(parents=True,exist_ok=True)
-    os.environ['QT_QPA_PLATFORM']='windows'; os.environ['CADENCE_RENDERER']=renderer
+    if sys.platform=='win32': os.environ['QT_QPA_PLATFORM']='windows'
+    else: os.environ.setdefault('QT_QPA_PLATFORM','xcb')
+    os.environ['CADENCE_RENDERER']=renderer
     if renderer=='direct3d': os.environ['CADENCE_RENDER_READBACK']='1'
     os.environ['CADENCE_PREFS']=str(output/'preferences.json'); os.environ['CADENCE_CACHE']=str(output/'cache')
     from video_surface import configure_graphics
@@ -688,12 +690,21 @@ def run_gpu(directory,renderer='opengl'):
 
 
 def check_native_cursor(window):
-    import ctypes
-    from ctypes import wintypes
-    from unittest.mock import patch
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QApplication
     guard=window.viewer.cursor_guard; native=guard.native
+    if os.name!='nt':
+        assert native is None
+        previous=guard.desired
+        try:
+            guard.set_cursor(Qt.CursorShape.CrossCursor)
+            guard.boundary(True); assert window.viewer.cursor().shape()==Qt.CursorShape.ArrowCursor
+            guard.boundary(False); assert window.viewer.cursor().shape()==Qt.CursorShape.CrossCursor
+        finally: guard.set_cursor(previous)
+        return dict(qt_cursor_boundary=True,native_cursor_boundary=False)
+    import ctypes
+    from ctypes import wintypes
+    from unittest.mock import patch
     assert native is not None
     user32=native.user32
     user32.GetCursor.argtypes=[]; user32.GetCursor.restype=wintypes.HANDLE

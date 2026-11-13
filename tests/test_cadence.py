@@ -819,6 +819,7 @@ def test_compact_timeline_when_panels_hidden(prepared):
     doc=Document(); doc.append_media([m]); win.install_doc(doc)
     try:
         app.processEvents(); before=win.viewer.height(); timeline_height=win.timeline_panel.height()
+        content_height=win.timeline_panel.widget().height()
         for key in ('header','transport'): win.set_panel(key,False)
         win.resize(1600,1000); app.processEvents()
         assert win.viewer.height()>before
@@ -830,7 +831,9 @@ def test_compact_timeline_when_panels_hidden(prepared):
         assert win.timeline_scroll.isVisible() and win.timeline_scroll.geometry().bottom()<win.timeline_panel.widget().height()
         assert win.timeline_panel.height()>timeline_height
         win.timeline.reset_view(); app.processEvents(); assert win.timeline_panel.height()==timeline_height
-        win.layout_action.trigger(); app.processEvents(); assert win.timeline_panel.height()<=timeline_height+26
+        win.layout_action.trigger(); app.processEvents()
+        assert win.timeline_panel.widget().height()==content_height
+        assert win.timeline_panel.height()<=win.timeline_panel.sizeHint().height()
     finally: doc.saved_signature=doc.signature(); win.close(); app.processEvents()
 
 

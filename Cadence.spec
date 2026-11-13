@@ -3,6 +3,8 @@ from pathlib import Path
 import ssl
 import sys
 root = Path(SPECPATH)
+windows = sys.platform == 'win32'
+native_name = 'cadence_native.dll' if windows else 'libcadence_native.so'
 
 datas = [(str(root / 'assets' / name), 'assets') for name in (
     'cadence.ico', 'cadence.png', 'guide_fr.txt',
@@ -12,7 +14,9 @@ datas += [(str(root / 'integrations' / 'cadence_bridge.py'), 'integrations')]
 datas += [(str(root / 'integrations' / 'cadence_autostart.py'), 'integrations')]
 datas += [(str(root / 'integrations' / name), 'integrations') for name in (
     'cadence_drawings.py', 'cadence_drawings_blender.py', 'cadence_drawings_maya.py')]
-datas += [(str(root/'vendor'/'ffmpeg.exe'),'vendor')]
+if windows:
+    datas += [(str(root/'vendor'/'ffmpeg.exe'),'vendor')]
+media_binaries = [] if windows else [(str(root/'vendor'/'ffmpeg'),'vendor')]
 
 
 # Some Python distributions require an additional CA file when constructing SSLContext.
@@ -30,13 +34,13 @@ if sys.platform == 'win32':
 a = Analysis(
     [str(root / 'app.py')],
     pathex=[],
-    binaries=[(str(root/'native'/'bin'/'cadence_native.dll'),'native/bin'), *ssl_binaries],
+    binaries=[(str(root/'native'/'bin'/native_name),'native/bin'), *ssl_binaries, *media_binaries],
     datas=datas,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['tkinter', 'matplotlib', 'pytest', 'imageio_ffmpeg'],
+    excludes=['tkinter', 'matplotlib', 'pytest', 'imageio_ffmpeg'] + ([] if windows else ['pyaudiowpatch']),
     noarchive=False,
     optimize=0,
 )

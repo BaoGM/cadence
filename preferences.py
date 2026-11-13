@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (QDialog,QVBoxLayout,QHBoxLayout,QGridLayout,QGrou
 
 from cache_ram import default_cache_mb,maximum_cache_mb
 from shortcut_defaults import REVISION,migrate
+from platform_support import WINDOWS, config_directory
 
 MODIFIERS=['Aucun','Ctrl','Shift','Alt','Ctrl+Shift','Ctrl+Alt','Shift+Alt','Ctrl+Shift+Alt']
 
@@ -23,6 +24,7 @@ def default_renderer():
 
 def preferred_renderer(data):
     renderer=data.get('video_renderer',default_renderer())
+    if renderer=='direct3d' and not WINDOWS: return default_renderer()
     if renderer=='opengl' and data.get('video_renderer_version')!=2:
         return default_renderer()
     return renderer if renderer in ('direct3d','opengl','software') else default_renderer()
@@ -104,7 +106,7 @@ def validate(data,registry):
     return result
 
 def preference_path():
-    return Path(os.environ['CADENCE_PREFS']) if os.environ.get('CADENCE_PREFS') else Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'CadenceStudio'/'preferences.json'
+    return Path(os.environ['CADENCE_PREFS']) if os.environ.get('CADENCE_PREFS') else config_directory()/'preferences.json'
 
 def load_preferences(registry):
     try: return validate(json.loads(preference_path().read_text(encoding='utf-8')),registry)
@@ -131,7 +133,7 @@ class ShortcutDialog(QDialog):
         display=section('Affichage et lecture'); grid=QGridLayout(display); grid.setHorizontalSpacing(20); grid.setVerticalSpacing(14); grid.setColumnStretch(1,1); general.addWidget(display)
         self.language=QComboBox(); self.language.addItem(tr('Français'),'fr'); self.language.addItem(tr('English'),'en')
         self.video_renderer=QComboBox()
-        self.video_renderer.addItem(tr('Accéléré - Direct3D 11 (recommandé)'),'direct3d')
+        if WINDOWS: self.video_renderer.addItem(tr('Accéléré - Direct3D 11 (recommandé)'),'direct3d')
         self.video_renderer.addItem(tr('Accéléré - OpenGL'),'opengl'); self.video_renderer.addItem(tr('Compatible - logiciel'),'software')
         self.preview_quality=QComboBox()
         for title,value in [('Résolution native','native'),('480p','480p'),('720p','720p'),('1080p','1080p'),('4K','4k')]: self.preview_quality.addItem(tr(title),value)
@@ -154,6 +156,9 @@ class ShortcutDialog(QDialog):
         updates=section('Mises à jour'); updates_col=QVBoxLayout(updates); general.addWidget(updates)
         self.auto_update_check=QCheckBox(tr('Vérifier automatiquement les mises à jour')); updates_col.addWidget(self.auto_update_check)
         self.update_previews=QCheckBox(tr('Proposer les versions de test')); updates_col.addWidget(self.update_previews)
+        if not WINDOWS:
+            updates.setEnabled(False)
+            updates.setToolTip(tr('Cette fonction n’est pas encore disponible sous Linux.'))
         general.addStretch(); tabs.addTab(prefs,tr('Préférences')); self.cache_probe=CacheProbe(self); self.cache_probe.ready.connect(self.cache_ready); self.cache_generation=0
         QTimer.singleShot(0,self.update_cache_label)
         keys=QWidget(); self.keys_layout=QVBoxLayout(keys); tabs.addTab(keys,tr('Raccourcis'))

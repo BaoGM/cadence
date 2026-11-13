@@ -147,3 +147,5 @@ def attach_surface(viewer):
             from video_surface_d3d import D3DStartup
             viewer.graphics_startup=D3DStartup(viewer)
         else: viewer.graphics_startup=GraphicsStartup(viewer)
+    elif sys.platform.startswith('linux'):
+        viewer.graphics_startup=GraphicsStartup(viewer)

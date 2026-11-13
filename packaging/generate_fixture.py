@@ -1,15 +1,19 @@
 # SPDX-License-Identifier: GPL-3.0-only
 import argparse
 import hashlib
+import os
 from pathlib import Path
 import subprocess
 
-from fetch_ffmpeg import EXECUTABLE_SHA256
+if os.name == 'nt':
+    from fetch_ffmpeg import EXECUTABLE_SHA256
+else:
+    from fetch_ffmpeg_linux import EXECUTABLE_SHA256
 
 
 def generate(target):
     root = Path(__file__).resolve().parents[1]
-    executable = root / 'vendor/ffmpeg.exe'
+    executable = root / 'vendor' / ('ffmpeg.exe' if os.name == 'nt' else 'ffmpeg')
     with executable.open('rb') as stream:
         if hashlib.file_digest(stream, 'sha256').hexdigest() != EXECUTABLE_SHA256:
             raise ValueError('Unexpected FFmpeg binary')

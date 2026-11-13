@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox, QProgressDialog
 from ui_text import tr, language
 from dialogs import ConfirmationDialog
 from updates import check, download, verify_package, installed_copy, launch_installer, UpdateCancelled
+from platform_support import WINDOWS
 
 class UpdateManager(QObject):
     finished = Signal(object, str)
@@ -34,11 +35,13 @@ class UpdateManager(QObject):
         self.timer = QTimer(self); self.timer.setSingleShot(True); self.timer.timeout.connect(self.offer_pending)
 
     def start(self):
+        if not WINDOWS: return
         if not getattr(sys, 'frozen', False) or os.environ.get('CADENCE_DISABLE_UPDATES') == '1':
             return
         QTimer.singleShot(8000, self, lambda: self.check_now(False))
 
     def check_now(self, manual=True):
+        if not WINDOWS: return
         if self.stopped or self.busy or self.pending is not None:
             return
         if not manual:

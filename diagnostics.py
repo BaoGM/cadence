@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 import threading
 import time
+from platform_support import state_directory
 
 _ready=False
 _fault_file=None
@@ -22,7 +23,7 @@ class DiagnosticHandler(RotatingFileHandler):
 def log_directory():
     if os.environ.get('CADENCE_PREFS'): return Path(os.environ['CADENCE_PREFS']).parent/'logs'
     if os.environ.get('CADENCE_CACHE'): return Path(os.environ['CADENCE_CACHE']).parent/'logs'
-    return Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'CadenceStudio'/'logs'
+    return state_directory()/'logs'
 
 def initialize():
     global _ready,_fault_file

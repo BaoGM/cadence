@@ -5,6 +5,7 @@ native/build/
 native/bin/
 .ruff_cache/
 vendor/*.exe
+vendor/ffmpeg
 .venv/
 venv/
 build/

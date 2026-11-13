@@ -721,3 +721,5 @@ Installer la mise à jour maintenant ? => Install the update now?
 Cadence doit être fermé. Vous pourrez enregistrer votre projet avant de continuer. Windows peut demander une autorisation. => Cadence must close. You can save your project before continuing. Windows may request permission.
 Attendez la fin de la tâche en cours avant d’installer la mise à jour. => Wait for the current task to finish before installing the update.
 L’installateur n’a pas été lancé. Cadence reste ouvert. => The installer did not start. Cadence remains open.
+
+Cette fonction n’est pas encore disponible sous Linux. => This feature is not yet available on Linux.

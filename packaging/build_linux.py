@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import sys
 
@@ -66,7 +67,8 @@ def main():
         smoke[language] = sha256(result_file)
     if identity['source_sha256'] != source_identity()['source_sha256']:
         raise ValueError('Sources changed during validation')
-    record = {'status': 'passed', 'scope': 'Linux core prototype; desktop and device validation separate',
+    version = re.search(r"^VERSION\s*=\s*['\"]([^'\"]+)", (SOURCE / 'app.py').read_text(), re.M)[1]
+    record = {'status': 'passed', 'version': version, 'scope': 'Linux build; clean desktop validation separate',
               'source': identity, 'platform': platform.platform(), 'python': platform.python_version(),
               'qt': qVersion(), 'packages': {name: importlib.metadata.version(name) for name in
                   ('PySide6-Essentials', 'PySide6-Addons', 'shiboken6', 'av', 'numpy', 'pyinstaller', 'pytest')},

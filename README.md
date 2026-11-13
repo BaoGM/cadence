@@ -1,6 +1,6 @@
 # Cadence
 
-Cadence is a Windows video review and annotation application for animation. Its interface is available in French and English. The application combines Python and Qt with native C++ rendering components.
+Cadence is a video review and annotation application for animation, with a Windows version and an Ubuntu Linux beta built from the same codebase. Its interface is available in French and English. The application combines Python and Qt with native C++ rendering components.
 
 ## Features
 
@@ -19,6 +19,8 @@ Cadence is a Windows video review and annotation application for animation. Its 
 Windows 10 or 11, 64-bit. The [1.16.1 Windows preview](https://github.com/BaoGM/cadence/releases/tag/v1.16.1) includes an installer, a portable archive, corresponding sources, checksums and build provenance. It is unsigned and marked as a prerelease. SignPath Foundation acceptance is not claimed; see the [code signing policy](CODE_SIGNING_POLICY.md).
 
 The installer requires administrator permission to install in Program Files. For the portable edition, extract the whole archive and run `Cadence.exe`; keep `_internal` and `Licences` beside it. Third-party source archives accompany full releases but are not needed to run the application.
+
+The [1.17.0 Linux beta](https://github.com/BaoGM/cadence/releases/tag/v1.17.0) targets Ubuntu Desktop 24.04 x86_64. Extract the complete `Linux-x86_64.tar.gz` archive and run `./Cadence`. See [Linux installation and limitations](docs/LINUX.txt). Screen capture requires X11; Wayland capture and Blender/Maya integration are unavailable. Physical GPU acceleration and microphone input have not been validated. This prerelease does not replace the Windows download.
 
 ## Use
 

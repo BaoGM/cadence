@@ -13,11 +13,11 @@ Vous pouvez utiliser, modifier et redistribuer Cadence, y compris à des fins co
 
 Cadence est fourni sans aucune garantie, y compris de qualité marchande ou d'adéquation à un usage particulier. Le texte officiel complet de la licence est conservé sans modification, en anglais, dans COPYING.txt : https://www.gnu.org/licenses/gpl-3.0.html. Le présent document explique son application à Cadence et ne remplace pas la licence.
 
-Les composants tiers, bibliothèques et polices conservent leurs propres licences. Cette notice ne les place pas sous une autre licence. Leurs notices figurent dans le dossier Licences de la livraison Windows et, pour les polices incluses, dans assets/fonts.
+Les composants tiers, bibliothèques et polices conservent leurs propres licences. Cette notice ne les place pas sous une autre licence. Leurs notices figurent dans le dossier Licences de la livraison et, pour les polices incluses, dans assets/fonts.
 
-Les sources de Cadence sont dans Cadence-<version>-sources.zip et dans Licences/Cadence-sources.zip de la livraison Windows. Les instructions de construction figurent dans BUILD.txt et native/BUILD.txt.
+Les sources de Cadence sont dans Cadence-<version>-sources.zip et dans Licences/Cadence-sources.zip de la livraison. Les instructions de construction figurent dans BUILD.txt, docs/BUILD.md et native/BUILD.txt.
 
-Les sources, recettes de construction et modifications des bibliothèques tierces sont fournies séparément dans Cadence-<version>-third-party-sources.zip. Lors d'une redistribution en téléchargement, proposer également cette archive au même emplacement, sans coût supplémentaire. Elle n'est pas nécessaire au fonctionnement de Cadence.
+Les sources, recettes de construction et modifications des bibliothèques tierces sont fournies séparément dans Cadence-<version>-third-party-sources.zip (Windows) ou Cadence-<version>-Linux-third-party-sources-<partie>.zip (Linux). Lors d'une redistribution en téléchargement, proposer également toutes les archives correspondantes au même emplacement, sans coût supplémentaire. Elles ne sont pas nécessaires au fonctionnement de Cadence.
 
 ENGLISH
 -------
@@ -30,8 +30,8 @@ You may use, modify and redistribute Cadence, including commercially, under the 
 
 Cadence is provided without any warranty, including the implied warranties of merchantability or fitness for a particular purpose. The complete official license text is preserved verbatim in English in COPYING.txt: https://www.gnu.org/licenses/gpl-3.0.html. This document explains its application to Cadence and does not replace the license.
 
-Third-party components, libraries and fonts retain their own licenses. This notice does not relicense them. Their notices accompany the Windows distribution in Licences and, for bundled fonts, assets/fonts.
+Third-party components, libraries and fonts retain their own licenses. This notice does not relicense them. Their notices accompany the distribution in Licences and, for bundled fonts, assets/fonts.
 
-Cadence sources are provided in Cadence-<version>-sources.zip and in Licences/Cadence-sources.zip within the Windows distribution. Build instructions are in BUILD.txt and native/BUILD.txt.
+Cadence sources are provided in Cadence-<version>-sources.zip and in Licences/Cadence-sources.zip within the distribution. Build instructions are in BUILD.txt, docs/BUILD.md and native/BUILD.txt.
 
-Third-party sources, build recipes and patches are supplied separately in Cadence-<version>-third-party-sources.zip. When distributing downloads, offer this archive alongside the program at the same location, at no additional charge. It is not required to run Cadence.
+Third-party sources, build recipes and patches are supplied separately in Cadence-<version>-third-party-sources.zip (Windows) or Cadence-<version>-Linux-third-party-sources-<part>.zip (Linux). When distributing downloads, offer all corresponding archives alongside the program at the same location, at no additional charge. They are not required to run Cadence.

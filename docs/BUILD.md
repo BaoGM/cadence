@@ -47,3 +47,21 @@ Installer upgrade/removal must first be tested with the private test identifier,
 The published 1.15.1 installer was additionally verified on 2026-11-12 in a fresh Windows Sandbox (Windows build 26100), with networking disabled. Administrative silent installation used the default Program Files directory. Upgrade from 1.15.0, reinstallation, file associations, Start Menu shortcut, French/English packaged self-tests and uninstallation passed. All 1,238 installed payload files matched the portable release. Preferences, a user project and a modified user file were preserved. This test used a SYSTEM session and software rendering; interactive UAC prompts and hardware graphics were not covered by it. The Sandbox was stopped after verification.
 
 Signing is a separate, approval-gated stage and is not configured yet.
+
+## Native Linux beta
+
+Use Ubuntu 24.04 x86_64 with Python 3.12, GCC, CMake, Ninja and Qt 6.12.0 GCC x64. Install the desktop runtime packages listed in [LINUX.txt](LINUX.txt), plus `build-essential cmake ninja-build python3-venv libgl1-mesa-dev`. Qt headers and libraries must match the PySide6 runtime. Obtain the official Qt 6.12.0 `gcc_64` kit under `.deps/Qt/6.12.0/gcc_64` (the Qt installer or aqtinstall can provide it).
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python packaging/fetch_ffmpeg_linux.py
+.venv/bin/python packaging/build_linux.py --qt-root .deps/Qt/6.12.0/gcc_64 --build-dir .build-linux
+.venv/bin/python packaging/release.py --platform linux --build-dir .build-linux --dependency-root .deps/linux-release-inputs --output dist/linux
+```
+
+Linux dependency source ZIP parts from the matching release are independent archives: extract all of them into `.deps/linux-release-inputs`. `packaging/third-party-linux.lock.json` verifies every input. It includes common Qt/PyAV/FFmpeg recipes and source archives, Linux-specific sources, exact Ubuntu source packages and original notices. No Windows dependency input manifest is changed.
+
+The Linux build records package versions, source and payload hashes, native compilation, automated tests and French/English frozen executable checks. Packaging verifies these results, embeds exact Cadence sources and notices, and creates a portable tar archive with executable permissions, checksums and provenance. Internal PyInstaller links are materialized so the archive extracts without symbolic-link support. No cross-compilation is used.
+
+Release acceptance additionally requires extraction and execution of the exact portable archive on a separate Ubuntu desktop without the Cadence source checkout, development environment or Qt SDK. Test playback/editing/export, OpenGL display, file associations, HTTPS update checks and X11 capture with audio. Record the archive SHA-256 and actual desktop environment; software OpenGL in a VM does not validate a physical GPU. Linux packaging does not produce or publish a new Windows installer.

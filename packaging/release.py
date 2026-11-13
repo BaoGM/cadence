@@ -3,6 +3,7 @@ import argparse
 import json
 from pathlib import Path
 import shutil
+import sys
 import zipfile
 
 from audit_release import audit
@@ -47,7 +48,12 @@ def main():
     parser.add_argument('--dependency-root', type=Path, required=True)
     parser.add_argument('--output', type=Path, default=SOURCE / 'dist/unsigned')
     parser.add_argument('--compiler', type=Path)
+    parser.add_argument('--platform', choices=('windows','linux'), default='linux' if sys.platform=='linux' else 'windows')
     args = parser.parse_args()
+    if args.platform == 'linux':
+        from release_linux import package
+        package(args)
+        return
     directory, output = args.build_dir.resolve(), args.output.resolve()
     payload = directory / 'dist/Cadence'
     evidence, identity = validate_build(directory, payload)

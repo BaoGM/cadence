@@ -63,6 +63,7 @@ comparison_gpu.py
 diagnostics.py
 dialogs.py
 docs/BUILD.md
+docs/LINUX.txt
 docs/PUBLISHING.md
 docs/SIGNPATH_APPLICATION.md
 docs/UNINSTALL.md
@@ -116,10 +117,12 @@ packaging/generate_fixture.py
 packaging/headless-tests.json
 packaging/linux-tests.json
 packaging/release.py
+packaging/release_linux.py
 packaging/source-files.txt
 packaging/test_installer.py
 packaging/test_release_pipeline.py
 packaging/third-party.lock.json
+packaging/third-party-linux.lock.json
 packaging/toolchain.lock.json
 platform_support.py
 playback_preferences.py

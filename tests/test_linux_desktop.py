@@ -20,10 +20,50 @@ def test_linux_releases_require_platform_architecture_and_checksum(monkeypatch):
                release('1.19.0', 'Linux-aarch64.tar.gz'), release('1.18.0', 'Linux-x86_64.tar.gz', False)]
     assert updates.select_release(entries, '1.16.1', False) is None
     entries.append(release('1.17.0', 'Linux-x86_64.tar.gz'))
-    assert updates.select_release(entries, '1.16.1', True).filename == 'Cadence-1.17.0-Linux-x86_64.tar.gz'
+    assert updates.select_release(entries, '1.16.1', False).filename == 'Cadence-1.17.0-Linux-x86_64.tar.gz'
+    assert updates.select_release(entries, '1.16.1', True) is None
     entries[-1]['prerelease'] = True
     assert updates.select_release(entries, '1.16.1', False) is None
     assert updates.select_release(entries, '1.16.1', False, True).version == '1.17.0'
+    entries.append(release('1.18.0', 'Linux-amd64.deb'))
+    assert updates.select_release(entries, '1.16.1', True).filename == 'Cadence-1.18.0-Linux-amd64.deb'
+    assert updates.select_release(entries, '1.16.1', False, True).filename.endswith('Linux-x86_64.tar.gz')
+
+
+def test_installed_linux_copy_is_distinct_from_portable(monkeypatch, tmp_path):
+    monkeypatch.setattr(updates, 'update_target', lambda: 'linux-x86_64')
+    executable = tmp_path / 'Cadence'
+    assert not updates.installed_copy(executable)
+    marker = tmp_path / '.cadence-package'
+    marker.write_text('unrelated-package')
+    assert not updates.installed_copy(executable)
+    marker.write_text('cadence-player\n')
+    assert updates.installed_copy(executable)
+
+
+def test_deb_update_rechecks_integrity_without_running_windows_installer(monkeypatch, tmp_path):
+    from unittest.mock import patch
+    from PySide6.QtWidgets import QApplication, QWidget
+    import update_ui
+    app = QApplication.instance() or QApplication([])
+    window = QWidget()
+    manager = update_ui.UpdateManager(window, '1.18.0')
+    manager.installed = True
+    monkeypatch.setattr(update_ui, 'WINDOWS', False)
+    path = tmp_path / 'Cadence-1.19.0-Linux-amd64.deb'
+    path.write_bytes(b'verified package')
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    with patch('update_ui.QMessageBox.information') as info, patch('update_ui.QDesktopServices.openUrl') as opened, patch('update_ui.launch_installer') as installer:
+        manager.install_offer(path, digest)
+        info.assert_called_once()
+        assert 'sudo apt install -- ' in info.call_args.args[2]
+        opened.assert_called_once()
+        installer.assert_not_called()
+    path.write_bytes(b'modified')
+    with patch('update_ui.QMessageBox.warning') as warning, patch('update_ui.QDesktopServices.openUrl') as opened:
+        manager.install_offer(path, digest)
+        warning.assert_called_once()
+        opened.assert_not_called()
 
 
 def test_linux_archive_download_and_tamper_detection(monkeypatch, tmp_path):

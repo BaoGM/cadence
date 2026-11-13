@@ -734,3 +734,6 @@ Par défaut : dossier temporaire / Cadence => Default: temporary folder / Cadenc
 Lancez cette commande depuis la version portable de Cadence. => Run this command from the portable version of Cadence.
 Installez xdg-utils, desktop-file-utils et shared-mime-info pour enregistrer les associations. => Install xdg-utils, desktop-file-utils and shared-mime-info to register file associations.
 Impossible d’ouvrir la source sonore sélectionnée. Vérifiez les périphériques audio et le service PipeWire / PulseAudio. => Unable to open the selected audio source. Check your audio devices and the PipeWire / PulseAudio service.
+Le paquet téléchargé a été modifié. Téléchargez à nouveau la mise à jour. => The downloaded package has changed. Download the update again.
+La synchronisation Maya n’est pas encore disponible sous Linux. => Maya synchronization is not yet available on Linux.
+Paquet .deb vérifié. Enregistrez votre projet et fermez Cadence, puis installez le paquet avec votre gestionnaire de logiciels ou cette commande dans un terminal. Vos préférences sont conservées. => Verified .deb package. Save your project and close Cadence, then install the package with your software manager or this terminal command. Your preferences are preserved.

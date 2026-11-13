@@ -106,6 +106,7 @@ packaging/README.txt
 packaging/audit_release.py
 packaging/bootstrap_python.ps1
 packaging/bootstrap_windows.ps1
+packaging/build_deb.py
 packaging/build_inputs.py
 packaging/build_installer.py
 packaging/build_linux.py
@@ -121,8 +122,8 @@ packaging/release_linux.py
 packaging/source-files.txt
 packaging/test_installer.py
 packaging/test_release_pipeline.py
-packaging/third-party.lock.json
 packaging/third-party-linux.lock.json
+packaging/third-party.lock.json
 packaging/toolchain.lock.json
 platform_support.py
 playback_preferences.py
@@ -138,9 +139,11 @@ shape_gesture.py
 shortcut_defaults.py
 shortcut_edit.py
 smoke.py
+smoke_blender.py
 sync3d.py
 sync3d_dialog.py
 sync3d_setup.py
+tests/blender_fixture.py
 tests/conftest.py
 tests/test_audio1218.py
 tests/test_audio_export1112.py
@@ -206,6 +209,7 @@ tests/test_spatial_gpu182.py
 tests/test_stress141.py
 tests/test_sync1120.py
 tests/test_sync1121.py
+tests/test_sync_linux.py
 tests/test_task150.py
 tests/test_timecode_overlay.py
 tests/test_timeline102.py

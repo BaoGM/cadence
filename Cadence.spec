@@ -10,6 +10,7 @@ datas = [(str(root / 'assets' / name), 'assets') for name in (
     'cadence.ico', 'cadence.png', 'guide_fr.txt',
     'guide_en.txt', 'qtbase_fr.qm', 'ui_en.txt', 'ui_patterns.json')]
 datas += [(str(root / 'assets' / 'fonts'), 'assets/fonts')]
+datas += [(str(root / 'tests' / 'blender_fixture.py'), 'tests')]
 datas += [(str(root / 'integrations' / 'cadence_bridge.py'), 'integrations')]
 datas += [(str(root / 'integrations' / 'cadence_autostart.py'), 'integrations')]
 datas += [(str(root / 'integrations' / name), 'integrations') for name in (

@@ -26,6 +26,13 @@ def desktop_entry(executable):
             'Categories=AudioVideo;Video;\nMimeType=' + ';'.join(MIME_TYPES) + ';\n')
 
 
+def project_mime_xml():
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">\n'
+        f'<mime-type type="{PROJECT_MIME}"><comment>Cadence project</comment>'
+        '<glob pattern="*.cadence"/></mime-type>\n</mime-info>\n')
+
+
 def register():
     if not getattr(sys, 'frozen', False):
         raise RuntimeError('Lancez cette commande depuis la version portable de Cadence.')
@@ -39,10 +46,7 @@ def register():
     icon = data / 'icons/hicolor/256x256/apps/cadence.png'
     entry = desktop_entry(Path(sys.executable).resolve())
     for folder in (applications, package.parent, icon.parent): folder.mkdir(parents=True, exist_ok=True)
-    package.write_text('<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">\n'
-        f'<mime-type type="{PROJECT_MIME}"><comment>Cadence project</comment>'
-        '<glob pattern="*.cadence"/></mime-type>\n</mime-info>\n', encoding='utf-8')
+    package.write_text(project_mime_xml(), encoding='utf-8')
     source = Path(getattr(sys, '_MEIPASS', Path(__file__).parent)) / 'assets/cadence.png'
     shutil.copyfile(source, icon)
     (applications / DESKTOP_ID).write_text(entry, encoding='utf-8')

@@ -4,6 +4,17 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
     QComboBox, QCheckBox, QLabel, QPushButton, QDialogButtonBox, QGroupBox, QWidget)
 from widgets import ScrubSpinBox
 from ui_text import tr
+from platform_support import WINDOWS
+
+
+def add_hosts(choices):
+    choices.addItem(tr('Choisir un logiciel…'), None)
+    choices.addItem('Blender', 'blender')
+    choices.addItem('Maya', 'maya')
+    if not WINDOWS:
+        item = choices.model().item(choices.findData('maya'))
+        item.setEnabled(False)
+        item.setToolTip(tr('La synchronisation Maya n’est pas encore disponible sous Linux.'))
 
 
 class SyncDialog(QDialog):
@@ -20,9 +31,7 @@ class SyncDialog(QDialog):
         form = QFormLayout()
         form.setHorizontalSpacing(20)
         self.host = QComboBox()
-        self.host.addItem(tr('Choisir un logiciel…'), None)
-        for text, value in (('Blender', 'blender'), ('Maya', 'maya')):
-            self.host.addItem(text, value)
+        add_hosts(self.host)
         self.direction = QComboBox()
         for text, value in (('Dans les deux sens', 'both'), ('Logiciel 3D vers Cadence', 'receive'), ('Cadence vers logiciel 3D', 'send')):
             self.direction.addItem(tr(text), value)
@@ -129,9 +138,7 @@ def choose_host(parent):
     label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     layout.addWidget(label)
     choices = QComboBox()
-    choices.addItem(tr('Choisir un logiciel…'), None)
-    choices.addItem('Blender', 'blender')
-    choices.addItem('Maya', 'maya')
+    add_hosts(choices)
     layout.addWidget(choices)
     buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
     buttons.setCenterButtons(True)

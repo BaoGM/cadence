@@ -2,9 +2,11 @@
 import os
 from pathlib import Path
 import re
+import shutil
 import sys
 
 from integrations.cadence_bridge import endpoint_path
+from platform_support import WINDOWS
 from ui_text import tr
 
 
@@ -22,6 +24,21 @@ def blender_script_folders():
     override = os.environ.get('BLENDER_USER_SCRIPTS')
     if override:
         return [Path(override)]
+    if not WINDOWS:
+        config = os.environ.get('XDG_CONFIG_HOME')
+        root = (Path(config) if config and Path(config).is_absolute() else Path.home() / '.config') / 'blender'
+        versions = {p.name for p in root.glob('*') if p.is_dir() and re.fullmatch(r'[4-9]\d*\.\d+', p.name)}
+        executable = shutil.which('blender')
+        installs = {Path(executable).resolve().parent} if executable else set()
+        import psutil
+        for process in psutil.process_iter(['name', 'exe']):
+            if (process.info['name'] or '').lower() == 'blender' and process.info['exe']:
+                installs.add(Path(process.info['exe']).resolve().parent)
+        for folder in installs:
+            versions.update(p.name for p in folder.glob('*') if p.is_dir() and re.fullmatch(r'[4-9]\d*\.\d+', p.name))
+        if not versions:
+            raise OSError(tr('Installation de Blender introuvable. Lancez Blender une fois, puis réessayez.'))
+        return [root / version / 'scripts' for version in sorted(versions)]
     root = Path(os.environ.get('APPDATA', Path.home())) / 'Blender Foundation' / 'Blender'
     versions = {p.name for p in root.glob('*') if p.is_dir() and re.fullmatch(r'[4-9]\d*\.\d+', p.name)}
     installs = set((Path(os.environ.get('ProgramFiles', 'C:/Program Files')) / 'Blender Foundation').glob('Blender*'))
@@ -39,6 +56,8 @@ def blender_script_folders():
 def install_connector(host):
     if host not in ('blender', 'maya'):
         raise ValueError('Unsupported 3D application')
+    if host == 'maya' and not WINDOWS:
+        raise OSError(tr('La synchronisation Maya n’est pas encore disponible sous Linux.'))
     source = Path(getattr(sys, '_MEIPASS', Path(__file__).parent)) / 'integrations'
     runtime = endpoint_path().parent / 'integrations'
     for name in ('cadence_bridge.py', 'cadence_autostart.py', 'cadence_drawings.py',

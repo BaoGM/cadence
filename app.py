@@ -34,7 +34,7 @@ from comparison import ComparisonMixin
 from draw_ui import DrawController
 from PySide6.QtWidgets import QGridLayout
 
-VERSION='1.17.0'
+VERSION='1.18.0'
 STYLE='''
 QMainWindow, QWidget { background:#11161d; color:#dce4ee; font-family:"Segoe UI"; font-size:13px; }
 QMenuBar { background:#11161d; color:#91a1b5; padding:3px; }
@@ -296,11 +296,6 @@ class MainWindow(ComparisonMixin,QMainWindow):
         organize_menus(self)
         from navigation_modes import install
         install(self)
-        if not WINDOWS:
-            for key,(action,shortcut) in self.action_registry.items():
-                if key.startswith('Synchronisation 3D/'):
-                    action.setEnabled(False)
-                    action.setToolTip(tr('Cette fonction n’est pas encore disponible sous Linux.'))
 
     def createPopupMenu(self):
         from menu_layout import panel_menu
@@ -1026,11 +1021,13 @@ def main():
     code=app.exec(); sys.exit(code)
 
 if __name__=='__main__':
-    if len(sys.argv)>2 and sys.argv[1] in ('--self-test','--self-test-gpu','--self-test-d3d','--self-test-updates'):
+    if len(sys.argv)>2 and sys.argv[1] in ('--self-test','--self-test-gpu','--self-test-d3d','--self-test-updates','--self-test-blender'):
         from smoke import run,run_gpu,run_updates
         if sys.argv[1]=='--self-test-updates': run=run_updates
         elif sys.argv[1]=='--self-test-gpu': run=run_gpu
         elif sys.argv[1]=='--self-test-d3d': run=lambda directory:run_gpu(directory,'direct3d')
+        elif sys.argv[1]=='--self-test-blender':
+            from smoke_blender import run
         try: run(sys.argv[2])
         except Exception:
             import traceback

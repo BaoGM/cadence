@@ -20,7 +20,7 @@ Windows 10 or 11, 64-bit. The [1.16.1 Windows preview](https://github.com/BaoGM/
 
 The installer requires administrator permission to install in Program Files. For the portable edition, extract the whole archive and run `Cadence.exe`; keep `_internal` and `Licences` beside it. Third-party source archives accompany full releases but are not needed to run the application.
 
-The [1.17.0 Linux beta](https://github.com/BaoGM/cadence/releases/tag/v1.17.0) targets Ubuntu Desktop 24.04 x86_64. Extract the complete `Linux-x86_64.tar.gz` archive and run `./Cadence`. See [Linux installation and limitations](docs/LINUX.txt). Screen capture requires X11; Wayland capture and Blender/Maya integration are unavailable. Physical GPU acceleration and microphone input have not been validated. This prerelease does not replace the Windows download.
+The Linux beta targets Ubuntu Desktop 24.04 x86_64. Version 1.18.0 adds a `.deb` installer alongside the portable `Linux-x86_64.tar.gz` archive, and Blender synchronization. See [Linux installation and limitations](docs/LINUX.txt). Screen capture requires X11; Wayland capture and Maya integration are unavailable. Physical GPU acceleration and microphone input have not been validated. This prerelease does not replace the stable Windows download.
 
 ## Use
 

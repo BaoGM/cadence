@@ -22,7 +22,7 @@ class UpdateManager(QObject):
         super().__init__(window)
         self.window = window
         self.version = version
-        self.installed = WINDOWS and bool(getattr(sys, 'frozen', False)) and installed_copy(sys.executable)
+        self.installed = bool(getattr(sys, 'frozen', False)) and installed_copy(sys.executable)
         self.busy = False
         self.manual = False
         self.phase = ''
@@ -120,6 +120,18 @@ class UpdateManager(QObject):
         self.run(lambda: download(release, root, self.cancel, self.progress.emit))
 
     def install_offer(self, path, digest):
+        if self.installed and not WINDOWS:
+            try:
+                verify_package(path, digest)
+            except (OSError, ValueError):
+                logging.exception('Linux update package verification failed')
+                QMessageBox.warning(self.window, tr('Mises à jour'), tr('Le paquet téléchargé a été modifié. Téléchargez à nouveau la mise à jour.'))
+                return
+            import shlex
+            message = tr('Paquet .deb vérifié. Enregistrez votre projet et fermez Cadence, puis installez le paquet avec votre gestionnaire de logiciels ou cette commande dans un terminal. Vos préférences sont conservées.')
+            QMessageBox.information(self.window, tr('Mises à jour'), message + '\n\nsudo apt install -- ' + shlex.quote(str(path)))
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.parent)))
+            return
         if not self.installed:
             message = tr('Archive portable vérifiée. Extrayez-la dans un nouveau dossier, puis lancez Cadence.exe. Vos préférences sont conservées.') if WINDOWS else tr('Archive Linux vérifiée. Extrayez-la dans un nouveau dossier, puis lancez Cadence. Vos préférences sont conservées. Associez à nouveau les fichiers depuis la nouvelle version si nécessaire.')
             QMessageBox.information(self.window, tr('Mises à jour'), message)

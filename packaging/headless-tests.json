@@ -9,6 +9,7 @@
   "tests/test_audio_export1112.py",
   "tests/test_sync1120.py",
   "tests/test_sync1121.py",
+  "tests/test_sync_linux.py",
   "tests/test_drawing_transfer1140.py",
   "tests/test_transfer1141.py",
   "tests/test_transfer1150.py",

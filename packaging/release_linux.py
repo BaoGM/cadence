@@ -7,6 +7,7 @@ import tarfile
 
 from build_inputs import SOURCE, sha256, verify_tree
 from fetch_ffmpeg_linux import EXECUTABLE_SHA256
+from build_deb import build as build_deb
 from release import archive, validate_build
 
 
@@ -69,7 +70,8 @@ def package(args):
         for entry in target:
             if not entry.isfile() or not entry.name.startswith('Cadence/') or '..' in Path(entry.name).parts:
                 raise ValueError('Unsafe Linux archive entry')
-    artifacts={path.name:sha256(path) for path in [sources,*third,portable]}
+    deb = build_deb(version, stage, output, directory / 'deb-root')
+    artifacts={path.name:sha256(path) for path in [sources,*third,portable,deb]}
     provenance={'version':version,'platform':'linux-x86_64','status':'prerelease',
         'source':identity,'build_verification_sha256':sha256(directory/'verification.json'),
         'dependency_manifest_sha256':sha256(lock_path),'artifacts':artifacts,

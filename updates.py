@@ -91,7 +91,8 @@ def select_release(releases, current, installed, previews=False, target=None):
                 continue
         except (ValueError, AttributeError):
             continue
-        suffix = ('Setup.exe' if installed else 'Windows.zip') if target == 'windows' else 'Linux-x86_64.tar.gz'
+        suffix = (('Setup.exe' if installed else 'Windows.zip') if target == 'windows'
+                  else ('Linux-amd64.deb' if installed else 'Linux-x86_64.tar.gz'))
         filename = f'Cadence-{version}-' + suffix
         assets = {a.get('name'): a for a in item.get('assets', []) if isinstance(a, dict) and a.get('state') == 'uploaded'}
         asset = assets.get(filename)
@@ -164,7 +165,11 @@ def verify_package(path, digest):
             raise ValueError('Downloaded package changed after verification')
 
 def installed_copy(executable):
-    return (Path(executable).resolve().parent / 'uninstall' / 'unins000.exe').is_file()
+    directory = Path(executable).resolve().parent
+    if update_target() == 'linux-x86_64':
+        marker = directory / '.cadence-package'
+        return marker.is_file() and marker.read_text(encoding='utf-8').strip() == 'cadence-player'
+    return (directory / 'uninstall' / 'unins000.exe').is_file()
 
 def launch_installer(path, directory):
     import ctypes

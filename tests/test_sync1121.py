@@ -84,7 +84,8 @@ def test_host_choice_is_required_and_not_persisted(application, isolated, monkey
     link.stop(); window.deleteLater()
 
 
-def test_host_dialog_no_default_and_cancel(application):
+def test_host_dialog_no_default_and_cancel(application, monkeypatch):
+    monkeypatch.setattr('sync3d_dialog.WINDOWS', True)
     from sync3d_dialog import choose_host
     def choose():
         dialog = application.activeModalWidget()
@@ -97,7 +98,8 @@ def test_host_dialog_no_default_and_cancel(application):
     assert choose_host(None) is None
 
 
-def test_setup_idempotent_and_existing_startup_preserved(application, isolated):
+def test_setup_idempotent_and_existing_startup_preserved(application, isolated, monkeypatch):
+    monkeypatch.setattr('sync3d_setup.WINDOWS', True)
     startup = isolated / 'maya/scripts/userSetup.py'
     startup.parent.mkdir(parents=True); startup.write_text('my_existing_setup = True\n')
     assert install_connector('maya')

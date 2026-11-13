@@ -1,7 +1,16 @@
-Cadence 1.17.0 — Linux beta / bêta Linux
+Cadence 1.18.0 — Linux beta / bêta Linux
 
 FRANÇAIS
 Ubuntu Desktop 24.04, processeur x86_64 (Intel/AMD 64 bits).
+Installation classique : ouvrir un terminal dans le dossier du téléchargement :
+sudo apt install ./Cadence-1.18.0-Linux-amd64.deb
+Lancer ensuite Cadence depuis le menu des applications, ou avec cadence-player.
+Le paquet installe les dépendances et l'application dans /opt/cadence.
+La même commande permet la mise à niveau avec un nouveau paquet.
+Pour désinstaller : sudo apt remove cadence-player
+Les préférences et projets personnels sont conservés, y compris après une purge.
+
+Version portable :
 Extraire toute l'archive dans un dossier personnel, puis lancer le fichier Cadence.
 Dans un terminal : ./Cadence
 Ne pas lancer Cadence avec sudo. Conserver le dossier _internal à côté du programme.
@@ -17,15 +26,20 @@ Fichier > Associer enregistre Cadence dans « Ouvrir avec » ; le choix par déf
 reste dans les propriétés des fichiers d'Ubuntu. En cas de déplacement du dossier
 ou de mise à jour, refaire l'association depuis le nouvel emplacement.
 
-Limites de cette bêta : capture Wayland et intégration 3D indisponibles.
+Blender : Synchronisation 3D > choisir Blender > activer la synchronisation.
+Au premier usage, redémarrer Blender après l'installation du connecteur.
+Synchronisation dans les deux sens, décalage, conversion de cadence, dessins
+Grease Pencil et images transparentes avec pelures d'oignon. Validé avec Blender 5.3.
+Limites de cette bêta : capture Wayland et synchronisation Maya indisponibles.
 Le rendu utilise OpenGL avec repli logiciel. Le décodage matériel Linux et les
 performances sur une carte graphique physique ne sont pas encore validés.
 Les tests audio ont utilisé une sortie virtuelle ; le microphone physique reste à vérifier.
 Les autres distributions, ARM64 et Ubuntu antérieures à 24.04 ne sont pas validées.
 
 Mises à jour : Aide > Rechercher des mises à jour. Activer les versions de test
-dans les préférences pour recevoir les préversions Linux. L'archive téléchargée
-est vérifiée puis extraite manuellement dans un nouveau dossier. Les préférences
+dans les préférences pour recevoir les préversions Linux. L'installation classique
+reçoit un paquet .deb vérifié à installer avec la commande affichée. La version
+portable reçoit une archive vérifiée à extraire dans un nouveau dossier. Les préférences
 restent dans ~/.config/CadenceStudio (ou XDG_CONFIG_HOME).
 
 Code Cadence : GPL-3.0-only. Sources exactes dans Licences/Cadence-sources.zip.
@@ -33,17 +47,28 @@ Les licences et sources tierces conservent leurs conditions propres ; voir
 Licences/NOTICE.txt et Licences/THIRD-PARTY-SOURCES.txt.
 
 ENGLISH
-Target: Ubuntu Desktop 24.04, x86_64. Extract the complete archive into a user
+Target: Ubuntu Desktop 24.04, x86_64. Install the Debian package from its folder:
+sudo apt install ./Cadence-1.18.0-Linux-amd64.deb
+Launch Cadence from the applications menu or run cadence-player. Use the same
+command to upgrade. Remove with sudo apt remove cadence-player. Removal and purge
+preserve your personal preferences and projects. Application files are in /opt/cadence.
+
+Portable version: extract the complete archive into a user
 directory and run ./Cadence. Keep _internal next to the executable; do not use sudo.
 Runtime packages: libxcb-cursor0, xdg-utils, desktop-file-utils, shared-mime-info;
 audio recording also needs PipeWire/PulseAudio and pulseaudio-utils.
 Screen recording requires an X11 session (Ubuntu on Xorg). Ctrl+Shift+F8 starts/stops.
 File > Associate registers Open With support; choose defaults in Ubuntu file properties.
 Register again after moving or replacing the application directory.
-Wayland recording, 3D integration, hardware video decoding, physical GPU performance,
+Blender: select Blender under 3D synchronization and enable it. Restart Blender
+after the first connector installation. Bidirectional sync, offsets, frame-rate
+conversion, Grease Pencil and transparent-image drawings with onion skins have
+been validated with Blender 5.3.
+Wayland recording, Maya integration, hardware video decoding, physical GPU performance,
 physical microphone input and other distributions/architectures are not validated.
-Enable test versions in preferences to receive Linux previews. Updates download a
-verified archive to extract into a new directory; your preferences are retained.
+Enable test versions in preferences to receive Linux previews. Installed copies
+download a verified .deb package with installation instructions; portable copies
+download a verified archive to extract into a new directory. Preferences are retained.
 Cadence is GPL-3.0-only. Exact sources and license notices are under Licences.
 The separately published third-party source archives are listed in
 Licences/THIRD-PARTY-SOURCES.txt; extract all ZIP parts into the same directory.

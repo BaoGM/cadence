@@ -12,7 +12,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox, QProgressDialog
 from ui_text import tr, language
 from dialogs import ConfirmationDialog
 from updates import check, download, verify_package, installed_copy, launch_installer, UpdateCancelled
-from platform_support import WINDOWS
+from platform_support import WINDOWS, cache_directory
 
 class UpdateManager(QObject):
     finished = Signal(object, str)
@@ -22,7 +22,7 @@ class UpdateManager(QObject):
         super().__init__(window)
         self.window = window
         self.version = version
-        self.installed = bool(getattr(sys, 'frozen', False)) and installed_copy(sys.executable)
+        self.installed = WINDOWS and bool(getattr(sys, 'frozen', False)) and installed_copy(sys.executable)
         self.busy = False
         self.manual = False
         self.phase = ''
@@ -35,13 +35,11 @@ class UpdateManager(QObject):
         self.timer = QTimer(self); self.timer.setSingleShot(True); self.timer.timeout.connect(self.offer_pending)
 
     def start(self):
-        if not WINDOWS: return
         if not getattr(sys, 'frozen', False) or os.environ.get('CADENCE_DISABLE_UPDATES') == '1':
             return
         QTimer.singleShot(8000, self, lambda: self.check_now(False))
 
     def check_now(self, manual=True):
-        if not WINDOWS: return
         if self.stopped or self.busy or self.pending is not None:
             return
         if not manual:
@@ -89,7 +87,7 @@ class UpdateManager(QObject):
                 if self.manual:
                     message = QMessageBox(self.window)
                     message.setWindowTitle(tr('Mises à jour'))
-                    message.setText(tr('Aucune nouvelle version disponible.'))
+                    message.setText(tr('Aucune nouvelle version disponible.') if WINDOWS else tr('Aucune nouvelle version Linux compatible n’est publiée pour ce canal.'))
                     message.setStandardButtons(QMessageBox.StandardButton.Ok)
                     message.exec()
                 return
@@ -115,7 +113,7 @@ class UpdateManager(QObject):
         if box.exec() != 1:
             return
         self.phase = 'download'
-        root = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'CadenceStudio' / 'updates'
+        root = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'CadenceStudio' / 'updates' if WINDOWS else cache_directory() / 'updates'
         self.dialog = QProgressDialog(tr('Téléchargement de la mise à jour…'), tr('Annuler'), 0, 100, self.window)
         self.dialog.setWindowTitle(tr('Mises à jour')); self.dialog.setAutoClose(False); self.dialog.setMinimumDuration(0)
         self.dialog.setWindowModality(Qt.WindowModality.NonModal); self.dialog.canceled.connect(self.cancel.set); self.dialog.show()
@@ -123,7 +121,8 @@ class UpdateManager(QObject):
 
     def install_offer(self, path, digest):
         if not self.installed:
-            QMessageBox.information(self.window, tr('Mises à jour'), tr('Archive portable vérifiée. Extrayez-la dans un nouveau dossier, puis lancez Cadence.exe. Vos préférences sont conservées.'))
+            message = tr('Archive portable vérifiée. Extrayez-la dans un nouveau dossier, puis lancez Cadence.exe. Vos préférences sont conservées.') if WINDOWS else tr('Archive Linux vérifiée. Extrayez-la dans un nouveau dossier, puis lancez Cadence. Vos préférences sont conservées. Associez à nouveau les fichiers depuis la nouvelle version si nécessaire.')
+            QMessageBox.information(self.window, tr('Mises à jour'), message)
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.parent)))
             return
         box = ConfirmationDialog(self.window, tr('Mises à jour'), tr('Installer la mise à jour maintenant ?'), tr('Cadence doit être fermé. Vous pourrez enregistrer votre projet avant de continuer. Windows peut demander une autorisation.'))

@@ -11,6 +11,11 @@ import updates
 DATA = b'cadence-package-test'
 DIGEST = hashlib.sha256(DATA).hexdigest()
 
+@pytest.fixture(autouse=True)
+def windows_update_contract(monkeypatch):
+    monkeypatch.setattr(updates,'update_target',lambda:'windows')
+    monkeypatch.setattr('update_ui.WINDOWS',True)
+
 def release(version='1.17.0', prerelease=False, installed=True):
     filename=f'Cadence-{version}-'+('Setup.exe' if installed else 'Windows.zip')
     return dict(tag_name='v'+version,prerelease=prerelease,draft=False,assets=[

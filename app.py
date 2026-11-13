@@ -6,7 +6,7 @@ import sys
 if __name__=='__main__' and '--register-associations' in sys.argv:
     from association import register
     register()
-    if '--no-settings' not in sys.argv:
+    if '--no-settings' not in sys.argv and sys.platform=='win32':
         import os
         os.startfile('ms-settings:defaultapps')
     raise SystemExit(0)
@@ -297,9 +297,8 @@ class MainWindow(ComparisonMixin,QMainWindow):
         from navigation_modes import install
         install(self)
         if not WINDOWS:
-            unavailable={'Capturer l’écran…','Démarrer / arrêter la capture','Associer les vidéos et projets à cette version','Rechercher des mises à jour…'}
             for key,(action,shortcut) in self.action_registry.items():
-                if key.startswith('Synchronisation 3D/') or key.split('/',1)[-1] in unavailable:
+                if key.startswith('Synchronisation 3D/'):
                     action.setEnabled(False)
                     action.setToolTip(tr('Cette fonction n’est pas encore disponible sous Linux.'))
 
@@ -535,10 +534,12 @@ class MainWindow(ComparisonMixin,QMainWindow):
         if ok:
             self.pause(); self.commit_exposure(); self.doc.insert_gap(frames); self.refresh(); self.request_frame()
     def associate_files(self):
-        if not WINDOWS: return
         try:
             from association import register
             register()
+            if not WINDOWS:
+                QMessageBox.information(self,tr('Associations de fichiers'),tr('Cadence est disponible dans « Ouvrir avec » pour les médias et les projets. Dans Fichiers, ouvrez les propriétés d’un fichier, puis choisissez Cadence comme application par défaut.'))
+                return
             self.notify('Association enregistrée pour cet utilisateur Windows.')
             QMessageBox.information(self,tr('Associations Windows'),tr('Cette version est enregistrée pour les vidéos et les projets Cadence. Choisissez Cadence dans les applications par défaut de Windows.'))
             QDesktopServices.openUrl(QUrl('ms-settings:defaultapps'))
@@ -657,7 +658,11 @@ class MainWindow(ComparisonMixin,QMainWindow):
         if not self.job and self.confirm_discard():
             self.install_doc(Document()); self.timeline.reset_view(); self.viewer.reset_view()
     def capture_screen(self,quick=False):
-        if not WINDOWS: return
+        if not WINDOWS:
+            from capture_x11 import available
+            if not available():
+                self.error(tr('La capture nécessite une session X11. La capture Wayland n’est pas encore disponible.'))
+                return
         if self.job: return
         if getattr(self,'capture_dialog',None):
             d=self.capture_dialog

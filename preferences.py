@@ -156,9 +156,6 @@ class ShortcutDialog(QDialog):
         updates=section('Mises à jour'); updates_col=QVBoxLayout(updates); general.addWidget(updates)
         self.auto_update_check=QCheckBox(tr('Vérifier automatiquement les mises à jour')); updates_col.addWidget(self.auto_update_check)
         self.update_previews=QCheckBox(tr('Proposer les versions de test')); updates_col.addWidget(self.update_previews)
-        if not WINDOWS:
-            updates.setEnabled(False)
-            updates.setToolTip(tr('Cette fonction n’est pas encore disponible sous Linux.'))
         general.addStretch(); tabs.addTab(prefs,tr('Préférences')); self.cache_probe=CacheProbe(self); self.cache_probe.ready.connect(self.cache_ready); self.cache_generation=0
         QTimer.singleShot(0,self.update_cache_label)
         keys=QWidget(); self.keys_layout=QVBoxLayout(keys); tabs.addTab(keys,tr('Raccourcis'))

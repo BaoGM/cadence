@@ -4,6 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import platform
+import sys
 import tempfile
 import time
 from urllib.parse import urlparse
@@ -67,9 +69,17 @@ class Release:
     def url(self):
         return self.base + self.filename
 
-def select_release(releases, current, installed, previews=False):
+def update_target():
+    if sys.platform == 'win32': return 'windows'
+    if sys.platform == 'linux' and platform.machine().lower() in ('x86_64', 'amd64'): return 'linux-x86_64'
+    return None
+
+
+def select_release(releases, current, installed, previews=False, target=None):
     if not isinstance(releases, list):
         raise ValueError('Invalid release list')
+    target = target or update_target()
+    if target not in ('windows', 'linux-x86_64'): return None
     candidates = []
     for item in releases:
         if not isinstance(item, dict) or item.get('draft') or (item.get('prerelease') and not previews):
@@ -81,7 +91,8 @@ def select_release(releases, current, installed, previews=False):
                 continue
         except (ValueError, AttributeError):
             continue
-        filename = f'Cadence-{version}-' + ('Setup.exe' if installed else 'Windows.zip')
+        suffix = ('Setup.exe' if installed else 'Windows.zip') if target == 'windows' else 'Linux-x86_64.tar.gz'
+        filename = f'Cadence-{version}-' + suffix
         assets = {a.get('name'): a for a in item.get('assets', []) if isinstance(a, dict) and a.get('state') == 'uploaded'}
         asset = assets.get(filename)
         if not asset or f'Cadence-{version}-sha256.json' not in assets:

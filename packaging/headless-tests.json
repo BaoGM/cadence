@@ -18,5 +18,8 @@
   "packaging/test_release_pipeline.py",
   "tests/test_updates1160.py",
   "tests/test_timeline1152.py",
-  "tests/test_platform_support.py"
+  "tests/test_platform_support.py",
+  "tests/test_linux_desktop.py",
+  "tests/test_capture126.py",
+  "tests/test_capture0151.py"
 ]

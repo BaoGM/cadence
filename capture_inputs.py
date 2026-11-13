@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 import ctypes
+import os
 from ctypes import wintypes
 import time
 
@@ -75,7 +76,11 @@ class CaptureInputs(QWidget):
         self.stop()
         self.keyboard, self.clicks = keyboard, clicks
         if not keyboard and not clicks: return
-        if self.reader is None: self.reader = WindowsInputs()
+        if self.reader is None:
+            if os.name=='nt': self.reader = WindowsInputs()
+            else:
+                from capture_x11 import Inputs
+                self.reader = Inputs()
         area = screen.geometry() if region is None else region.translated(screen.geometry().topLeft())
         self.setGeometry(area)
         self.previous = self.reader.pressed(keyboard)
@@ -98,6 +103,8 @@ class CaptureInputs(QWidget):
 
     def stop(self):
         self.timer.stop()
+        if os.name!='nt' and self.reader is not None and hasattr(self.reader,'close'):
+            self.reader.close(); self.reader=None
         self.hide()
         self.previous.clear()
         self.caption = ''

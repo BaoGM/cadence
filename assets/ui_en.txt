@@ -723,3 +723,14 @@ Attendez la fin de la tâche en cours avant d’installer la mise à jour. => Wa
 L’installateur n’a pas été lancé. Cadence reste ouvert. => The installer did not start. Cadence remains open.
 
 Cette fonction n’est pas encore disponible sous Linux. => This feature is not yet available on Linux.
+
+Aucune nouvelle version Linux compatible n’est publiée pour ce canal. => No new compatible Linux version is published for this channel.
+Archive Linux vérifiée. Extrayez-la dans un nouveau dossier, puis lancez Cadence. Vos préférences sont conservées. Associez à nouveau les fichiers depuis la nouvelle version si nécessaire. => Linux archive verified. Extract it into a new folder, then launch Cadence. Your preferences are preserved. Register file associations again from the new version if needed.
+Associations de fichiers => File associations
+Cadence est disponible dans « Ouvrir avec » pour les médias et les projets. Dans Fichiers, ouvrez les propriétés d’un fichier, puis choisissez Cadence comme application par défaut. => Cadence is available in Open With for media and projects. In Files, open a file’s properties and choose Cadence as the default application.
+La capture nécessite une session X11. La capture Wayland n’est pas encore disponible. => Capture requires an X11 session. Wayland capture is not yet available.
+Par défaut : dossier temporaire / Cadence => Default: temporary folder / Cadence
+Écran X11 indisponible. => X11 display unavailable.
+Lancez cette commande depuis la version portable de Cadence. => Run this command from the portable version of Cadence.
+Installez xdg-utils, desktop-file-utils et shared-mime-info pour enregistrer les associations. => Install xdg-utils, desktop-file-utils and shared-mime-info to register file associations.
+Impossible d’ouvrir la source sonore sélectionnée. Vérifiez les périphériques audio et le service PipeWire / PulseAudio. => Unable to open the selected audio source. Check your audio devices and the PipeWire / PulseAudio service.

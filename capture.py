@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Windows screen capture with explicit start, global stop and automatic import."""
 from ui_text import tr
 import ctypes, os, subprocess, tempfile, time, uuid, json, threading,math,re,logging
 from ctypes import wintypes
@@ -35,6 +34,9 @@ def native_monitors():
 
 def physical_region(screen,region,monitors=None):
     g=screen.geometry()
+    if monitors is None and os.name!='nt':
+        from capture_x11 import monitors as x11_monitors
+        monitors=x11_monitors()
     if monitors is None and os.name=='nt':
         _,(x,y,w,h)=monitor_info(int(screen.nativeInterface().handle()))
     else:
@@ -54,6 +56,12 @@ def capture_args(rect,fps,cursor,path):
         '-video_size',f'{w}x{h}','-i','desktop','-an',
         '-vf','pad=ceil(iw/2)*2:ceil(ih/2)*2','-c:v','libx264','-preset','ultrafast',
         '-crf','20','-pix_fmt','yuv420p','-movflags','+faststart',str(path)]
+    if os.name!='nt':
+        display=os.environ.get('DISPLAY')
+        if not display or x<0 or y<0: raise ValueError('Écran X11 indisponible.')
+        args[args.index('gdigrab')]='x11grab'
+        args[args.index('-offset_x')]='-grab_x'; args[args.index('-offset_y')]='-grab_y'
+        args[args.index('desktop')]=display
     if Path(path).suffix.lower()=='.gif':
         args=args[:args.index('-vf')]+['-filter_complex','split[a][b];[a]palettegen=stats_mode=single[p];[b][p]paletteuse=new=1:dither=bayer','-loop','0',str(path)]
     return args
@@ -82,13 +90,21 @@ class StopHotkey(QAbstractNativeEventFilter):
     ID=0xCA12
     def __init__(self,stop):
         super().__init__(); self.stop=stop; self.registered=False
+        self.linux=None
     def register(self):
         if self.registered: return True
+        if os.name!='nt':
+            from capture_x11 import Hotkey
+            self.linux=self.linux or Hotkey(self.stop)
+            self.registered=self.linux.register()
+            return self.registered
         if os.name=='nt':
             self.registered=bool(ctypes.windll.user32.RegisterHotKey(None,self.ID,0x4000|0x2|0x4,0x77)) # Ctrl+Shift+F8
         if self.registered: QApplication.instance().installNativeEventFilter(self)
         return self.registered
     def close(self):
+        if self.linux:
+            self.linux.close(); self.registered=False; return
         if self.registered:
             ctypes.windll.user32.UnregisterHotKey(None,self.ID)
             QApplication.instance().removeNativeEventFilter(self); self.registered=False
@@ -135,7 +151,7 @@ class CaptureDialog(QDialog):
         row.addWidget(self.system_audio); row.addWidget(self.microphone); row.addStretch(); root.addLayout(row)
         self.audio_note=QLabel(tr('Le format GIF ne contient pas de son.')); root.addWidget(self.audio_note)
         self.format.currentTextChanged.connect(self.update_audio_options)
-        row=QHBoxLayout(); self.folder=QLineEdit(); self.folder.setPlaceholderText(tr('Par défaut : dossier temporaire Windows / Cadence'))
+        row=QHBoxLayout(); self.folder=QLineEdit(); self.folder.setPlaceholderText(tr('Par défaut : dossier temporaire Windows / Cadence') if os.name=='nt' else tr('Par défaut : dossier temporaire / Cadence'))
         self.browse=QPushButton(tr('Parcourir…')); self.browse.clicked.connect(self.choose_folder)
         row.addWidget(self.folder); row.addWidget(self.browse); root.addLayout(row)
         root.addWidget(QLabel(tr('Démarrer / arrêter la capture : Ctrl+Shift+F8')))

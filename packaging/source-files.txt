@@ -43,6 +43,7 @@ assets/qtbase_fr.qm
 assets/ui_en.txt
 assets/ui_patterns.json
 association.py
+association_linux.py
 audio_jobs.py
 audio_prepare.py
 cache_ram.py
@@ -51,8 +52,10 @@ cadence_change.py
 cadence_dialog.py
 capture.py
 capture_audio.py
+capture_audio_linux.py
 capture_feedback.py
 capture_inputs.py
+capture_x11.py
 clip_geometry.py
 compact_transport.py
 comparison.py
@@ -103,8 +106,8 @@ packaging/audit_release.py
 packaging/bootstrap_python.ps1
 packaging/bootstrap_windows.ps1
 packaging/build_inputs.py
-packaging/build_linux.py
 packaging/build_installer.py
+packaging/build_linux.py
 packaging/build_windows.py
 packaging/fetch_ffmpeg.py
 packaging/fetch_ffmpeg_linux.py
@@ -171,6 +174,7 @@ tests/test_import1213.py
 tests/test_interface0150.py
 tests/test_interface1218.py
 tests/test_keys128.py
+tests/test_linux_desktop.py
 tests/test_menus0143.py
 tests/test_native130.py
 tests/test_native140.py

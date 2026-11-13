@@ -21,6 +21,9 @@ def registration_values(executable):
     return values
 
 def register():
+    if sys.platform == 'linux':
+        from association_linux import register as register_linux
+        return register_linux()
     if not getattr(sys,'frozen',False): raise RuntimeError('Lancez cette commande depuis la version .exe portable.')
     import winreg
     for path,values in registration_values(sys.executable).items():

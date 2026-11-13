@@ -46,13 +46,19 @@ def test_linux_update_manager_never_requests_windows_packages(monkeypatch):
     import update_ui
     app = QApplication.instance() or QApplication([])
     window = QWidget()
+    window.preferences={'update_previews':False}
     monkeypatch.setattr(update_ui, 'WINDOWS', False)
     manager = update_ui.UpdateManager(window, '1.16.1')
-    def unexpected(*args): raise AssertionError('Linux must not request a Windows update')
-    monkeypatch.setattr(manager, 'run', unexpected)
-    manager.start()
+    import updates
+    monkeypatch.setattr(updates, 'update_target', lambda:'linux-x86_64')
+    windows_release={'tag_name':'v1.17.0','assets':[
+        {'name':'Cadence-1.17.0-Windows.zip','size':100,'state':'uploaded'},
+        {'name':'Cadence-1.17.0-sha256.json','state':'uploaded'}]}
+    monkeypatch.setattr(updates, 'read_json', lambda url:[windows_release])
+    results=[]
+    monkeypatch.setattr(manager, 'run', lambda operation:results.append(operation()))
     manager.check_now()
-    assert not manager.busy
+    assert results == [None] and not manager.installed
     manager.stop()
     window.close()
 

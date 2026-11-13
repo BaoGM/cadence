@@ -55,8 +55,13 @@ class AudioTrack:
             self.file.close(); self.file=None
 
 class AudioCapture:
+    def __new__(cls,system=False,microphone=False):
+        if not WINDOWS:
+            from capture_audio_linux import AudioCapture as LinuxAudioCapture
+            return LinuxAudioCapture(system,microphone)
+        return super().__new__(cls)
+
     def __init__(self,system=False,microphone=False):
-        if not WINDOWS: raise RuntimeError('Audio capture is not available on Linux yet.')
         self.tracks=[]; self.manager=None; self.temp=tempfile.TemporaryDirectory(prefix='cadence-audio-')
         try:
             self.manager=pa.PyAudio(); host=self.manager.get_host_api_info_by_type(pa.paWASAPI)

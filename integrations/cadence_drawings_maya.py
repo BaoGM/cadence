@@ -397,7 +397,10 @@ def grease_pencil_steps(data,folder,shape):
             c.refresh(suspend=suspended)
             yield dict(progress=92)
             if progress_dialog.cancelled: raise TransferCancelled()
-            for texture,filename in textures:
+            for index,(texture,filename) in enumerate(textures):
+                if index%16==0:
+                    yield dict(progress=92+int(4.*index/max(1,len(textures))))
+                    if progress_dialog.cancelled: raise TransferCancelled()
                 c.setAttr(texture+'.fileTextureName',os.path.join(destination,filename).replace('\\','/'),type='string')
             native=c.greasePencilCtx('greasePencilContext',query=True,sequenceNodeName=True)
             if not native: raise RuntimeError('Maya did not create a Grease Pencil sequence')
@@ -435,6 +438,9 @@ def grease_pencil_steps(data,folder,shape):
         c.addAttr(group,longName='cadenceGrease',attributeType='bool',defaultValue=True)
         c.addAttr(group,longName='drawings',attributeType='message',multi=True)
         for index,node in enumerate(created[:-1]):
+            if index%64==0:
+                yield dict(progress=97)
+                if progress_dialog.cancelled: raise TransferCancelled()
             if not c.objExists(node): continue
             try:
                 c.addAttr(node,longName='cadenceImported',attributeType='bool',defaultValue=True)

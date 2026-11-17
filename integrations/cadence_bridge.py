@@ -105,7 +105,7 @@ class Bridge:
                 self.connect(now)
             if self.sock is None:
                 return 1.
-            if now - self.received > 5:
+            if now - self.received > (180 if self.drawing_job is not None else 5):
                 self.disconnect()
                 return 1.
             readable, writable, errors = select.select([self.sock], [self.sock] if self.outgoing or self.connecting else [], [self.sock], 0)
@@ -200,6 +200,7 @@ class Bridge:
         try: job.close()
         except Exception: logging.exception('Could not roll back Cadence drawing transfer')
         self.last_state=None
+        self.received=monotonic()
         if notify: self.queue(dict(type='drawing_result',request=request,ok=False,cancelled=True))
 
     def advance_drawing(self):
@@ -210,6 +211,7 @@ class Bridge:
                 update=next(self.drawing_job)
                 if 'result' in update:
                     self.drawing_job.close(); self.drawing_job=None; self.drawing_request=None
+                    self.received=monotonic()
                     self.last_state=None; self.queue(update['result']); return
                 progress=int(update.get('progress',0))
                 if progress!=self.drawing_progress:

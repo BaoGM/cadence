@@ -130,3 +130,20 @@ def test_platform_release_tag_does_not_select_linux():
     selected=select_release([release('v1.18.0-linux'),release('v1.17.0-windows')],'1.16.1',False)
     assert selected.version=='1.17.0'
     assert '/v1.17.0-windows/' in selected.url
+
+
+def test_bridge_keeps_a_slow_drawing_step_connected():
+    import socket
+    from integrations.cadence_bridge import Bridge,monotonic
+    server,client=socket.socketpair()
+    server.setblocking(False); client.setblocking(False)
+    bridge=Bridge('maya',lambda:dict(frame=1,start=1,end=100,fps=24),lambda frame:None)
+    bridge.sock=client; bridge.authenticated=True; bridge.received=monotonic()-6
+    def job():
+        while True: yield dict(progress=50)
+    bridge.drawing_job=job(); bridge.drawing_request='test'
+    try:
+        bridge.tick()
+        assert bridge.sock is client and bridge.drawing_job is not None
+    finally:
+        bridge.close(); server.close()

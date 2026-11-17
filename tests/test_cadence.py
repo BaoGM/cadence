@@ -59,7 +59,7 @@ def test_exposure_ffmpeg_parity(tmp_path):
 def prepared(tmp_path_factory):
     root=tmp_path_factory.mktemp('media')
     os.environ['CADENCE_CACHE']=str(root/'cache')
-    m=prepare_media(Path(__file__).resolve().parents[1]/'assets'/'Demonstration.mp4')
+    m=prepare_media(Path(__file__).parent/'assets'/'Demonstration.mp4')
     return m,root
 
 def test_import_and_precise_seek(prepared):
@@ -346,7 +346,8 @@ def test_timeline_gestures_and_numeric_scrub(prepared):
         assert expanded(d.state.segments)==list(range(48,72))+list(range(24))
         assert d.state.audio==audio_before
         win.undo(); win.clear_selection()
-        drag(5,48,106,Qt.KeyboardModifier.AltModifier)
+        win.expand_media_audio(d.active_track_id,True)
+        drag(5,48,t.track_y('audio')+9,Qt.KeyboardModifier.AltModifier)
         assert expanded(d.state.audio)==list(range(48,72))+list(range(24))
         for name in ('header','transport'):
             if win.panel_actions[name].isChecked(): win.panel_actions[name].trigger()
@@ -452,6 +453,8 @@ def test_timeline_context_menu_track(prepared):
     try:
         t=win.timeline; app.processEvents()
         assert t.context_target(t.x_for(6),60)==(4,10,'video')
+        assert t.context_target(t.x_for(30),t.track_y('audio')+9) is None
+        win.expand_media_audio(d.active_track_id,True)
         assert t.context_target(t.x_for(30),t.track_y('audio')+9)==(24,48,'audio')
         assert t.context_target(t.x_for(6),20) is None
         def choose():
@@ -822,8 +825,8 @@ def test_compact_timeline_when_panels_hidden(prepared):
         for key in ('header','transport'): win.set_panel(key,False)
         win.resize(1600,1000); app.processEvents()
         assert win.viewer.height()>before
-        assert win.timeline.height()==100 and win.timeline_panel.height()==timeline_height
-        assert 99<=win.timeline_panel.height()<=102
+        assert win.timeline.height()==80 and win.timeline_panel.height()==timeline_height
+        assert 79<=win.timeline_panel.height()<=82
         for control in (win.copy_audio,win.leave_gap,win.link_tracks):
             assert win.header.isAncestorOf(control) and not win.timeline_panel.isAncestorOf(control)
         win.timeline.zoom=4; win.timeline.clamp_view(); app.processEvents()

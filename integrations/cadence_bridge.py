@@ -4,27 +4,24 @@ import json
 import logging
 import math
 import os
-from pathlib import Path
 import select
 import socket
-import time
+import sys
 
-bl_info = {'name': 'Cadence', 'author': 'Cadence', 'version': (1, 15, 1),
+if __package__:
+    from .cadence_runtime import endpoint_path, finite, fs_path, integer_types, load_source, maya_timer, monotonic, read_json, string_types
+else:
+    from cadence_runtime import endpoint_path, finite, fs_path, integer_types, load_source, maya_timer, monotonic, read_json, string_types
+
+bl_info = {'name': 'Cadence', 'author': 'Cadence', 'version': (1, 17, 0),
            'blender': (4, 0, 0), 'category': 'Animation',
     'description': 'Synchronize the timeline with Cadence'}
 
 
-def endpoint_path():
-    override = os.environ.get('CADENCE_SYNC_ENDPOINT')
-    if override:
-        return Path(override)
-    return Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'CadenceStudio' / 'sync_endpoint.json'
-
-
 def number(value, limit=100000000):
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    if isinstance(value, bool) or not isinstance(value, integer_types + (float,)):
         raise ValueError('Invalid timeline number')
-    if not math.isfinite(value) or abs(value) > limit:
+    if not finite(value) or abs(value) > limit:
         raise ValueError('Timeline number outside supported range')
     return value
 
@@ -46,15 +43,20 @@ class Bridge:
         self.active = True
         self.poll_timer = None
         self.drawings = None
+        self.drawing_job = None
+        self.drawing_request = None
+        self.drawing_progress = -1
+        self.drawing_state = None
 
     def disconnect(self):
+        self.cancel_drawing(notify=False)
         if self.sock:
             self.sock.close()
         self.sock = None
         self.authenticated = False
         self.incoming = self.outgoing = b''
         self.last_state = None
-        self.next_connect = time.monotonic() + 1.
+        self.next_connect = monotonic() + 1.
 
     def close(self):
         self.active = False
@@ -73,15 +75,15 @@ class Bridge:
     def connect(self, now):
         self.next_connect = now + 1.
         try:
-            info = json.loads(endpoint_path().read_text(encoding='utf-8'))
+            info = read_json(endpoint_path())
             if not isinstance(info, dict) or info.get('version') != 1 or info.get('host') != self.host:
                 return
             port = info['port']
             if type(port) is not int or not 1024 <= port <= 65535:
                 return
-            if not isinstance(info.get('token'), str) or len(info['token']) != 64:
+            if not isinstance(info.get('token'), string_types) or len(info['token']) != 64:
                 return
-        except (OSError, ValueError, KeyError, TypeError):
+        except (IOError, OSError, ValueError, KeyError, TypeError):
             return
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(False)
@@ -97,7 +99,7 @@ class Bridge:
     def tick(self):
         if not self.active:
             return None
-        now = time.monotonic()
+        now = monotonic()
         try:
             if self.sock is None and now >= self.next_connect:
                 self.connect(now)
@@ -132,7 +134,7 @@ class Bridge:
                     self.received = now
                     if message.get('type') == 'ready':
                         self.authenticated = True
-                        self.queue(dict(type='capabilities',drawings=1,drawing_remove=1))
+                        self.queue(dict(type='capabilities', drawings=1, drawing_remove=1, drawing_cancel=int(self.host=='maya'), drawing_modes=self.drawing_modes()))
                     elif message.get('type') == 'stop' and self.authenticated:
                         self.close()
                         return None
@@ -140,38 +142,86 @@ class Bridge:
                         sequence = message.get('seq')
                         if type(sequence) is not int or not 0 <= sequence <= 2147483647:
                             raise ValueError('Invalid frame sequence')
-                        commands.append((number(message['frame']), sequence))
+                        commands.append((number(message['frame']), sequence, self.drawing_job is None))
+                    elif message.get('type')=='drawing_cancel' and self.authenticated:
+                        if message.get('request')==self.drawing_request: self.cancel_drawing()
                     elif message.get('type') in ('drawing_cameras','drawing_send','drawing_remove') and self.authenticated:
                         self.drawing_command(message)
-                        now=time.monotonic(); self.received=now
+                        now=monotonic(); self.received=now
             # Only the latest requested time matters when the host is rendering slowly.
             if commands:
-                self.set_frame(commands[-1][0])
-                self.last_state = self.snapshot()
+                if self.drawing_job is None and commands[-1][2]: self.set_frame(commands[-1][0])
+                self.last_state = self.drawing_state if self.drawing_job is not None else self.snapshot()
                 self.queue(dict(type='ack', seq=commands[-1][1], **self.last_state))
                 self.last_sent = now
+            self.advance_drawing()
             if self.authenticated and not self.outgoing:
-                state = self.snapshot()
+                state = self.drawing_state if self.drawing_job is not None else self.snapshot()
                 if state != self.last_state or now - self.last_sent >= 1:
                     self.queue(dict(type='state', **state))
                     self.last_state = state
                     self.last_sent = now
-        except (OSError, ValueError, TypeError, KeyError, RuntimeError):
+        except (IOError, OSError, ValueError, TypeError, KeyError, RuntimeError):
             logging.debug('Cadence timeline disconnected', exc_info=True)
             self.disconnect()
-        return .033 if self.sock else 1.
+        return .008 if self.drawing_job is not None else .033 if self.sock else 1.
+
+    def drawing_module(self):
+        if self.drawings is None:
+            path = os.path.join(os.path.dirname(fs_path(__file__)), 'cadence_drawings.py')
+            self.drawings = load_source((__package__+'.' if __package__ else '')+'cadence_drawings', path)
+        return self.drawings
+
+    def drawing_modes(self):
+        if self.host == 'blender':
+            return ['native', 'images']
+        return self.drawing_module().module('maya').modes()
 
     def drawing_command(self,message):
+        if self.drawing_job is not None:
+            self.queue(dict(type='drawing_result',request=message.get('request',''),ok=False,error='A drawing transfer is already running'))
+            return
+        if self.host=='maya' and message['type']=='drawing_send':
+            self.drawing_state=self.snapshot()
+            self.drawing_request=message['request']; self.drawing_progress=-1
+            self.drawing_job=self.drawing_module().execute_steps(self.host,message,os.path.join(os.path.dirname(fs_path(endpoint_path())), 'drawing_transfers'))
+            return
         try:
-            if self.drawings is None:
-                import importlib.util
-                spec=importlib.util.spec_from_file_location('cadence_drawings',Path(__file__).with_name('cadence_drawings.py'))
-                self.drawings=importlib.util.module_from_spec(spec); spec.loader.exec_module(self.drawings)
-            result=self.drawings.execute(self.host,message,endpoint_path().parent/'drawing_transfers')
+            result=self.drawing_module().execute(self.host,message,os.path.join(os.path.dirname(fs_path(endpoint_path())), 'drawing_transfers'))
         except Exception as error:
             logging.exception('Cadence drawing transfer failed')
             result=dict(type='drawing_result',request=message.get('request',''),ok=False,error=str(error)[:1000])
         self.queue(result)
+
+    def cancel_drawing(self,notify=True):
+        job,self.drawing_job=self.drawing_job,None
+        request,self.drawing_request=self.drawing_request,None
+        if job is None: return
+        try: job.close()
+        except Exception: logging.exception('Could not roll back Cadence drawing transfer')
+        self.last_state=None
+        if notify: self.queue(dict(type='drawing_result',request=request,ok=False,cancelled=True))
+
+    def advance_drawing(self):
+        if self.drawing_job is None: return
+        deadline=monotonic()+.02
+        try:
+            for step in range(32):
+                update=next(self.drawing_job)
+                if 'result' in update:
+                    self.drawing_job.close(); self.drawing_job=None; self.drawing_request=None
+                    self.last_state=None; self.queue(update['result']); return
+                progress=int(update.get('progress',0))
+                if progress!=self.drawing_progress:
+                    self.drawing_progress=progress
+                    self.queue(dict(type='drawing_progress',request=self.drawing_request,progress=progress))
+                if monotonic()>=deadline: break
+        except Exception as error:
+            request=self.drawing_request
+            self.cancel_drawing(notify=False)
+            cancelled=bool(getattr(error,'cancelled',False))
+            if not cancelled: logging.exception('Cadence drawing transfer failed')
+            self.queue(dict(type='drawing_result',request=request,ok=False,cancelled=cancelled,error=str(error)[:1000]))
 
 
 _bridge = None
@@ -219,10 +269,6 @@ def start(host=None):
     elif host == 'maya':
         import maya.cmds as cmds
         import maya.api.OpenMaya as om
-        try:
-            from PySide6.QtCore import QTimer
-        except ImportError:
-            from PySide2.QtCore import QTimer
 
         def snapshot():
             seconds = om.MTime(1., om.MTime.uiUnit()).asUnits(om.MTime.kSeconds)
@@ -237,12 +283,12 @@ def start(host=None):
 
         _bridge = Bridge(host, snapshot, set_frame)
         bridge = _bridge
-        timer = QTimer()
+        timer = maya_timer()
         timer.setSingleShot(True)
         def poll():
             delay = bridge.tick()
             if delay is not None:
-                timer.start(max(1, round(delay * 1000)))
+                timer.start(max(1, int(round(delay * 1000))))
         timer.timeout.connect(poll)
         bridge.poll_timer = timer
         timer.start(0)

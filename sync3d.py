@@ -68,9 +68,12 @@ class TimelineLink(QObject):
         self.prompt_open = False
         self.dialog = None
         self.drawing_capability = False
+        self.drawing_modes = None
         self.drawing_removal = False
         self.drawing_request = None
         self.drawing_bundle = None
+        self.drawing_cancellation = False
+        self.import_dialog = None
         self.cameras = []
         self.transfer_status = ''
         self.status = 'Synchronisation désactivée'
@@ -142,6 +145,7 @@ class TimelineLink(QObject):
             self.window.error(str(error))
 
     def stop(self):
+        self.close_import_dialog()
         self.timer.stop()
         if self.peer:
             self.send(dict(type='stop'))
@@ -166,6 +170,7 @@ class TimelineLink(QObject):
         self.metadata = self.pending = None
         self.awaiting = None
         self.drawing_capability = False
+        self.drawing_modes = None
         self.drawing_removal = False
         self.drawing_request = None
         self.cameras = []
@@ -189,10 +194,12 @@ class TimelineLink(QObject):
 
     def disconnected(self, peer):
         if peer is self.peer:
+            self.close_import_dialog()
             self.peer = None
             self.metadata = self.pending = None
             self.awaiting = None
             self.drawing_capability = False
+            self.drawing_modes = None
             self.drawing_removal = False
             self.drawing_request = None
             self.cameras = []
@@ -224,7 +231,7 @@ class TimelineLink(QObject):
                     self.last_position = None
                     self.changed.emit()
                 else:
-                    if message.get('type') in ('capabilities','drawing_cameras','drawing_result'):
+                    if message.get('type') in ('capabilities','drawing_cameras','drawing_result','drawing_progress'):
                         self.read_drawing(message)
                         self.last_received = time.monotonic()
                         continue
@@ -289,16 +296,34 @@ class TimelineLink(QObject):
         if kind=='capabilities':
             self.drawing_capability=message.get('drawings')==1
             self.drawing_removal=message.get('drawing_remove')==1
+            self.drawing_cancellation=message.get('drawing_cancel')==1
+            modes=message.get('drawing_modes')
+            if modes is not None and (not isinstance(modes,list) or not modes or len(modes)>4 or
+                    any(mode not in ('native','images','blue_pencil','grease_pencil') for mode in modes)):
+                raise ValueError('Invalid drawing modes')
+            self.drawing_modes=modes
             if self.drawing_capability: self.refresh_cameras()
         elif kind=='drawing_cameras':
             cameras=message.get('cameras')
             if not isinstance(cameras,list) or len(cameras)>64 or any(not isinstance(c,str) or len(c)>1024 for c in cameras):
                 raise ValueError('Invalid camera list')
             self.cameras=cameras
+        elif kind=='drawing_progress':
+            if message.get('request')!=self.drawing_request:
+                raise ValueError('Unexpected drawing progress')
+            progress=message.get('progress')
+            if type(progress) is not int or not 0<=progress<=100:
+                raise ValueError('Invalid drawing progress')
+            if self.import_dialog:
+                self.import_dialog.setValue(progress)
         elif kind=='drawing_result':
             if self.drawing_request and message.get('request')!=self.drawing_request:
                 raise ValueError('Unexpected drawing acknowledgement')
+            if self.drawing_request:
+                self.pending=None
+                self.last_position=None
             self.drawing_request=None
+            self.close_import_dialog()
             if self.drawing_bundle:
                 import shutil
                 from pathlib import Path
@@ -310,10 +335,13 @@ class TimelineLink(QObject):
             if message.get('ok'):
                 text=('Dessins envoyés supprimés.' if message.get('removed') else
                     'Dessins envoyés dans Blue Pencil : {keys} clés.' if message.get('blue_pencil') else
+                    'Dessins envoyés dans Grease Pencil : {keys} clés.' if message.get('grease_pencil') else
                     'Dessins envoyés : {keys} clés, {native} en traits, {images} en images.')
                 self.transfer_status=tr(text).format(**message)
                 if message.get('collapsed'):
                     self.transfer_status+=' '+tr('{count} clés trop courtes pour la cadence 3D.').format(count=message['collapsed'])
+            elif message.get('cancelled'):
+                self.transfer_status=tr('Transfert des dessins annulé.')
             else:
                 self.transfer_status=tr('Échec du transfert des dessins.')
                 error=str(message.get('error',''))
@@ -349,6 +377,23 @@ class TimelineLink(QObject):
     def refresh_cameras(self):
         if self.drawing_capability and not self.drawing_request: self.send(dict(type='drawing_cameras'))
 
+    def close_import_dialog(self):
+        dialog,self.import_dialog=self.import_dialog,None
+        if dialog:
+            dialog.done(0)
+            dialog.deleteLater()
+
+    def show_import_dialog(self,mode):
+        from drawing_progress import DrawingProgress
+        self.close_import_dialog()
+        cancel=None
+        if mode=='grease_pencil' and self.host=='maya' and self.drawing_cancellation:
+            def cancel():
+                return bool(self.drawing_request and self.send(dict(type='drawing_cancel',request=self.drawing_request)))
+        dialog=DrawingProgress(self.window,cancel)
+        self.import_dialog=dialog
+        dialog.setValue(0); dialog.show()
+
     def send_drawings(self,camera,mode,onion):
         import uuid
         from drawing_transfer import build_bundle
@@ -357,11 +402,12 @@ class TimelineLink(QObject):
             return
         if camera not in self.cameras:
             w.error(tr('Choisissez une caméra dans le logiciel 3D.')); return
-        if self.host=='maya' and mode not in ('images','blue_pencil'): mode='blue_pencil'
+        if self.host=='maya' and mode not in ('images','blue_pencil','grease_pencil'): mode='blue_pencil'
+        if self.drawing_modes is not None and mode not in self.drawing_modes: mode=self.drawing_modes[0]
         w.drawing.finish()
         doc=w.doc
-        media=next((m for m in doc.media.values() if m.get('has_video',True)),{'width':1920,'height':1080})
-        width,height=media['width'],media['height']
+        from composite_media import canvas_size
+        width,height=canvas_size(doc.state,doc.media)
         scale=min(1.,4096/max(width,height)); width=max(2,round(width*scale)); height=max(2,round(height*scale))
         onion=bool(onion and w.drawing.onion.isChecked())
         before=w.drawing.before.value() if onion else 0
@@ -377,6 +423,7 @@ class TimelineLink(QObject):
                 self.drawing_request=request
                 self.drawing_bundle=path
                 self.transfer_status=tr('Importation dans le logiciel 3D…')
+                self.show_import_dialog(mode)
             else: self.transfer_status=tr('Connexion interrompue. Renvoyez les dessins.')
             self.changed.emit()
         w.begin_task(tr('Préparation des dessins'),lambda progress,cancel:build_bundle(
@@ -407,7 +454,7 @@ class TimelineLink(QObject):
     def check_rate(self):
         from model import locate
         w = self.window
-        key, _ = locate(w.doc.state.segments, min(w.doc.state.position, w.doc.state.length - 1))
+        key, _ = locate(w.doc.active_track.segments, min(w.doc.state.position, w.doc.active_track.length - 1))
         media = w.doc.media.get(key)
         if not media or not media.get('has_video', True):
             return
@@ -444,8 +491,8 @@ class TimelineLink(QObject):
         w = self.window
         if not self.metadata or w.job or not w.doc.state.length:
             return
-        keys = ({s.media for s in w.doc.state.segments} if all_media else
-            {locate(w.doc.state.segments, min(w.doc.state.position, w.doc.state.length - 1))[0]})
+        keys = ({s.media for t in w.doc.state.tracks for s in t.segments} if all_media else
+            {locate(w.doc.active_track.segments, min(w.doc.state.position, w.doc.active_track.length - 1))[0]})
         keys = {key for key in keys if key in w.doc.media and w.doc.media[key].get('has_video', True)}
         if not keys:
             return
@@ -460,17 +507,17 @@ class TimelineLink(QObject):
             self.prompt_open = False
 
     def adapt_keys(self, document, keys, target):
-        from cadence_change import plan_ranges, build_change
+        from track_cadence import plan_tracks, build_tracks
         w = self.window
         if w.job or w.doc is not document:
             return
         w.pause(); w.drawing.finish(); w.commit_exposure()
         state = document.state
-        ranges = plan_ranges(state, document.media, keys=keys)
-        if not ranges:
+        plans = plan_tracks(document, keys=keys, all_tracks=True)
+        if not plans:
             return
         def prepare(progress, cancel):
-            return build_change(state, document.media, document.fps, ranges, target, 'duration', True,
+            return build_tracks(state, document.media, document.fps, plans, target, 'duration', True,
                 w.preferences.get('preview_quality', 'native'), progress, cancel)
         def apply(result):
             changed, media = result

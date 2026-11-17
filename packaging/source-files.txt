@@ -57,6 +57,7 @@ clip_geometry.py
 compact_transport.py
 comparison.py
 comparison_gpu.py
+composite_media.py
 diagnostics.py
 dialogs.py
 docs/BUILD.md
@@ -71,6 +72,7 @@ draw_ui.py
 drawing.py
 drawing_cache.py
 drawing_gpu.py
+drawing_progress.py
 drawing_timeline.py
 drawing_transfer.py
 engine.py
@@ -83,7 +85,9 @@ integrations/cadence_bridge.py
 integrations/cadence_drawings.py
 integrations/cadence_drawings_blender.py
 integrations/cadence_drawings_maya.py
+integrations/cadence_runtime.py
 media.py
+media_track_ui.py
 menu_layout.py
 model.py
 native/BUILD.txt
@@ -180,13 +184,16 @@ tests/test_picker1110.py
 tests/test_playback117.py
 tests/test_playback160.py
 tests/test_preview110.py
+tests/test_preview1162.py
 tests/test_preview181.py
 tests/test_progress1215.py
 tests/test_ram126.py
 tests/test_readout121.py
 tests/test_references1100.py
+tests/test_refinements1170.py
 tests/test_release100.py
 tests/test_release1130.py
+tests/test_render1170.py
 tests/test_sensitivity1211.py
 tests/test_session120.py
 tests/test_session170.py
@@ -194,6 +201,7 @@ tests/test_spatial_gpu182.py
 tests/test_stress141.py
 tests/test_sync1120.py
 tests/test_sync1121.py
+tests/test_sync1163.py
 tests/test_task150.py
 tests/test_timecode_overlay.py
 tests/test_timeline102.py
@@ -202,6 +210,7 @@ tests/test_timeline1152.py
 tests/test_toolbar_layout.py
 tests/test_tools0160.py
 tests/test_tools0170.py
+tests/test_tracks1170.py
 tests/test_transfer1141.py
 tests/test_transfer1150.py
 tests/test_transfer1151.py
@@ -210,7 +219,12 @@ tests/test_updates1160.py
 tests/test_wipe1217.py
 timecode_overlay.py
 timeline_index.py
+timestamp_preview.py
 tool_icons.py
+track_cadence.py
+track_edits.py
+track_export.py
+track_rows.py
 transform_frame.py
 ui_style.py
 ui_text.py
@@ -221,6 +235,7 @@ video_surface.py
 video_surface_d3d.py
 viewer_cursor.py
 viewer_cursor_win.py
+volume_shortcut.py
 widgets.py
 wipe.py
 workspace_modes.py

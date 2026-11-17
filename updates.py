@@ -54,14 +54,15 @@ class Release:
     filename: str
     size: int
     digest: str
+    tag: str = ''
 
     @property
     def page(self):
-        return REPOSITORY + '/releases/tag/v' + self.version
+        return REPOSITORY + '/releases/tag/' + (self.tag or 'v'+self.version)
 
     @property
     def base(self):
-        return REPOSITORY + '/releases/download/v' + self.version + '/'
+        return REPOSITORY + '/releases/download/' + (self.tag or 'v'+self.version) + '/'
 
     @property
     def url(self):
@@ -76,8 +77,8 @@ def select_release(releases, current, installed, previews=False):
             continue
         tag = item.get('tag_name', '')
         try:
-            version = tag.removeprefix('v')
-            if tag != 'v'+version or version_tuple(version) <= version_tuple(current):
+            version = tag.removeprefix('v').removesuffix('-windows')
+            if tag not in ('v'+version,'v'+version+'-windows') or version_tuple(version) <= version_tuple(current):
                 continue
         except (ValueError, AttributeError):
             continue
@@ -92,7 +93,7 @@ def select_release(releases, current, installed, previews=False):
         digest = asset.get('digest') or ''
         if digest and not re.fullmatch(r'sha256:[a-fA-F0-9]{64}', digest):
             continue
-        candidates.append(Release(version, bool(item.get('prerelease')), filename, size, digest[7:].lower()))
+        candidates.append(Release(version, bool(item.get('prerelease')), filename, size, digest[7:].lower(),tag))
     return max(candidates, key=lambda r: version_tuple(r.version), default=None)
 
 def check(current, installed, previews=False):

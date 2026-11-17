@@ -679,6 +679,7 @@ Impossible de créer les images de dessin. => Unable to create drawing images.
 Le transfert dépasse 64 Mo de géométrie. Choisissez le mode images. => The transfer exceeds 64 MB of geometry. Choose image mode.
 Blue Pencil => Blue Pencil
 Dessins envoyés dans Blue Pencil : {keys} clés. => Drawings sent to Blue Pencil: {keys} keys.
+Dessins envoyés dans Grease Pencil : {keys} clés. => Drawings sent to Grease Pencil: {keys} keys.
 Le transfert dépasse 25 000 images. Réduisez la portée des pelures. => The transfer exceeds 25,000 frames. Reduce the onion skin range.
 Le transfert dépasse 2 Go. Réduisez la portée des pelures. => The transfer exceeds 2 GB. Reduce the onion skin range.
 La caméra a été supprimée. Actualisez la liste des caméras. => The camera has been deleted. Refresh the camera list.
@@ -721,3 +722,25 @@ Installer la mise à jour maintenant ? => Install the update now?
 Cadence doit être fermé. Vous pourrez enregistrer votre projet avant de continuer. Windows peut demander une autorisation. => Cadence must close. You can save your project before continuing. Windows may request permission.
 Attendez la fin de la tâche en cours avant d’installer la mise à jour. => Wait for the current task to finish before installing the update.
 L’installateur n’a pas été lancé. Cadence reste ouvert. => The installer did not start. Cadence remains open.
+
+Piste 1 => Track 1
+Piste 2 => Track 2
++ Piste média => + Media track
+Ajouter une seconde piste média sous la première. => Add a second media track below the first.
+Replier l’audio => Collapse audio
+Déployer l’audio => Expand audio
+Monter la piste => Move track up
+Descendre la piste => Move track down
+Ajouter une piste média => Add media track
+Supprimer la piste média => Delete media track
+Réordonner les pistes média => Reorder media tracks
+Afficher la bande audio => Show audio lane
+Replier la bande audio => Collapse audio lane
+
+Désactiver l’audio de la piste => Disable track audio
+Activer l’audio de la piste => Enable track audio
+Transfert des dessins annulé. => Drawing transfer cancelled.
+Annulation du transfert… => Cancelling transfer…
+
+Déplacer vers une autre piste => Move to another track
+Copier vers une autre piste => Copy to another track

@@ -17,5 +17,10 @@
   "tests/test_release1130.py",
   "packaging/test_release_pipeline.py",
   "tests/test_updates1160.py",
-  "tests/test_timeline1152.py"
+  "tests/test_timeline1152.py",
+  "tests/test_tracks1170.py",
+  "tests/test_render1170.py",
+  "tests/test_refinements1170.py",
+  "tests/test_preview1162.py",
+  "tests/test_sync1163.py"
 ]

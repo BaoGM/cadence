@@ -1,4 +1,4 @@
-Cadence 1.16.1 - Quick guide
+Cadence 1.17.0 - Quick guide
 
 These are the default shortcuts. The complete list is at the end of the guide; customize them in File > Options > Shortcuts.
 
@@ -11,10 +11,12 @@ Ctrl+S updates the current project. The first save asks for a filename. Ctrl+Shi
 
 Ctrl+S saves a .cadence project: edit, drawings and comparison references. Media files stay in their original folders; keep them available when reopening the project. Ctrl+N creates an empty timeline. Session recovery at startup does not replace saving a project.
 
-Ctrl+E exports MP4, MOV, GIF, WAV or MP3. WAV and MP3 export only the edited audio track, including cuts and silent gaps. WAV keeps uncompressed sound (48 kHz, 16-bit stereo); MP3 uses 192 kbit/s. GIF has no sound. Drawings and enabled onion skins are included when Include drawings in export is checked. The output folder opens when export finishes.
+Ctrl+E exports MP4, MOV, GIF, WAV or MP3. WAV and MP3 export the mixed audio from both media tracks, including cuts and silent gaps. WAV keeps uncompressed sound (48 kHz, 16-bit stereo); MP3 uses 192 kbit/s. GIF has no sound. Drawings and enabled onion skins are included when Include drawings in export is checked. The output folder opens when export finishes.
 
 ----------------------------------------
 Play and select
+
+Ctrl + wheel raises or lowers the master volume in 5% steps without changing the zoom.
 
 Space: play / pause. Left and Right: one frame. Home and End: timeline boundaries. Comma and Period: previous / next keyframe or marker, wrapping at either end.
 
@@ -28,6 +30,14 @@ Shift-double-click a media segment to select its whole range, including on the s
 
 ----------------------------------------
 Edit the timeline
+
+A media track pairs a video lane and an audio lane. The + Media track button adds a second track below the first. The upper track appears in front; transparent areas reveal the lower track. Audio from both tracks is mixed.
+
+The tracks are named Track 1 and Track 2. Click a title to select a track. Ctrl-click adds or removes a track from the selection, on its title or timeline. Edits affect the selected tracks. Drag a title above or below the other to change their order. Right-click a title to move or delete the entire track. Ctrl+Z undoes these actions. Audio lanes start collapsed: click the triangle next to the title to expand them.
+
+Double-click a track title or timeline to expand or collapse its audio lane. Right-click to disable or enable all its audio, including in exports. With both tracks selected, drag media onto the other track to move its video and audio together, leaving a gap at the original position. Alt+Shift-drag copies it. Drawing keys appear above the playback bar without overlapping the numbers, including on the simplified timeline.
+
+Drawings, their keys and frame markers remain shared above both tracks. Editing one track keeps drawings in place; when both tracks are selected, linked drawings follow the edits.
 
 Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste the current frame or selected range. Delete removes the range. Sound is copied only when Copy/paste audio is checked in the top panel. Ctrl+Z undoes; Ctrl+Y redoes.
 
@@ -68,7 +78,7 @@ Drag outside a corner to rotate; Shift snaps to 15-degree increments. Enter appl
 ----------------------------------------
 Compare videos
 
-A is the working edit; B is one or more reference videos. Comparison > Add B references appends them in sequence. The playlist's References tab lets you reorder them by dragging or remove them with the context menu.
+A is the working edit; B is one or more reference videos. Right-click a track title > Use as reference B to choose that track for B; the other track becomes A in the comparison preview. Export keeps the complete two-track edit. Comparison > Add B references appends them in sequence. The playlist's References tab lets you reorder them by dragging or remove them with the context menu.
 
 Modes are Side by side, Top / bottom, Overlay, Difference, Wipe and Foreground. Shift+X or the comparison button cycles through them, then returns to A alone. Alt+X swaps A and B.
 
@@ -138,7 +148,9 @@ In 3D synchronization > Settings, enable the link and choose a camera. Refresh r
 
 Blender 4.3 or later: Grease Pencil creates editable brush strokes, arrows, rectangles and circles. A key containing text, erasing, a group or a non-uniform transform becomes a transparent image. Transparent images applies this to every key. Text, images and onion skins remain visible with Blender overlays disabled. Sending drawings switches Solid viewports to Texture color mode to display them. They also appear in renders. Images are packed into the .blend file when saved.
 
-Maya: Blue Pencil creates an animated layer on the selected camera. Each image is flattened: it can be retouched with Blue Pencil painting tools, but text and shapes do not remain separate objects. This mode is for the viewport and playblasts, not final rendering. Transparent images creates a single animated image plane. Its files are copied into sourceimages/Cadence in the Maya project and must be kept with the scene.
+Maya 2022: Grease Pencil creates images editable with the native painting tools. Transfer runs progressively; Cancel in Cadence or Escape in Maya interrupts between steps and preserves the previous drawings. Navigation in Cadence is paused during import. Drawing proportions are preserved.
+
+Maya 2023 or later: Blue Pencil creates an animated layer on the selected camera. Each image is flattened: it can be retouched with Blue Pencil painting tools, but text and shapes do not remain separate objects. This mode is for the viewport and playblasts, not final rendering. Transparent images creates a single animated image plane. Its files are copied into sourceimages/Cadence in the Maya project and must be kept with the scene.
 
 Include onion skins requires onion skins to be enabled in Cadence. Transfer uses their ranges, fading opacity and original colors. Maya disables native Blue Pencil ghosting to avoid duplicating ghosts already baked into the images. In Blender, stacking may differ when several ghosts overlap.
 

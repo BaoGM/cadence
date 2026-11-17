@@ -18,10 +18,10 @@ FORMATS = {
 
 def default_destination(doc):
     video = any(s.media in doc.media and not s.muted and doc.media[s.media].get('has_video', True)
-                for s in doc.state.segments)
+                for track in doc.state.tracks for s in track.segments)
     audio_only = not video and not doc.state.drawings
     extension = '.wav' if audio_only else '.mp4'
-    source = next((doc.media[s.media] for s in doc.state.segments + doc.state.audio if s.media in doc.media), None)
+    source = next((doc.media[s.media] for s in doc.state.all_segments if s.media in doc.media), None)
     folders = []
     if doc.project_path:
         project = Path(doc.project_path).resolve()

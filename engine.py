@@ -44,6 +44,11 @@ class Decoder(QThread):
             same.sort(key=lambda item:abs(item[1]-index))
             self.prefetch=same+other; self.condition.notify()
         if cached is not None: self.ready.emit(token,cached)
+    def request_layers(self,token,layers,size):
+        with self.condition:
+            self.generation+=1
+            self.requested=(token,None,(layers,size))
+            self.prefetch=[]; self.condition.notify()
     def run(self):
         reader=PreviewReader(cache=self.cache,retain_decoded=True) if self.cache is not None else PreviewReader(retain_decoded=True)
         try:
@@ -57,11 +62,15 @@ class Decoder(QThread):
                         media,index=self.prefetch.pop(0); token=None
                     generation=self.generation
                 try:
-                    arr=reader.read(media,index,lambda:self.stopping or generation!=self.generation)
+                    cancel=lambda:self.stopping or generation!=self.generation
+                    if media is None:
+                        from composite_media import decode_layers
+                        arr=decode_layers(reader,*index,cancel)
+                    else: arr=reader.read(media,index,cancel)
                     if token is not None: self.ready.emit(token,arr)
                 except DecodeSuperseded: continue
                 except Exception as e:
-                    logging.exception('Frame decoding failed at %s in %s',index,media.get('path'))
+                    logging.exception('Frame decoding failed at %s in %s',index,(media or {}).get('path','media tracks'))
                     if token is not None: self.failed.emit(token,str(e).strip() or type(e).__name__)
         finally: reader.close()
     def stop(self):
@@ -104,7 +113,8 @@ class Transport:
         self.passes=0 if mode=='loop' else (passes if mode=='count' else 1)
         self.started=time.perf_counter()
         self.running=True
-        self.pcm=TimelinePCM(state.audio,media,fps)
+        from composite_media import MixedPCM
+        self.pcm=MixedPCM(state,media,fps)
         self.device=PCMDevice(self.pcm,sample_at(self.start_frame,fps),sample_at(a,fps),sample_at(b,fps),self.passes)
         fmt=QAudioFormat(); fmt.setSampleRate(RATE); fmt.setChannelCount(2); fmt.setSampleFormat(QAudioFormat.SampleFormat.Int16)
         output=QMediaDevices.defaultAudioOutput()

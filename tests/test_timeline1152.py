@@ -102,7 +102,7 @@ def test_dense_keys_keep_compact_height_and_render(application):
     t=Timeline(); t.resize(1200,100)
     keys=tuple(DrawingKey(f,f+1,(Mark(),)) for f in range(0,100000,5))
     state=State((Segment(None,0,100000),),drawings=keys,frame_markers=(10,50000,99999))
-    t.set_document(state,{},24); assert t.height()==100
+    t.set_document(state,{},24); assert t.height()==80
     image=QImage(t.size(),QImage.Format.Format_ARGB32_Premultiplied); t.render(image)
     for zoom in (1,10,100):
         t.zoom=zoom; t.view_start=40000 if zoom>1 else 0

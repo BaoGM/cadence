@@ -49,8 +49,9 @@ class ScrubAudio(QObject):
     def request(self,state,media,fps,frame):
         if not self.enabled or not self.volume or not state.length or not 0<=frame<=state.length: self.stop(); return
         frame=min(frame,state.length-1)
-        paths=tuple((key,media.get(key,{}).get('audio')) for key in sorted({s.media for s in state.audio if s.media is not None and not s.muted}))
-        signature=(state.audio,fps,paths); request=(signature,frame)
+        tracks=tuple(t.audible for t in state.tracks)
+        paths=tuple((key,media.get(key,{}).get('audio')) for key in sorted({s.media for track in tracks for s in track if s.media is not None and not s.muted}))
+        signature=(tracks,fps,paths); request=(signature,frame)
         if request==self.last_request and (self.pending is not None or time.monotonic()-self.last_played<.08): return
         self.last_request=request; self.pending=(state,media,fps,frame,signature)
         if not self.timer.isActive(): self.timer.start(max(0,math.ceil((.04-(time.monotonic()-self.last_played))*1000)))
@@ -69,7 +70,9 @@ class ScrubAudio(QObject):
             if signature!=self.signature:
                 if self.pcm: self.pcm.close()
                 self.pcm=None; self.signature=None
-                self.pcm=TimelinePCM(state.audio,media,fps); self.signature=signature
+                from composite_media import MixedPCM
+                self.pcm=MixedPCM(state,media,fps)
+                self.signature=signature
             data=audio_fragment(self.pcm,frame,fps)
             self.buffer.replace(data)
             if not any(data) and not self.streaming: return

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from PySide6.QtCore import Qt, QSignalBlocker
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
-    QComboBox, QCheckBox, QLabel, QPushButton, QDialogButtonBox, QGroupBox, QWidget)
+    QComboBox, QCheckBox, QLabel, QPushButton, QDialogButtonBox, QGroupBox, QWidget, QLayout)
 from widgets import ScrubSpinBox
 from ui_text import tr
 
@@ -13,6 +13,7 @@ class SyncDialog(QDialog):
         self.setWindowTitle(tr('Synchronisation 3D'))
         self.resize(540, 300)
         layout = QVBoxLayout(self)
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         layout.setSpacing(12)
         self.enabled = QCheckBox(tr('Activer la synchronisation'))
         self.enabled.toggled.connect(link.set_enabled)
@@ -49,8 +50,10 @@ class SyncDialog(QDialog):
         layout.addWidget(self.status)
         self.drawings=QGroupBox(tr('Dessins vers le logiciel 3D'))
         drawing_layout=QVBoxLayout(self.drawings)
-        drawing_fields=QWidget(); drawing_fields.setMinimumHeight(76)
+        drawing_fields=QWidget()
         drawing_form=QFormLayout(drawing_fields); drawing_form.setContentsMargins(0,0,0,0)
+        drawing_form.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        drawing_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         drawing_form.setHorizontalSpacing(20); drawing_form.setVerticalSpacing(8)
         self.camera=QComboBox()
         self.camera.setMinimumHeight(34)
@@ -82,10 +85,6 @@ class SyncDialog(QDialog):
             signal.connect(self.configure)
         link.changed.connect(self.refresh)
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.drawings.setMinimumHeight(self.drawings.layout().totalHeightForWidth(self.drawings.width()))
-
     def configure(self, *args):
         self.link.configure(self.host.currentData(), self.direction.currentData(), self.offset.value(), self.from_start.isChecked())
 
@@ -100,12 +99,18 @@ class SyncDialog(QDialog):
         self.adapt.setEnabled(link.metadata is not None)
         self.adapt_all.setEnabled(link.metadata is not None)
         host=link.host
-        if self.drawings.property('host')!=host:
-            self.drawings.setProperty('host',host)
+        modes=getattr(link,'drawing_modes',None)
+        mode_key=host,tuple(modes) if modes is not None else None
+        previous_key=getattr(self,'_drawing_mode_key',None)
+        if previous_key!=mode_key:
+            current_mode=self.drawing_mode.currentData() if previous_key and previous_key[0]==host else None
+            self._drawing_mode_key=mode_key
             self.drawing_mode.clear()
-            if host=='blender': self.drawing_mode.addItem('Grease Pencil','native')
-            if host=='maya': self.drawing_mode.addItem(tr('Blue Pencil'),'blue_pencil')
-            self.drawing_mode.addItem(tr('Images transparentes'),'images')
+            if host=='blender' and (modes is None or 'native' in modes): self.drawing_mode.addItem('Grease Pencil','native')
+            if host=='maya' and (modes is None or 'blue_pencil' in modes): self.drawing_mode.addItem(tr('Blue Pencil'),'blue_pencil')
+            if host=='maya' and modes is not None and 'grease_pencil' in modes: self.drawing_mode.addItem('Grease Pencil (Maya 2022)','grease_pencil')
+            if modes is None or 'images' in modes: self.drawing_mode.addItem(tr('Images transparentes'),'images')
+            if self.drawing_mode.findData(current_mode)>=0: self.drawing_mode.setCurrentIndex(self.drawing_mode.findData(current_mode))
             self.drawings.setTitle(tr('Dessins vers Blender') if host=='blender' else tr('Dessins vers Maya') if host=='maya' else tr('Dessins vers le logiciel 3D'))
         current=self.camera.currentData()
         if [self.camera.itemData(i) for i in range(self.camera.count())]!=link.cameras:
@@ -116,8 +121,6 @@ class SyncDialog(QDialog):
         self.onion.setEnabled(hasattr(link.window,'drawing') and link.window.drawing.onion.isChecked())
         self.send.setEnabled(bool(link.cameras and not link.drawing_request and not link.window.job))
         self.remove.setEnabled(bool(getattr(link,'drawing_removal',False) and not link.drawing_request and not link.window.job))
-        if self.isVisible():
-            self.drawings.setMinimumHeight(self.drawings.layout().totalHeightForWidth(self.drawings.width()))
 
 
 def choose_host(parent):

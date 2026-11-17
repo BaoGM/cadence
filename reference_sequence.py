@@ -24,6 +24,9 @@ def snapshot(entries):
 
 def restore(document,quality,progress,cancel):
     config=document.review
+    if config.get('reference_track'):
+        document.reference_sequence=[]; document.reference_media=None; document.reference_warning=''
+        return
     entries=config.get('references')
     if entries is None:
         path=config.get('reference')

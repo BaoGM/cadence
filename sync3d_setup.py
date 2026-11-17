@@ -41,31 +41,52 @@ def install_connector(host):
         raise ValueError('Unsupported 3D application')
     source = Path(getattr(sys, '_MEIPASS', Path(__file__).parent)) / 'integrations'
     runtime = endpoint_path().parent / 'integrations'
-    for name in ('cadence_bridge.py', 'cadence_autostart.py', 'cadence_drawings.py',
-                 'cadence_drawings_blender.py', 'cadence_drawings_maya.py'):
-        write_changed(runtime / name, (source / name).read_text(encoding='utf-8'))
-    loader = ("import importlib.util as _cadence_import, sys as _cadence_sys\n"
-        "_cadence_module = _cadence_sys.modules.get('cadence_autostart')\n"
-        "if _cadence_module is None:\n"
-        f"    _cadence_spec = _cadence_import.spec_from_file_location('cadence_autostart', {str(runtime / 'cadence_autostart.py')!r})\n"
-        "    _cadence_module = _cadence_import.module_from_spec(_cadence_spec)\n"
-        "    _cadence_sys.modules['cadence_autostart'] = _cadence_module\n"
-        "    _cadence_spec.loader.exec_module(_cadence_module)\n")
     changed = False
+    for name in ('cadence_runtime.py', 'cadence_bridge.py', 'cadence_autostart.py', 'cadence_drawings.py',
+                 'cadence_drawings_blender.py', 'cadence_drawings_maya.py'):
+        changed |= write_changed(runtime / name, (source / name).read_text(encoding='utf-8'))
+    runtime_path = 'u' + ascii(str(runtime / 'cadence_runtime.py'))
+    auto_path = 'u' + ascii(str(runtime / 'cadence_autostart.py'))
+    loader = (
+        "def _cadence_startup():\n"
+        "    try:\n"
+        "        import sys\n"
+        "        module = sys.modules.get('cadence_autostart')\n"
+        "        if module is None:\n"
+        "            import types\n"
+        "            runtime = types.ModuleType('cadence_runtime')\n"
+        f"            runtime.__file__ = {runtime_path}\n"
+        "            runtime.__package__ = ''\n"
+        "            sys.modules['cadence_runtime'] = runtime\n"
+        "            with open(runtime.__file__, 'rb') as stream:\n"
+        "                exec(compile(stream.read(), runtime.__file__, 'exec'), runtime.__dict__)\n"
+        f"            module = runtime.load_source('cadence_autostart', {auto_path})\n")
+    if host == 'maya':
+        loader += ("        import maya.cmds as cmds\n"
+            "        cmds.evalDeferred(\"import cadence_autostart; cadence_autostart.safe_start('maya')\", lowestPriority=True)\n")
+    else:
+        loader += "        module.safe_start('blender')\n"
+    loader += (
+        "    except (Exception, SystemExit):\n"
+        "        try:\n"
+        "            import logging\n"
+        "            logging.getLogger('cadence.connector').exception('Cadence startup failed; other startup scripts are unaffected')\n"
+        "        except Exception:\n"
+        "            pass\n")
     if host == 'blender':
-        text = loader + "\ndef register():\n    _cadence_module.start('blender')\n\ndef unregister():\n    _cadence_module.shutdown()\n"
+        text = loader + ("\ndef register():\n    _cadence_startup()\n\ndef unregister():\n"
+            "    import sys\n    module = sys.modules.get('cadence_autostart')\n"
+            "    if module is not None:\n        module.shutdown()\n")
         for folder in blender_script_folders():
             startup = folder / 'startup' / 'cadence_timeline_startup.py'
-            changed |= not startup.exists()
-            write_changed(startup, text)
+            changed |= write_changed(startup, text)
     else:
         from PySide6.QtCore import QStandardPaths
         root = Path(os.environ.get('MAYA_APP_DIR') or (Path(QStandardPaths.writableLocation(QStandardPaths.DocumentsLocation)) / 'maya'))
         module = runtime / 'maya'
-        text = loader + "\nimport maya.cmds as _cadence_cmds\n_cadence_cmds.evalDeferred(\"import cadence_autostart; cadence_autostart.start('maya')\", lowestPriority=True)\n"
+        text = loader + "\n_cadence_startup()\ndel _cadence_startup\n"
         setup = module / 'scripts' / 'userSetup.py'
         descriptor = root / 'modules' / 'cadence_timeline.mod'
-        changed = not setup.exists() or not descriptor.exists()
-        write_changed(setup, text)
-        write_changed(descriptor, f'+ CadenceTimeline 1.15.1 {module.as_posix()}\n')
+        changed |= write_changed(setup, text)
+        changed |= write_changed(descriptor, f'+ CadenceTimeline 1.17.0 {module.as_posix()}\n')
     return changed

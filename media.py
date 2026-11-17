@@ -116,28 +116,40 @@ def display_waveform(values):
 def direct_preview(source,info,fps,quality,cancel=None):
     import av
     source_fps=Fraction(info['fps'])
-    if not info['frames'] or info['codec']=='gif': return None
-    if not any(name in info['container'].split(',') for name in ('mov','mp4','avi')): return None
-    if abs(info['duration']*float(source_fps)-info['frames'])>.1: return None
+    def reject(reason):
+        logging.info('Direct preview rejected: %s; source=%s',reason,source)
+        return None
+    if info['codec']=='gif': return reject('animated GIF requires normalization')
+    if not any(name in info['container'].split(',') for name in ('mov','mp4','avi')): return reject('container requires normalization')
+    if not np.isfinite(info['duration']) or info['duration']<=0: return reject('video duration unavailable')
+    regular=bool(info['frames']) and abs(info['duration']*float(source_fps)-info['frames'])<=.1
+    reason='regular timestamps' if regular else 'frame count/duration mismatch or missing frame count'
     started=time.perf_counter()
     with av.open(str(source)) as container:
         stream=container.streams.video[0]
-        if stream.sample_aspect_ratio not in (None,Fraction(1)): return None
-        first=None
+        sar=stream.sample_aspect_ratio
+        first=None; previous=None; rotation=0
         for index,frame in enumerate(container.decode(video=0)):
             if cancel and cancel.is_set(): raise Cancelled()
-            if frame.pts is None or getattr(frame,'rotation',0): return None
+            if frame.pts is None: return reject('missing frame timestamp')
+            angle=getattr(frame,'rotation',0)
+            if angle%90: return reject(f'unsupported rotation {angle}')
+            rotation=int(angle)%360
             stamp=Fraction(frame.pts)*frame.time_base
             if first is None: first=stamp
-            if abs((stamp-first)*source_fps-index)>Fraction(1,100): return None
-            if index>=min(15,info['frames']-1): break
+            if previous is not None and stamp<previous: return reject('non-monotonic timestamps')
+            previous=stamp
+            if abs((stamp-first)*source_fps-index)>Fraction(1,100):
+                regular=False; reason='variable or rounded frame timestamps'
+            if index>=15: break
         if first is None: raise ValueError('Aucune image décodable dans ce fichier.')
     width,height=info['width'],info['height']
+    if rotation in (90,270): width,height=height,width
     if quality!='native':
         mw,mh=PREVIEW_SIZES[quality]; ratio=min(1,mw/width,mh/height)
         width=max(2,int(width*ratio)//2*2); height=max(2,int(height*ratio)//2*2)
-    logging.info('Direct preview validation %.3fs: %s',time.perf_counter()-started,source)
-    return {'start':str(first),'size':(width,height)}
+    logging.info('Direct preview validation %.3fs: mode=%s reason=%s sar=%s rotation=%s source=%s',time.perf_counter()-started,'frames' if regular else 'timestamps',reason,sar,rotation,source)
+    return {'start':str(first),'size':(width,height),'timestamps':not regular,'rotation':rotation}
 
 
 def prepare_media(path, fps=None, progress=None, cancel=None, quality='native',cadence=None,defer_audio=False):
@@ -149,13 +161,13 @@ def prepare_media(path, fps=None, progress=None, cancel=None, quality='native',c
     source = Path(path).resolve()
     stat = source.stat()
     info = probe(source)
-    logging.info('Media metadata %.3fs: %s',time.perf_counter()-started,source)
+    logging.info('Media metadata %.3fs: codec=%s container=%s fps=%s frames=%s duration=%.6fs size=%sx%s source=%s',time.perf_counter()-started,info['codec'],info['container'],info['fps'],info['frames'],info['duration'],info['width'],info['height'],source)
     if info['hdr']: raise ValueError('Cadence accepte les médias SDR. Convertissez ce média HDR en SDR avant import.')
     fps = Fraction(fps or info['fps'])
     duration=info['duration']/float(Fraction(cadence['speed'])) if cadence else info['duration']
     if quality not in ('native',*PREVIEW_SIZES): raise ValueError('Qualité d’aperçu inconnue.')
     variant='|cadence-v1-'+json.dumps(cadence,sort_keys=True) if cadence else ''
-    key = hashlib.sha256(f'{source}|{stat.st_size}|{stat.st_mtime_ns}|{fps}|proxy-v6-{quality}{variant}'.encode()).hexdigest()[:24]
+    key = hashlib.sha256(f'{source}|{stat.st_size}|{stat.st_mtime_ns}|{fps}|proxy-v7-{quality}{variant}'.encode()).hexdigest()[:24]
     root = cache_root()/key
     root.mkdir(parents=True,exist_ok=True)
     manifest = root/'media.json'
@@ -195,8 +207,10 @@ def prepare_media(path, fps=None, progress=None, cancel=None, quality='native',c
     progress(0,'Préparation de la vidéo image par image')
     if direct:
         from cadence_change import rounded
-        proxy=source; frames=max(1,rounded(Fraction(info['frames'])*fps/Fraction(info['fps']))); pw,ph=direct['size']
+        count=Fraction(str(info['duration']))*fps if direct['timestamps'] else Fraction(info['frames'])*fps/Fraction(info['fps'])
+        proxy=source; frames=max(1,rounded(count)); pw,ph=direct['size']
     else:
+        logging.info('Full preview conversion: reason=%s duration=%.3fs quality=%s source=%s','cadence change' if cadence else 'direct preview unavailable',duration,quality,source)
         if quality=='native': scale='scale=iw:ih'
         else:
             width,height=PREVIEW_SIZES[quality]
@@ -217,7 +231,9 @@ def prepare_media(path, fps=None, progress=None, cancel=None, quality='native',c
     data['video_start']=info['video_start']
     data['audio_pending']=bool(info['has_audio'])
     if cadence: data['cadence']=cadence
-    if direct: data.update(direct_start=direct['start'],direct_fps=info['fps'],direct_frames=info['frames'])
+    if direct:
+        data.update(direct_start=direct['start'],direct_fps=info['fps'],direct_frames=info['frames'],direct_timestamps=direct['timestamps'],preview_rotation=direct['rotation'])
+        if direct['rotation'] in (90,270): data['width'],data['height']=info['height'],info['width']
     write_manifest(data)
     if info['has_audio']:
         if not defer_audio: data=prepare_audio(data,lambda p,m:progress(.8+p*.19,m),cancel)
@@ -265,13 +281,15 @@ def prefetch_frames(media,index,start,end,budget,backward=True):
 
 
 def preview_frame_index(media,index):
+    if media.get('direct_timestamps'): return index
     if 'direct_fps' not in media: return index
     value=Fraction(2*index+1,2)*Fraction(media['direct_fps'])/Fraction(media['fps'])
     return max(0,min(media['direct_frames']-1,-(-value.numerator//value.denominator)-1))
 
 
 def frame_cache_key(media,index):
-    return (media['proxy'],media.get('size'),media.get('mtime_ns'),media.get('preview_quality','native'),preview_frame_index(media,index))
+    timing=(media['fps'],media['direct_start']) if media.get('direct_timestamps') else None
+    return (media['proxy'],media.get('size'),media.get('mtime_ns'),media.get('preview_quality','native'),preview_frame_index(media,index),timing)
 
 
 class PreviewReader:
@@ -282,8 +300,13 @@ class PreviewReader:
         self.owns_cache = cache is None
         self.retain_decoded=retain_decoded
         self.hardware=set(); self.hardware_failed=set(); self.hardware_reformatters={}
+        self.timestamp_readers={}
     def pixels(self,frame,media):
-        return frame.to_ndarray(format='rgb24',width=media.get('proxy_width',frame.width),height=media.get('proxy_height',frame.height))
+        width,height=media.get('proxy_width',frame.width),media.get('proxy_height',frame.height)
+        rotation=media.get('preview_rotation',0)
+        if rotation in (90,270): width,height=height,width
+        pixels=frame.to_ndarray(format='rgb24',width=width,height=height)
+        return np.ascontiguousarray(np.rot90(pixels,rotation//90)) if rotation else pixels
     def read(self, media, index, superseded=None):
         if media.get('has_video') is False: return np.zeros((media['proxy_height'],media['proxy_width'],3),np.uint8)
         identity=(media['proxy'],media.get('size'),media.get('mtime_ns'))
@@ -294,6 +317,7 @@ class PreviewReader:
             logging.warning('Hardware preview failed at frame %s; retrying software: %s',index,media['proxy'],exc_info=True)
             self.hardware.discard(identity); self.hardware_failed.add(identity)
             self.hardware_reformatters.pop(identity,None)
+            self.timestamp_readers.pop(identity,None)
             self.cache.discard_decoded_source(identity)
             container=self.containers.pop(identity,None)
             if container is not None: container.close()
@@ -307,7 +331,7 @@ class PreviewReader:
         index=preview_frame_index(media,index)
         cached = self.cache.get(key)
         if cached is not None: return cached
-        if self.retain_decoded:
+        if self.retain_decoded and not media.get('direct_timestamps'):
             decoded=self.cache.get_decoded((identity,index))
             if decoded is not None:
                 if superseded is not None and superseded(): raise DecodeSuperseded()
@@ -319,6 +343,7 @@ class PreviewReader:
                 self.decoders.pop(old,None); self.positions.pop(old,None); self.pending.pop(old,None); self.targets.pop(old,None); container.close()
                 self.hardware.discard(old)
                 self.hardware_reformatters.pop(old,None)
+                self.timestamp_readers.pop(old,None)
             from hardware_decode import open_preview
             container,hardware=open_preview(path,identity in self.hardware_failed)
             self.containers[identity]=container
@@ -326,6 +351,19 @@ class PreviewReader:
         self.containers.move_to_end(identity)
         c = self.containers[identity]
         v = c.streams.video[0]
+        if media.get('direct_timestamps'):
+            from timestamp_preview import TimestampPreview
+            timing=(str(media['direct_start']),str(media['fps']))
+            saved=self.timestamp_readers.get(identity)
+            if saved is None or saved[:2]!=timing:
+                saved=(*timing,TimestampPreview(c,*timing))
+                self.timestamp_readers[identity]=saved
+                self.decoders.pop(identity,None)
+            frame=saved[2].read(index,superseded)
+            arr=self.pixels(frame,media); self.cache.put(key,arr)
+            return arr
+        if self.timestamp_readers.pop(identity,None) is not None:
+            self.decoders.pop(identity,None)
         fps = Fraction(media.get('direct_fps',media['fps']))
         origin=Fraction(media.get('direct_start','0'))
         previous=self.positions.get(identity,-1000)
@@ -366,6 +404,7 @@ class PreviewReader:
         for c in self.containers.values(): c.close()
         self.containers.clear(); self.decoders.clear(); self.positions.clear(); self.pending.clear(); self.targets.clear()
         self.hardware.clear(); self.hardware_failed.clear(); self.hardware_reformatters.clear()
+        self.timestamp_readers.clear()
         if self.owns_cache: self.cache.clear()
 
 
@@ -381,15 +420,17 @@ def export_video(state, media, fps, output, apply_exposure=True, progress=None, 
     except PermissionError as error:
         raise ValueError('Ce dossier est protégé. Choisissez un autre dossier pour l’export.\n'+str(output.parent)) from error
     audio_only = extension in ('.wav','.mp3')
-    sources = list(dict.fromkeys(s.media for s in state.segments if s.media is not None and not s.muted))
-    for key in dict.fromkeys(s.media for s in state.segments+state.audio if s.media is not None):
+    video_segments=tuple(s for track in state.tracks for s in track.segments)
+    audio_segments=tuple(s for track in state.tracks for s in track.audible)
+    sources = list(dict.fromkeys(s.media for s in video_segments if s.media is not None and not s.muted and media[s.media].get('has_video',True)))
+    for key in dict.fromkeys(s.media for s in state.all_segments if s.media is not None):
         source = Path(media[key]['path']).resolve()
         if source == output or (output.exists() and source.exists() and source.samefile(output)):
             raise ValueError('Choisissez un fichier différent du média source.')
-    required = state.audio if audio_only else state.segments+state.audio
+    required = audio_segments if audio_only else state.all_segments
     for key in dict.fromkeys(s.media for s in required if s.media is not None and not s.muted):
         validate_media(media[key])
-    for key in dict.fromkeys(s.media for s in state.audio if s.media is not None and not s.muted):
+    for key in dict.fromkeys(s.media for s in audio_segments if s.media is not None and not s.muted):
         if media[key].get('audio_pending'):
             from audio_prepare import prepare_audio
             media[key]=prepare_audio(media[key],lambda p,m:progress(0,m),cancel)
@@ -407,7 +448,8 @@ def export_video(state, media, fps, output, apply_exposure=True, progress=None, 
     partial = output.with_name(output.stem+'.'+uuid.uuid4().hex[:8]+'.partial'+output.suffix)
     with tempfile.TemporaryDirectory(prefix='cadence-export-') as tmp:
         pcm_path = Path(tmp)/'timeline.s16'
-        pcm = TimelinePCM(state.audio,media,fps)
+        from composite_media import MixedPCM
+        pcm = MixedPCM(state,media,fps)
         try:
             with pcm_path.open('wb') as out:
                 for start in range(0,pcm.samples,RATE):
@@ -428,17 +470,20 @@ def export_video(state, media, fps, output, apply_exposure=True, progress=None, 
             return str(output)
         first = media[sources[0]] if sources else next(iter(media.values()),{'width':1280,'height':720})
         width,height = first['width']//2*2,first['height']//2*2
+        if state.second_track is not None:
+            from composite_media import canvas_size
+            width,height=(dimension//2*2 for dimension in canvas_size(state,media))
         args,filters = [],[]
         for key in sources: args += ['-i',media[key]['path']]
         args += ['-f','s16le','-ar',str(RATE),'-ac','2','-i',str(pcm_path)]
-        for idx,key in enumerate(sources):
+        for idx,key in enumerate(sources if state.second_track is None else []):
             occurrences = [j for j,s in enumerate(state.segments) if s.media == key and not s.muted]
             labels = ''.join(f'[src{j}]' for j in occurrences)
             from cadence_change import video_filter
             base = f'[{idx}:v:0]'+video_filter(fps,media[key].get('cadence'))+f',scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1'
             if len(occurrences)>1: base += f',split={len(occurrences)}'
             filters.append(base+labels)
-        for i,seg in enumerate(state.segments):
+        for i,seg in enumerate(state.segments if state.second_track is None else []):
             if seg.media is None or seg.muted:
                 filters.append(f'color=c=black:s={width}x{height}:r={fps},trim=end_frame={seg.length},setpts=PTS-STARTPTS[v{i}]')
                 continue
@@ -446,11 +491,14 @@ def export_video(state, media, fps, output, apply_exposure=True, progress=None, 
             geometry=','+geometry_filter(seg,width,height) if seg.crop!=IDENTITY or seg.placement!=IDENTITY or seg.rotation else ''
             filters.append(f'[src{i}]trim=start_frame={seg.start}:end_frame={seg.end},setpts=PTS-STARTPTS'+geometry+f'[v{i}]')
         inputs = ''.join(f'[v{i}]' for i in range(len(state.segments)))
-        filters.append(inputs+f'concat=n={len(state.segments)}:v=1:a=0[joined]')
+        if state.second_track is None: filters.append(inputs+f'concat=n={len(state.segments)}:v=1:a=0[joined]')
         effect = exposure_filter(state.exposure)+',' if apply_exposure and state.exposure else ''
         if state.flip_h: effect+='hflip,'
         if state.flip_v: effect+='vflip,'
-        filters.append('[joined]'+effect+'format=rgba[drawbase]')
+        if state.second_track is None: filters.append('[joined]'+effect+'format=rgba[drawbase]')
+        else:
+            from track_export import video_graph
+            filters=video_graph(state,media,sources,fps,width,height,apply_exposure)
         drawbase='drawbase'
         if state.drawings and onion and (onion[0] or onion[1]):
             from drawing import render_layer
@@ -459,7 +507,7 @@ def export_video(state, media, fps, output, apply_exposure=True, progress=None, 
             for frame in range(state.length):
                 if cancel and cancel.is_set(): raise Cancelled()
                 image=render_layer(state.drawings,frame,width,height,*onion,cache=drawing_cache)
-                if state.flip_h or state.flip_v: image=image.mirrored(state.flip_h,state.flip_v)
+                if state.second_track is None and (state.flip_h or state.flip_v): image=image.mirrored(state.flip_h,state.flip_v)
                 if not image.save(str(Path(tmp)/f'onion-{frame:08d}.png')): raise ValueError('Impossible de préparer les dessins.')
                 progress(.1+.15*frame/state.length,'Préparation des pelures')
             index=len(sources)+1
@@ -474,12 +522,12 @@ def export_video(state, media, fps, output, apply_exposure=True, progress=None, 
                 if cancel and cancel.is_set(): raise Cancelled()
                 image=render_marks(key.marks,width,height)
                 flips=Qt.Orientation(0)
-                if state.flip_h: flips|=Qt.Orientation.Horizontal
-                if state.flip_v: flips|=Qt.Orientation.Vertical
+                if state.second_track is None and state.flip_h: flips|=Qt.Orientation.Horizontal
+                if state.second_track is None and state.flip_v: flips|=Qt.Orientation.Vertical
                 if flips: image=image.flipped(flips)
                 image_path=Path(tmp)/f'drawing-{key.start}.png'
                 if not image.save(str(image_path)): raise ValueError('Impossible de préparer les dessins.')
-                input_index=len(sources)+1+sum(1 for f in filters if 'overlay=' in f)
+                input_index=sum(1 for arg in args if arg=='-i')
                 args += ['-loop','1','-framerate',str(fps),'-i',str(image_path)]
                 outlabel=f'draw{key.start}'
                 filters.append(f"[{drawbase}][{input_index}:v]overlay=shortest=1:enable='gte(n,{key.start})*lt(n,{key.end})'[{outlabel}]")

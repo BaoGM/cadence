@@ -1,4 +1,4 @@
-Cadence 1.16.1 - Guide rapide
+Cadence 1.17.0 - Guide rapide
 
 Les raccourcis indiqués sont ceux par défaut. Leur liste complète figure à la fin du guide ; ils se personnalisent dans Fichier > Options > Raccourcis.
 
@@ -11,10 +11,12 @@ Ctrl+S met à jour le projet courant. Lors de la première sauvegarde, il demand
 
 Ctrl+S enregistre le projet .cadence : montage, dessins et références de comparaison. Les médias restent dans leurs dossiers d'origine ; conservez-les pour rouvrir le projet. Ctrl+N crée une timeline vide. La restauration de session au démarrage ne remplace pas l'enregistrement d'un projet.
 
-Ctrl+E exporte en MP4, MOV, GIF, WAV ou MP3. WAV et MP3 exportent uniquement la piste audio montée, avec ses coupes et ses silences. WAV conserve le son sans compression (48 kHz, 16 bits, stéréo) ; MP3 utilise 192 kbit/s. Le GIF ne contient pas de son. Dessins et pelures activées sont inclus si « Inclure les dessins à l'export » est coché. Le dossier du résultat s'ouvre à la fin.
+Ctrl+E exporte en MP4, MOV, GIF, WAV ou MP3. WAV et MP3 exportent le mélange des bandes audio des pistes média, avec leurs coupes et leurs silences. WAV conserve le son sans compression (48 kHz, 16 bits, stéréo) ; MP3 utilise 192 kbit/s. Le GIF ne contient pas de son. Dessins et pelures activées sont inclus si « Inclure les dessins à l'export » est coché. Le dossier du résultat s'ouvre à la fin.
 
 ----------------------------------------
 Lire et sélectionner
+
+Ctrl + molette augmente ou diminue le volume général par pas de 5 %, sans changer le zoom.
 
 Espace : lecture / pause. Gauche et Droite : une image. Début et Fin : extrémités de la timeline. Virgule et Point : clé ou marqueur précédent / suivant, avec retour à l'autre extrémité.
 
@@ -28,6 +30,14 @@ Maj + double-clic sur un média sélectionne tout son bloc, y compris sur la tim
 
 ----------------------------------------
 Modifier la timeline
+
+Une piste média réunit une bande vidéo et une bande audio. Le bouton « + Piste média » ajoute une seconde piste sous la première. La piste du dessus apparaît devant celle du dessous ; ses zones transparentes laissent voir la piste inférieure. Le son des deux pistes est mélangé.
+
+Les pistes sont nommées Piste 1 et Piste 2. Cliquez sur un titre pour sélectionner une piste. Ctrl+clic ajoute ou retire une piste de la sélection, sur son titre comme dans sa timeline. Les modifications portent sur les pistes sélectionnées. Glissez un titre au-dessus ou au-dessous de l’autre pour changer leur ordre. Le clic droit sur le titre permet aussi de déplacer ou supprimer toute la piste. Ctrl+Z annule ces actions. Les bandes audio sont repliées au départ : cliquez sur le triangle près du titre pour les déployer.
+
+Double-cliquez sur le titre ou la timeline d’une piste pour déployer ou replier sa bande audio. Le clic droit permet de désactiver ou réactiver tout son audio, y compris à l’export. Lorsque les deux pistes sont sélectionnées, glissez un média vers l’autre piste pour y déplacer sa vidéo et son audio ensemble. Son emplacement initial reste vide. Alt+Maj+glisser le copie. Les clés de dessin apparaissent au-dessus de la barre de lecture, sans recouvrir les chiffres, même en timeline simplifiée.
+
+Les dessins, leurs clés et les marqueurs restent communs, au-dessus des deux pistes. Modifier une seule piste conserve les dessins à leur position ; avec les deux pistes sélectionnées, les dessins liés suivent les modifications.
 
 Ctrl+C, Ctrl+X et Ctrl+V copient, coupent et collent l'image courante ou la plage sélectionnée. Suppr supprime la plage. Le son est copié seulement si « Copier/coller le son » est coché dans le bandeau supérieur. Ctrl+Z annule ; Ctrl+Y rétablit.
 
@@ -68,7 +78,7 @@ Glissez à l'extérieur d'un coin pour faire tourner ; Maj impose des pas de 15�
 ----------------------------------------
 Comparer des vidéos
 
-A est le montage de travail ; B est une ou plusieurs vidéos de référence. Comparaison > Ajouter des références B les charge à la suite. L'onglet Références de la liste de lecture permet de les réordonner par glissement ou de les retirer au clic droit.
+A est le montage de travail ; B est une ou plusieurs vidéos de référence. Le clic droit sur un titre de piste > Utiliser comme référence B choisit cette piste pour B ; l’autre piste devient A dans l’aperçu de comparaison. L’export conserve le montage complet des deux pistes. Comparaison > Ajouter des références B les charge à la suite. L'onglet Références de la liste de lecture permet de les réordonner par glissement ou de les retirer au clic droit.
 
 Les modes sont Côte à côte, Dessus / dessous, Superposition, Différence, Révélateur et Premier plan. Maj+X ou le bouton de comparaison les fait défiler, puis revient à A seule. Alt+X intervertit A et B.
 
@@ -138,7 +148,9 @@ Dans Synchronisation 3D > Réglages, activez la liaison puis choisissez une cam�
 
 Blender 4.3 ou ultérieur : Grease Pencil crée des traits modifiables pour le pinceau, les flèches, rectangles et cercles. Une clé contenant du texte, de la gomme, un groupe ou une déformation non uniforme devient une image transparente. Images transparentes applique ce traitement à toutes les clés. Les textes, images et pelures restent visibles avec les superpositions de Blender désactivées. À l’envoi, les vues en mode Solide passent en couleur Texture pour les afficher. Ils apparaissent aussi au rendu. Les images sont intégrées au fichier .blend à sa sauvegarde.
 
-Maya : Blue Pencil crée un calque animé dans la caméra choisie. Chaque image est aplatie : elle peut être retouchée avec les outils de peinture Blue Pencil, mais le texte et les formes ne restent pas des objets séparés. Ce mode sert à la vue et au playblast, pas au rendu final. Images transparentes crée un seul plan animé. Ses fichiers sont copiés dans sourceimages/Cadence du projet Maya, à conserver avec la scène.
+Maya 2022 : Grease Pencil crée des images retouchables avec les outils natifs. Le transfert est progressif ; Annuler dans Cadence ou Échap dans Maya interrompt entre deux étapes et conserve les dessins précédents. La navigation dans Cadence est suspendue pendant l’import. Les proportions du dessin sont conservées.
+
+Maya 2023 ou ultérieur : Blue Pencil crée un calque animé dans la caméra choisie. Chaque image est aplatie : elle peut être retouchée avec les outils de peinture Blue Pencil, mais le texte et les formes ne restent pas des objets séparés. Ce mode sert à la vue et au playblast, pas au rendu final. Images transparentes crée un seul plan animé. Ses fichiers sont copiés dans sourceimages/Cadence du projet Maya, à conserver avec la scène.
 
 Inclure les pelures d'oignon nécessite leur activation dans Cadence. Le transfert reprend leurs portées, leur opacité décroissante et les couleurs d'origine. Maya désactive les pelures natives de Blue Pencil pour éviter de les doubler avec celles déjà intégrées. Dans Blender, l'empilement peut différer si plusieurs pelures se recouvrent.
 

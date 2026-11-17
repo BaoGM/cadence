@@ -11,7 +11,7 @@ datas += [(str(root / 'assets' / 'fonts'), 'assets/fonts')]
 datas += [(str(root / 'integrations' / 'cadence_bridge.py'), 'integrations')]
 datas += [(str(root / 'integrations' / 'cadence_autostart.py'), 'integrations')]
 datas += [(str(root / 'integrations' / name), 'integrations') for name in (
-    'cadence_drawings.py', 'cadence_drawings_blender.py', 'cadence_drawings_maya.py')]
+    'cadence_drawings.py', 'cadence_drawings_blender.py', 'cadence_drawings_maya.py', 'cadence_runtime.py')]
 datas += [(str(root/'vendor'/'ffmpeg.exe'),'vendor')]
 
 

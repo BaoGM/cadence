@@ -97,7 +97,7 @@ def build_bundle(keys, root, owner, width, height, timeline_fps, host_fps, origi
             if progress: progress((index+1)/max(1,len(keys)), 'Préparation des dessins')
         if mode=='blue_pencil':
             build_blue_archive(result,folder,cancel)
-        elif mode=='images':
+        elif mode in ('images','grease_pencil'):
             build_image_sequence(result,folder,cancel)
         path = folder/'manifest.json'
         path.write_text(json.dumps(result,separators=(',',':'),allow_nan=False),encoding='utf-8')

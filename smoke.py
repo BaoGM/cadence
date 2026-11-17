@@ -397,6 +397,7 @@ def run(directory):
         assert sync_dialog.windowTitle()==tr('Synchronisation 3D') and not win.sync3d.enabled
         assert (Path(getattr(sys,'_MEIPASS',Path(__file__).parent))/'integrations/cadence_bridge.py').is_file()
         assert (Path(getattr(sys,'_MEIPASS',Path(__file__).parent))/'integrations/cadence_autostart.py').is_file()
+        assert (Path(getattr(sys,'_MEIPASS',Path(__file__).parent))/'integrations/cadence_runtime.py').is_file()
         from PySide6.QtWidgets import QPlainTextEdit
         assert win.sync3d.host is None and sync_dialog.host.currentData() is None
         assert not sync_dialog.findChildren(QPlainTextEdit) and sync_dialog.height()<750
@@ -413,6 +414,8 @@ def run(directory):
         assert 'Synchronisation 3D/Adapter la cadence du média courant…' in win.action_registry
         sync_dialog.grab().save(str(output/'sync3d-dialog.png')); sync_dialog.close(); sync_dialog.deleteLater()
         result.update(sync3d_controls=True,capture_cursor_fixed=True,save_action_renamed=True,sync3d_no_default_host=True,sync3d_compact_dialog=True)
+        check_connector_installation(output)
+        result['connector_installation'] = True
         result.update(capture_inclusion_controls=True,manual_rate_adaptation=True,drawing_transfer_controls=True)
         for extension in ('wav','mp3'):
             exported_audio=output/('audio-only.'+extension)
@@ -460,11 +463,83 @@ def run(directory):
         result.update(check_native_render())
         result.update(check_cadence_change(win,output))
         result.update(check_preview_options(win,output))
+        result.update(check_timestamp_preview(win,output))
+        result.update(check_media_tracks(win,output,media))
         result.update(check_review_tools(win,output))
         result.update(check_native_import(output))
         (output/'result.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     finally:
-        doc.saved_signature=doc.signature(); win.close(); app.processEvents()
+        win.doc.saved_signature=win.doc.signature(); win.close(); app.processEvents()
+
+
+def check_media_tracks(win,output,media):
+    from PySide6.QtCore import Qt,QPoint,QPointF
+    from PySide6.QtGui import QWheelEvent
+    from PySide6.QtWidgets import QApplication
+    from PySide6.QtTest import QTest
+    from model import Document
+    doc=Document(Fraction(media['fps'])); doc.append_media([media])
+    doc.add_media_track(); doc.append_media([media])
+    win.install_doc(doc); win.workspaces.switch('edit')
+    doc.select_track(doc.state.tracks[0].info.id,extend=True)
+    doc.select(0,3); original=doc.state.length
+    assert doc.delete() and all(track.length==original-3 for track in doc.state.tracks)
+    assert doc.undo()
+    win.refresh(); win.request_frame()
+    deadline=time.monotonic()+15
+    while win.rendered_token!=win.token and time.monotonic()<deadline:
+        QApplication.processEvents(); QTest.qWait(10)
+    assert win.rendered_token==win.token and win.viewer.layer_frame is not None
+    win.timeline.grab().save(str(output/'media-tracks.png'))
+    win.use_track_reference(doc.state.second_track.info.id)
+    doc.review=win.comparison_snapshot()
+    doc.save(output/'two-tracks.cadence')
+    loaded=Document.load(output/'two-tracks.cadence')
+    assert loaded.state==doc.state and loaded.review==doc.review
+    win.volume.setValue(50)
+    event=QWheelEvent(QPointF(20,20),QPointF(win.viewer.mapToGlobal(QPoint(20,20))),QPoint(),QPoint(0,120),Qt.NoButton,Qt.ControlModifier,Qt.ScrollPhase.NoScrollPhase,False)
+    QApplication.sendEvent(win.viewer,event)
+    assert win.volume.value()==55
+    win.sync3d.show_dialog(); dialog=win.sync3d.dialog; QApplication.processEvents()
+    dialog.resize(1,1); QApplication.processEvents()
+    assert dialog.size().width()>=dialog.minimumSizeHint().width() and dialog.size().height()>=dialog.minimumSizeHint().height()
+    dialog.grab().save(str(output/'sync-minimum.png')); dialog.hide()
+    return dict(media_tracks=True,track_reference=True,track_roundtrip=True,volume_wheel=True,sync_minimum=True)
+
+
+def check_timestamp_preview(win,output):
+    import numpy as np
+    from PySide6.QtWidgets import QApplication
+    from PySide6.QtTest import QTest
+    from media import run_ffmpeg
+    source=output/'variable-preview.mp4'
+    reference=output/'variable-preview.rgb'
+    run_ffmpeg(['-f','lavfi','-i','testsrc2=s=160x96:r=24:d=3','-vf',"select='not(eq(mod(n,7),3))'",'-fps_mode','vfr','-c:v','libx264','-crf','0',str(source)])
+    win.doc.saved_signature=win.doc.signature()
+    original_error=win.error; errors=[]; win.error=errors.append
+    started=time.perf_counter()
+    try:
+        win.open_path(str(source)); deadline=time.monotonic()+15
+        while not errors and (win.job or win.rendered_token!=win.token) and time.monotonic()<deadline:
+            QApplication.processEvents(); QTest.qWait(10)
+        assert not errors, errors
+    finally:
+        win.error=original_error
+    assert win.job is None and win.rendered_token==win.token
+    first_seconds=time.perf_counter()-started
+    item=next(iter(win.doc.media.values()))
+    assert item['proxy']==str(source) and item['direct_timestamps']
+    assert not Path(item['audio']).with_name('preview.avi').exists()
+    run_ffmpeg(['-i',str(source),'-vf',f'setpts=PTS-STARTPTS,fps={item["fps"]}', '-an','-pix_fmt','rgb24','-f','rawvideo',str(reference)])
+    expected=np.fromfile(reference,np.uint8).reshape(-1,96,160,3)
+    assert item['frames']==len(expected)
+    for index in (0,len(expected)-1,len(expected)//2,1):
+        win.seek(index); deadline=time.monotonic()+10
+        while win.rendered_token!=win.token and time.monotonic()<deadline:
+            QApplication.processEvents(); QTest.qWait(10)
+        assert win.rendered_token==win.token
+        np.testing.assert_array_equal(win.viewer.rgb,expected[index])
+    return dict(timestamp_preview=True,timestamp_preview_first_image_seconds=first_seconds)
 
 
 def check_native_import(output):
@@ -771,6 +846,37 @@ def check_reference_sequence(window,media,output):
     w.library_tabs.setCurrentIndex(w.reference_tab); QApplication.processEvents()
     w.library.grab().save(str(output/'reference-list.png'))
     w.doc.state=original; w.set_reference_sequence([media]); w.compare_offset.setValue(offset); w.refresh()
+
+
+def check_connector_installation(output):
+    from sync3d_setup import install_connector
+    folder = output / 'connector-installation'
+    overrides = {'CADENCE_SYNC_ENDPOINT': str(folder / 'endpoint.json'),
+                 'MAYA_APP_DIR': str(folder / 'maya'),
+                 'BLENDER_USER_SCRIPTS': str(folder / 'blender')}
+    previous = {name: os.environ.get(name) for name in overrides}
+    os.environ.update(overrides)
+    try:
+        studio = folder / 'maya/scripts/userSetup.py'
+        studio.parent.mkdir(parents=True, exist_ok=True)
+        studio.write_text('studio_startup = True\n', encoding='utf-8')
+        for host in ('maya', 'blender'):
+            assert install_connector(host)
+            assert not install_connector(host)
+        assert studio.read_text(encoding='utf-8') == 'studio_startup = True\n'
+        for name in ('cadence_runtime.py', 'cadence_autostart.py', 'cadence_bridge.py'):
+            assert (folder / 'integrations' / name).is_file()
+        loader = folder / 'integrations/maya/scripts/userSetup.py'
+        text = loader.read_text(encoding='utf-8')
+        compile(text, str(loader), 'exec')
+        assert 'safe_start' in text and 'except (Exception, SystemExit)' in text
+        assert (folder / 'maya/modules/cadence_timeline.mod').is_file()
+    finally:
+        for name, value in previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
 
 def check_navigation_shortcuts(window):

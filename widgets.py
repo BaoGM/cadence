@@ -178,15 +178,22 @@ class Viewer(QWidget):
     def hideEvent(self,event):
         self.cursor_guard.deactivate(); super().hideEvent(event)
     def set_frame(self,arr):
-        self.rgb=arr; self.loaded=True; self.apply_effect()
+        from composite_media import LayerFrame
+        self.layer_frame=arr if isinstance(arr,LayerFrame) else None
+        self.rgb=arr.compose() if self.layer_frame is not None else arr
+        self.loaded=True; self.apply_effect()
     def set_exposure(self,ev): self.ev=ev; self.apply_effect()
     def apply_effect(self):
         if self.rgb is not None:
             signature=(id(self.rgb),id(self.reference_rgb),self.ev,self.flip_h,self.flip_v,self.comparing,self.compare_mode,self.compare_opacity,self.compare_gain,self.compare_swapped,getattr(self,'geometry_segment',None),getattr(self,'geometry_aspect',None),getattr(self,'geometry_source',False))
+            signature+=(getattr(self,'layer_geometry_ids',()),tuple(sorted((getattr(self,'layer_exposures',None) or {}).items())))
             if signature==getattr(self,'_effect_signature',None): return
             from clip_geometry import apply_geometry
             from native_render import rgb_image
-            prepared=apply_geometry(self.rgb,getattr(self,'geometry_segment',None),getattr(self,'geometry_aspect',None),getattr(self,'geometry_source',False))
+            if getattr(self,'layer_frame',None) is not None:
+                prepared=self.layer_frame.compose(getattr(self,'layer_geometry_ids',()),getattr(self,'geometry_segment',None),
+                    getattr(self,'geometry_source',False),getattr(self,'layer_exposures',None))
+            else: prepared=apply_geometry(self.rgb,getattr(self,'geometry_segment',None),getattr(self,'geometry_aspect',None),getattr(self,'geometry_source',False))
             comparing=self.comparing and self.reference_rgb is not None
             self.gpu_packet=None; self._cpu_preview=None
             if self.renderer in ('opengl','direct3d') and self.surface is not None and not self.surface.compositor.failed:
@@ -256,7 +263,7 @@ class Viewer(QWidget):
                 image=QImage(rgb.data,rgb.shape[1],rgb.shape[0],rgb.strides[0],QImage.Format.Format_RGB888).copy()
             self._cpu_preview=image
         return self._cpu_preview
-    def clear(self): self._effect_signature=None; self._effect_sources=None; self.gpu_packet=None; self._cpu_preview=None; self.reference_rgb=None; self.rgb=None; self.image=None; self.loaded=False; self.update()
+    def clear(self): self.layer_frame=None; self._effect_signature=None; self._effect_sources=None; self.gpu_packet=None; self._cpu_preview=None; self.reference_rgb=None; self.rgb=None; self.image=None; self.loaded=False; self.update()
     def paintEvent(self,event):
         if self.renderer in ('opengl','direct3d'): return
         p=QPainter(self)
@@ -368,7 +375,18 @@ class Viewer(QWidget):
         paths=[u.toLocalFile() for u in urls if u.isLocalFile()]
         if paths: self.fileDropped.emit(paths)
 
-class Timeline(QWidget):
+from track_rows import TrackRows
+
+
+class Timeline(TrackRows,QWidget):
+    mediaTrackSelected=Signal(str,str)
+    mediaTrackAdded=Signal()
+    mediaTrackRemoved=Signal(str)
+    mediaTrackReordered=Signal(str,int)
+    mediaAudioExpanded=Signal(str,bool)
+    mediaAudioEnabled=Signal(str,bool)
+    mediaTransferred=Signal(str,str,int,int,int,bool)
+    mediaReferenceRequested=Signal(str)
     cadenceRequested=Signal(int,int)
     scrubStarted=Signal()
     scrubFinished=Signal()
@@ -407,7 +425,7 @@ class Timeline(QWidget):
             self.drag_animation.stop(); self.drag_animation.setStartValue(self.animated_x if self.animated_x is not None else end); self.drag_animation.setEndValue(end); self.drag_animation.start()
         self.ghost_x=x-self.grab_offset; self.update()
     def set_document(self,state,media,fps):
-        self.state=state; self.setFixedHeight(44 if getattr(self,"simple",False) else 100); self.media=media; self.fps=float(fps); self.clamp_view(); self.update()
+        self.state=state; self.setFixedHeight(64 if getattr(self,"simple",False) else self.media_height()); self.media=media; self.fps=float(fps); self.clamp_view(); self.update()
     def set_units(self,units):
         self.units=units; self.update(); self.unitsChanged.emit(units)
     def tick_label(self,frame):
@@ -423,9 +441,9 @@ class Timeline(QWidget):
             self.clamp_view(); self.update()
     def clamp_view(self): self.view_start=max(0,min(self.view_start,max(0,(self.state.length if self.state else 0)-self.span()))); self.viewportChanged.emit()
     def reset_view(self): self.zoom=1.; self.view_start=0.; self.clamp_view(); self.update()
-    def track_y(self,track): return {'video':47,'audio':73,'drawing':40}[track]
+    def track_y(self,track): return self.media_track_y(track)
     def track_rect(self,track): return QRectF(self.track_left(),self.track_y(track),self.track_width(),19)
-    def simple_track_rect(self): return QRectF(self.track_left(),24,self.track_width(),12)
+    def simple_track_rect(self): return QRectF(self.track_left(),44,self.track_width(),12)
     def track_left(self): return 20 if getattr(self,'simple',False) else 78
     def track_right(self): return self.width()-self.track_left()
     def track_width(self): return max(1,self.track_right()-self.track_left())
@@ -505,7 +523,7 @@ class Timeline(QWidget):
         minor,major=self.ruler_steps(); left=self.track_left(); right=left+self.track_width()
         end=min(self.state.length,math.ceil(self.view_start+self.span()))
         major_ticks=QPainterPath(); minor_ticks=QPainterPath()
-        p.save(); p.setClipRect(QRectF(left,0,self.track_width()+1,38)); p.setFont(QFont('Segoe UI',8))
+        p.save(); p.setClipRect(QRectF(left,0,self.track_width()+1,self.simple_track_rect().bottom()+1 if simple else 38)); p.setFont(QFont('Segoe UI',8))
         for f in range(max(0,math.ceil(self.view_start/minor)*minor),end+1,minor):
             x=self.x_for(f); large=f%major==0
             if simple:
@@ -549,7 +567,7 @@ class Timeline(QWidget):
     def media_boundaries(self):
         if not self.state: return []
         positions=[]; last=None
-        for _,at,segment in self.track_indices['video'].visible(self.state.segments,self.view_start,self.view_start+self.span()):
+        for _,at,segment in self.track_indices['video'].visible(self.active_media.segments,self.view_start,self.view_start+self.span()):
             x=self.x_for(at)
             if at and self.track_left()<x<self.track_right() and (last is None or x-last>=3):
                 positions.append(x); last=x
@@ -594,8 +612,7 @@ class Timeline(QWidget):
                 if self.track_left()<=x<=self.track_right(): p.drawLine(QPointF(x,bar.top()-2),QPointF(x,bar.bottom()+4))
             self.paint_selection_label(p); self.paint_simple_move(p); self.paint_frame_indicator(p); p.end(); return
         p.setFont(QFont('Segoe UI',9)); p.setPen(MUTED)
-        p.drawText(QRectF(0,self.track_y('video'),self.track_left(),19),Qt.AlignmentFlag.AlignCenter,tr('VIDÉO'))
-        p.drawText(QRectF(0,self.track_y('audio'),self.track_left(),19),Qt.AlignmentFlag.AlignCenter,tr('AUDIO'))
+        self.paint_media_titles(p)
         p.setPen(QColor('#27313e')); p.drawLine(0,38,self.width(),38)
         if not self.state or not self.state.length:
             p.setPen(MUTED); p.drawText(90,85,tr('Votre montage apparaîtra ici.')); p.end(); return
@@ -606,13 +623,18 @@ class Timeline(QWidget):
         colors=['#365f63','#36586b']
         left=self.track_left(); scale=self.track_width()/self.span()
         view_end=self.view_start+self.span()
-        for track,segments in [('video',self.state.segments),('audio',self.state.audio)]:
+        from timeline_index import SegmentIndex
+        rows=[(kind,segments,media_track.info.id,y+(26 if kind=='audio' else 0))
+              for media_track,y,height in self.media_rows()
+              for kind,segments in [('video',media_track.segments)]+([('audio',media_track.audible)] if media_track.info.audio_expanded else [])]
+        for track,segments,identity,y in rows:
             last_pixel=None
-            for i,at,seg in self.track_indices[track].visible(segments,self.view_start,view_end):
+            index=self.track_indices.setdefault((identity,track),SegmentIndex())
+            for i,at,seg in index.visible(segments,self.view_start,view_end):
                 x1=left+(at-self.view_start)*scale; x2=x1+seg.length*scale
                 if x2-x1<1 and math.floor(x1)==last_pixel: continue
                 last_pixel=math.floor(x1); w=max(1,x2-x1-(2 if at+seg.length<n else 0))
-                y,h=self.track_y(track),19
+                h=19
                 p.setPen(Qt.PenStyle.NoPen); p.setBrush(QColor('#484c52' if seg.muted else '#080b10' if seg.media is None else colors[i%len(colors)] if track=='video' else '#1e3c38')); p.drawRoundedRect(QRectF(x1,y,w,h),4,4)
                 if track=='video' and w>16:
                     p.setPen(QColor('#d5eaf1')); text=self.media.get(seg.media,{}).get('name','N/A')+(tr(' · DÉSACTIVÉ') if seg.muted else '')
@@ -633,8 +655,10 @@ class Timeline(QWidget):
             x=self.animated_x if self.animated_x is not None else self.x_for(self.drop_frame); p.setPen(QPen(QColor('#ff963b'),3)); p.drawLine(QPointF(x,40),QPointF(x,self.height()-4))
         if self.state.selection:
             a,b=self.state.selection; x1,x2=self.x_for(a),self.x_for(b)
-            p.setPen(QPen(ACCENT,1)); p.setBrush(QColor(104,224,207,35)); p.drawRect(QRectF(x1,42,max(2,x2-x1),54))
-            p.setBrush(ACCENT); p.drawRect(QRectF(x1,42,3,54)); p.drawRect(QRectF(max(x1,x2-3),42,3,54))
+            for media_track,y,height in self.media_rows():
+                if media_track.info.id not in getattr(self,'selected_media_ids',(self.active_media.info.id,)): continue
+                p.setPen(QPen(ACCENT,1)); p.setBrush(QColor(104,224,207,35)); p.drawRect(QRectF(x1,y-3,max(2,x2-x1),height))
+                p.setBrush(ACCENT); p.drawRect(QRectF(x1,y-3,3,height)); p.drawRect(QRectF(max(x1,x2-3),y-3,3,height))
         if self.state.loop_range:
             a,b=self.state.loop_range
             p.setPen(QPen(QColor('#e9b566'),3)); p.drawLine(QPointF(self.x_for(a),self.height()-4),QPointF(self.x_for(b),self.height()-4))
@@ -643,10 +667,11 @@ class Timeline(QWidget):
         p.setBrush(QColor('#ffffff')); p.drawEllipse(QPointF(x,35),4,4)
         self.drawing_track.paint(p)
         if self.move_span and self.ghost_x is not None:
-            a,b,track=self.move_span; linked=self.linked or self.gesture=='copy'; top=self.track_y('video' if linked else track); h=45 if linked else 19
+            a,b,track=self.move_span; linked=self.linked or self.gesture=='copy'; top=self.track_y('video' if linked else track); h=45 if linked and self.active_media.info.audio_expanded else 19
             source=QRectF(self.x_for(a),top,max(4,self.x_for(b)-self.x_for(a)),h)
             if self.gesture!='copy': p.fillRect(source,QColor(0,0,0,160))
             p.setPen(QPen(QColor('#8090a0'),1,Qt.PenStyle.DashLine)); p.setBrush(Qt.BrushStyle.NoBrush); p.drawRect(source)
+            if getattr(self,'cross_target',None): top=next(y for t,y,height in self.media_rows() if t.info.id==self.cross_target)
             width=max(28,self.x_for(b)-self.x_for(a)); gx=max(self.track_left(),min(self.ghost_x,self.track_right()-width))
             p.setPen(QPen(QColor('#ffb35e'),2)); p.setBrush(QColor(215,132,40,215)); p.drawRoundedRect(QRectF(gx,top-7,width,h),5,5)
             p.setPen(QColor('#ffffff')); p.save(); p.setClipRect(QRectF(gx+4,top-7,width-8,h),Qt.ClipOperation.IntersectClip); p.drawText(QRectF(gx+6,top-7,width-12,h),Qt.AlignmentFlag.AlignCenter,tr(('Copie · ' if self.gesture=='copy' else '')+f'{b-a} images · '+('vidéo + audio' if linked else track))); p.restore(); p.setClipRect(track_area)
@@ -654,16 +679,17 @@ class Timeline(QWidget):
             p.setClipping(False); p.fillRect(QRectF(self.track_left(),0,300,30),QColor('#161b23')); p.drawText(QRectF(self.track_left()+5,0,320,28),Qt.AlignmentFlag.AlignVCenter,tr(text))
         self.paint_hover_highlight(p); self.paint_current_highlight(p); self.paint_selection_label(p); self.paint_frame_indicator(p); p.end()
     def context_target(self,x,y,use_selection=True):
+        self.activate_media_row(y)
         if not self.state or not self.state.length: return None
         if getattr(self,'simple',False): track='video'
         elif self.track_y('video')<=y<=self.track_y('video')+19: track='video'
-        elif self.track_y('audio')<=y<=self.track_y('audio')+19: track='audio'
+        elif self.active_media.info.audio_expanded and self.track_y('audio')<=y<=self.track_y('audio')+19: track='audio'
         else: return None
         frame=self.frame_for(x)
         if use_selection and self.state.selection and self.state.selection[0]<=frame<self.state.selection[1]:
             return (*self.state.selection,track)
         at=0
-        for seg in (self.state.segments if track=='video' else self.state.audio):
+        for seg in (self.active_media.segments if track=='video' else self.active_media.audio):
             if at<=frame<at+seg.length: return (at,at+seg.length,track)
             at+=seg.length
     def contextMenuEvent(self,event):
@@ -676,7 +702,9 @@ class Timeline(QWidget):
             action=menu.addAction(tr(title)); action.setData('units_'+units); action.setCheckable(True); action.setChecked(self.units==units)
             action.triggered.connect(lambda checked=False,u=units:self.set_units(u))
     def context_menu(self,pos):
-        if not self.simple and pos.y()<self.track_y('video') and self.state and self.state.length:
+        header=self.media_header_menu(pos)
+        if header is not None: return header
+        if (self.drawing_track.contains(pos) or not self.simple and pos.y()<47) and self.state and self.state.length:
             return self.drawing_track.context_menu(pos.x())
         menu=QMenu(tr(self)); simple=getattr(self,'simple',False)
         self.add_units(menu); menu.addSeparator(); self.add_timeline_mode(menu)
@@ -685,15 +713,17 @@ class Timeline(QWidget):
         target=self.context_target(pos.x(),pos.y())
         if target is None: self.add_delete_keys(menu,pos.x()); return menu
         a,b,track=target
+        self.add_media_audio_action(menu,self.active_media)
+        menu.addSeparator()
         for target_track,title in [('video','Supprimer la vidéo'),('audio','Supprimer l’audio')]:
             action=menu.addAction(tr(title))
             action.triggered.connect(lambda checked=False,t=target_track:self.deleteRequested.emit(a,b,t))
         menu.addSeparator()
         action=menu.addAction(tr('Supprimer le média')); action.triggered.connect(lambda:self.deleteMediaRequested.emit(a,b))
         da,db,dt=self.context_target(pos.x(),pos.y(),False)
-        key=locate(self.state.segments,da)[0]
+        key=locate(self.active_media.segments,da)[0]
         action=menu.addAction(tr('Changer la cadence…')); action.setEnabled(key is not None and self.media.get(key,{}).get('has_video',True)); action.triggered.connect(lambda:self.cadenceRequested.emit(da,db))
-        action=menu.addAction(tr('Dupliquer le média')); action.setEnabled(locate(self.state.audio if dt=='audio' else self.state.segments,da)[0] is not None); action.triggered.connect(lambda:self.duplicated.emit(da,db,-1))
+        action=menu.addAction(tr('Dupliquer le média')); action.setEnabled(locate(self.active_media.audio if dt=='audio' else self.active_media.segments,da)[0] is not None); action.triggered.connect(lambda:self.duplicated.emit(da,db,-1))
         menu.addSeparator()
         action=menu.addAction(tr('Désactiver / Activer '+('la vidéo' if track=='video' else 'l’audio'))); action.triggered.connect(lambda:self.muteRequested.emit(a,b,track))
         action=menu.addAction(tr('Scinder')); action.triggered.connect(lambda:self.splitRequested.emit(track))
@@ -720,7 +750,7 @@ class Timeline(QWidget):
     def boundary_for(self,x):
         frame=max(0,min(self.state.length,round(self.raw_frame(x)))); at=0
         audio=self.move_span and self.move_span[2]=='audio' and not self.linked and self.gesture!='copy'
-        for seg in (self.state.audio if audio else self.state.segments):
+        for seg in (self.active_media.audio if audio else self.active_media.segments):
             end=at+seg.length
             if at<frame<end and seg.media is not None: return at if frame-at<=end-frame else end
             at=end
@@ -750,55 +780,68 @@ class Timeline(QWidget):
     def keyReleaseEvent(self,e):
         if not self.range_key_event(e,False): super().keyReleaseEvent(e)
     def mousePressEvent(self,e):
+        if self.toggle_media_selection(e): return
+        if self.press_media_title(e): return
+        self.activate_media_row(e.position().y())
         if e.button()==Qt.MouseButton.MiddleButton and e.modifiers()&Qt.KeyboardModifier.ControlModifier:
             self.nav=(e.position().x(),self.view_start); self._timeline_drag=ContinuousDrag(e.globalPosition()); self.drag_scale=self.span()/self.track_width(); e.accept(); return
         if not self.state or not self.state.length or e.button()!=Qt.MouseButton.LeftButton: return
         self.setFocus()
         frame=self.frame_for(e.position().x()); self.anchor=frame; self.drag_frame=self.raw_frame(e.position().x()); self.drag_scale=self.span()/self.track_width(); self._timeline_drag=ContinuousDrag(e.globalPosition())
+        self.begin_cross_drag(e)
         if e.modifiers()&Qt.KeyboardModifier.AltModifier and e.modifiers()&Qt.KeyboardModifier.ShiftModifier:
             target=self.context_target(e.position().x(),e.position().y(),False)
             if not target: self.anchor=None; return
             a,b,track=target
-            if locate(self.state.audio if track=='audio' else self.state.segments,a)[0] is None: self.anchor=None; return
+            if locate(self.active_media.audio if track=='audio' else self.active_media.segments,a)[0] is None: self.anchor=None; return
             self.gesture='copy'; self.copy_origin=e.position(); self.move_span=target; self.grab_offset=e.position().x()-self.x_for(a); self.target_drop(e.position().x())
         elif e.modifiers()&Qt.KeyboardModifier.AltModifier:
-            track='audio' if e.position().y()>=self.track_y('audio')-4 else 'video'
+            track='audio' if self.active_media.info.audio_expanded and e.position().y()>=self.track_y('audio')-4 else 'video'
             if self.state.selection and self.state.selection[0]<=frame<self.state.selection[1]: span=self.state.selection
             else:
                 at=0; span=None
-                for seg in (self.state.audio if track=='audio' else self.state.segments):
+                for seg in (self.active_media.audio if track=='audio' else self.active_media.segments):
                     if at<=frame<at+seg.length: span=(at,at+seg.length); break
                     at+=seg.length
+            if span is None: self.anchor=None; return
             self.gesture='move'; self.move_span=(*span,track); self.grab_offset=e.position().x()-self.x_for(span[0]); self.target_drop(e.position().x())
         else:
             self.begin_range_drag(frame); self.gesture=self.update_range_drag(frame,e.modifiers())
     def mouseMoveEvent(self,e):
+        if getattr(self,'media_title_drag',None) is not None: return
         if self.nav:
             self.view_start=self.nav[1]-self._timeline_drag.move(e.globalPosition()).x()*self.drag_scale; self.clamp_view(); self.update(); return
         self.hover_x=e.position().x()
         if self.anchor is None: self.update(); return
         raw=max(0,min(self.state.length,self.drag_frame+self._timeline_drag.move(e.globalPosition()).x()*self.drag_scale))
         frame=min(self.state.length-1,int(raw)); self.ensure_visible(frame)
+        if self.update_cross_drag(e,self.x_for(raw)): return
         if self.gesture in ('select','scrub'): self.gesture=self.update_range_drag(frame,e.modifiers())
         elif self.gesture in ('move','copy'): self.target_drop(self.x_for(raw))
     def mouseReleaseEvent(self,e):
+        if self.release_media_title(e): return
         if hasattr(self,'_timeline_drag'): self._timeline_drag.finish()
         self.nav=None
-        if self.gesture in ('move','copy') and self.move_span:
+        if self.gesture=='transfer' and self.cross_target and self.cross_origin:
+            source,a,b=self.cross_origin
+            self.mediaTransferred.emit(source,self.cross_target,a,b,self.drop_frame,self.cross_copy)
+        elif self.gesture in ('move','copy') and self.move_span:
             a,b,track=self.move_span
             if self.gesture=='copy':
                 if self._timeline_drag.total.manhattanLength()>=4: self.duplicated.emit(a,b,self.drop_frame)
             else: self.moved.emit(a,b,self.drop_frame,track)
+        self.cross_origin=None; self.cross_target=None
         self.drag_animation.stop(); self.anchor=None; self.gesture=None; self.move_span=None; self.drop_frame=None; self.ghost_x=None; self.animated_x=None; self.update(); self.finish_range_drag()
 
     def mouseDoubleClickEvent(self,e):
+        if self.double_click_media(e): return
         if e.button()!=Qt.MouseButton.LeftButton or not e.modifiers()&Qt.KeyboardModifier.ShiftModifier:
             return super().mouseDoubleClickEvent(e)
         if not self.track_left()<=e.position().x()<=self.track_left()+self.track_width(): return
         target=self.context_target(e.position().x(),e.position().y(),False)
         if not target: return
         a,b,track=target
-        if locate(self.state.audio if track=='audio' else self.state.segments,a)[0] is None: return
+        if locate(self.active_media.audio if track=='audio' else self.active_media.segments,a)[0] is None: return
         if hasattr(self,'_timeline_drag'): self._timeline_drag.finish()
         self.anchor=None; self.gesture=None; self.selection_track=track
         self.selectionDragged.emit(a,b,self.frame_for(e.position().x()))

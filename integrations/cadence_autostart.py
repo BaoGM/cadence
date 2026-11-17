@@ -1,20 +1,26 @@
 # SPDX-License-Identifier: GPL-3.0-only
 import ctypes
-import importlib.util
-import json
 import logging
 import os
-from pathlib import Path
 import sys
 
+if __package__:
+    from .cadence_runtime import endpoint_path, fs_path, integer_types, load_source, maya_timer, read_json, string_types
+else:
+    from cadence_runtime import endpoint_path, fs_path, integer_types, load_source, maya_timer, read_json, string_types
 
-def endpoint_path():
-    return Path(os.environ.get('CADENCE_SYNC_ENDPOINT') or
-        (Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'CadenceStudio' / 'sync_endpoint.json'))
+logger = logging.getLogger('cadence.connector')
+
+
+def report_failure(message):
+    try:
+        logger.exception(message)
+    except Exception:
+        pass
 
 
 def owner_alive(pid):
-    if type(pid) is not int or pid <= 0:
+    if isinstance(pid, bool) or not isinstance(pid, integer_types) or pid <= 0:
         return False
     if os.name != 'nt':
         try:
@@ -47,19 +53,22 @@ class Monitor:
         self.active = True
 
     def stop_bridge(self):
-        if self.module:
-            self.module.stop()
-        self.module = None
+        module, self.module = self.module, None
         self.token = None
+        if module:
+            try:
+                module.stop()
+            except Exception:
+                report_failure('Cadence connector could not stop')
 
     def tick(self):
         if not self.active:
             return None
         try:
-            info = json.loads(endpoint_path().read_text(encoding='utf-8'))
+            info = read_json(endpoint_path())
             valid = (isinstance(info, dict) and info.get('version') == 1 and info.get('host') == self.host and
-                isinstance(info.get('token'), str) and len(info['token']) == 64 and owner_alive(info.get('pid')))
-        except (OSError, ValueError, TypeError):
+                isinstance(info.get('token'), string_types) and len(info['token']) == 64 and owner_alive(info.get('pid')))
+        except (IOError, OSError, ValueError, TypeError):
             valid = False
         if not valid:
             self.stop_bridge()
@@ -69,14 +78,12 @@ class Monitor:
             try:
                 previous = sys.modules.get('cadence_bridge')
                 if previous: previous.stop()
-                spec = importlib.util.spec_from_file_location('cadence_bridge', Path(__file__).with_name('cadence_bridge.py'))
-                module = importlib.util.module_from_spec(spec)
-                sys.modules['cadence_bridge'] = module
-                spec.loader.exec_module(module)
+                module = load_source('cadence_bridge', os.path.join(os.path.dirname(fs_path(__file__)), 'cadence_bridge.py'))
+                self.module = module
                 module.start(self.host)
-                self.module, self.token = module, info['token']
+                self.token = info['token']
             except Exception:
-                logging.exception('Cadence connector could not start')
+                report_failure('Cadence connector could not start')
                 self.stop_bridge()
         return 1.
 
@@ -110,12 +117,19 @@ def start(host):
         import bpy
         bpy.app.timers.register(monitor.tick, first_interval=0., persistent=True)
     elif host == 'maya':
-        try:
-            from PySide6.QtCore import QTimer
-        except ImportError:
-            from PySide2.QtCore import QTimer
-        monitor.timer = QTimer()
+        monitor.timer = maya_timer()
         monitor.timer.setInterval(1000)
         monitor.timer.timeout.connect(monitor.tick)
         monitor.timer.start()
         monitor.tick()
+
+
+def safe_start(host):
+    try:
+        start(host)
+    except (Exception, SystemExit):
+        report_failure('Cadence startup failed; other startup scripts are unaffected')
+        try:
+            shutdown()
+        except Exception:
+            report_failure('Cadence startup cleanup failed')

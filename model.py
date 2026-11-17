@@ -8,6 +8,7 @@ from bisect import bisect_left,bisect_right
 import json
 import uuid
 from pathlib import Path
+from track_edits import selected_tracks
 from drawing import DrawingKey, load_keys, slice_keys, remove_key_range, insert_keys, relocate_keys, resize_key
 
 RATE = 48000
@@ -42,6 +43,34 @@ class Segment:
     @property
     def length(self): return self.end - self.start
 
+
+@dataclass(frozen=True)
+class TrackInfo:
+    id: str = 'media-1'
+    name: str = 'Piste 1'
+    audio_expanded: bool = False
+    audio_enabled: bool = True
+
+
+@dataclass(frozen=True)
+class MediaTrack:
+    info: TrackInfo
+    segments: tuple[Segment, ...] = ()
+    audio_segments: tuple[Segment, ...] | None = None
+    exposure: float = 0.
+    flip_h: bool = False
+    flip_v: bool = False
+
+    @property
+    def audio(self): return self.segments if self.audio_segments is None else self.audio_segments
+
+    @property
+    def audible(self): return self.audio if self.info.audio_enabled else tuple(replace(s,muted=True) for s in self.audio)
+
+    @property
+    def length(self): return sum(s.length for s in self.segments)
+
+
 @dataclass(frozen=True)
 class State:
     segments: tuple[Segment, ...] = ()
@@ -55,10 +84,31 @@ class State:
     drawings: tuple[DrawingKey, ...] = ()
     drawings_linked: bool = True
     frame_markers: tuple[int, ...] = ()
+    track_info: TrackInfo = TrackInfo()
+    second_track: MediaTrack | None = None
     @property
     def audio(self): return self.segments if self.audio_segments is None else self.audio_segments
     @cached_property
-    def length(self): return sum(s.length for s in self.segments)
+    def length(self): return max(track.length for track in self.tracks)
+
+    @property
+    def tracks(self):
+        first=MediaTrack(self.track_info,self.segments,self.audio_segments,self.exposure,self.flip_h,self.flip_v)
+        return (first,self.second_track) if self.second_track is not None else (first,)
+
+    @property
+    def all_segments(self): return tuple(seg for track in self.tracks for seg in track.segments+track.audio)
+
+
+def with_tracks(state,tracks):
+    first=tracks[0]
+    return replace(state,segments=first.segments,audio_segments=first.audio_segments,
+                   exposure=first.exposure,flip_h=first.flip_h,flip_v=first.flip_v,
+                   track_info=first.info,second_track=tracks[1] if len(tracks)>1 else None)
+
+
+def track_state(state,track):
+    return with_tracks(state,(track,))
 
 
 def slice_segments(segments, start, end):
@@ -109,6 +159,9 @@ class Document:
         self.state = State()
         self.media = {}
         self.clipboard = (); self.audio_clipboard = (); self.drawing_clipboard = (); self.drawing_clipboard_length = 0
+        self.track_clipboards = {}
+        self.selected_track_ids = ('media-1',)
+        self.active_track_id = 'media-1'
         self.undo_stack = []
         self.redo_stack = []
         self.review = {}
@@ -116,13 +169,108 @@ class Document:
         self.project_path = None
 
     def signature(self):
-        return (self.state.segments, self.state.exposure, self.state.flip_h, self.state.flip_v, self.state.audio_segments, self.fps, self.state.drawings, self.state.drawings_linked, self.state.frame_markers, json.dumps(self.review,sort_keys=True))
+        return (self.state.tracks, self.fps, self.state.drawings, self.state.drawings_linked, self.state.frame_markers, json.dumps(self.review,sort_keys=True))
+
+    def normalize_tracks(self):
+        ids=tuple(t.info.id for t in self.state.tracks)
+        self.selected_track_ids=ids if len(ids)==1 else tuple(i for i in self.selected_track_ids if i in ids)
+        if self.active_track_id not in ids: self.active_track_id=next(iter(self.selected_track_ids),ids[0])
+
+    @property
+    def active_track(self):
+        self.normalize_tracks()
+        return next(t for t in self.state.tracks if t.info.id==self.active_track_id)
+
+    def editable_tracks(self):
+        self.normalize_tracks()
+        return tuple(t for t in self.state.tracks if t.info.id in self.selected_track_ids)
+
+    def select_track(self,identity,extend=False):
+        if identity not in {t.info.id for t in self.state.tracks}: return
+        chosen=set(self.selected_track_ids) if extend else set()
+        if extend and identity in chosen: chosen.remove(identity)
+        else: chosen.add(identity)
+        self.selected_track_ids=tuple(t.info.id for t in self.state.tracks if t.info.id in chosen)
+        self.active_track_id=identity if identity in chosen or not chosen else self.selected_track_ids[0]
+
+    def clipboard_state(self):
+        return self.clipboard,self.audio_clipboard,self.drawing_clipboard,self.drawing_clipboard_length
+
+    def add_media_track(self):
+        if self.state.second_track is not None: return False
+        identity=uuid.uuid4().hex
+        name=next(name for name in ('Piste 1','Piste 2') if name not in {t.info.name for t in self.state.tracks})
+        changed=self.commit('Ajouter une piste média',replace(self.state,second_track=MediaTrack(TrackInfo(identity,name))))
+        self.select_track(identity)
+        return changed
+
+    def remove_media_track(self,identity):
+        tracks=tuple(t for t in self.state.tracks if t.info.id!=identity)
+        if len(tracks)==len(self.state.tracks): return False
+        if not tracks: tracks=(MediaTrack(TrackInfo()),)
+        changed=self.commit('Supprimer la piste média',with_tracks(self.state,tracks))
+        self.normalize_tracks()
+        return changed
+
+    def reorder_media_track(self,identity,direction):
+        tracks=list(self.state.tracks)
+        index=next((i for i,t in enumerate(tracks) if t.info.id==identity),-1)
+        destination=index+int(direction)
+        if index<0 or not 0<=destination<len(tracks): return False
+        tracks.insert(destination,tracks.pop(index))
+        return self.commit('Réordonner les pistes média',with_tracks(self.state,tracks))
+
+    def expand_track_audio(self,identity,expanded):
+        return self.commit('Afficher la bande audio' if expanded else 'Replier la bande audio',with_tracks(self.state,
+            tuple(replace(t,info=replace(t.info,audio_expanded=bool(expanded))) if t.info.id==identity else t for t in self.state.tracks)))
+
+    def enable_track_audio(self,identity,enabled):
+        return self.commit('Activer l’audio de la piste' if enabled else 'Désactiver l’audio de la piste',with_tracks(self.state,
+            tuple(replace(t,info=replace(t.info,audio_enabled=bool(enabled))) if t.info.id==identity else t for t in self.state.tracks)))
+
+    def transfer_media(self,source_id,target_id,start,end,destination,copy=False):
+        tracks={t.info.id:t for t in self.state.tracks}
+        if source_id==target_id or not {source_id,target_id}<=set(self.selected_track_ids): return False
+        source,target=tracks[source_id],tracks[target_id]
+        start,end,destination=int(start),int(end),int(destination)
+        if not 0<=start<end<=source.length or not 0<=destination<=self.state.length: return False
+        size=end-start
+        def pad(segments):
+            missing=max(0,destination-target.length)
+            return segments+((Segment(None,0,missing),) if missing else ())
+        video,audio=pad(target.segments),pad(target.audio)
+        filled=min(size,empty_duration(video,destination),empty_duration(audio,destination))
+        def insert(segments,block):
+            block=(replace(block[0],cut_before=True),)+block[1:]
+            right=slice_segments(segments,destination+filled,max(destination,target.length))
+            if right: right=(replace(right[0],cut_before=True),)+right[1:]
+            return compact(slice_segments(segments,0,destination)+block+right)
+        tracks[target_id]=replace(target,segments=insert(video,slice_segments(source.segments,start,end)),
+                                 audio_segments=insert(audio,slice_segments(source.audio,start,end)))
+        if not copy:
+            def remove(segments): return compact(slice_segments(segments,0,start)+(Segment(None,0,size),)+slice_segments(segments,end,source.length))
+            tracks[source_id]=replace(source,segments=remove(source.segments),audio_segments=remove(source.audio))
+        result=with_tracks(self.state,tuple(tracks[t.info.id] for t in self.state.tracks))
+        self.active_track_id=target_id
+        return self.commit('Copier vers une autre piste' if copy else 'Déplacer vers une autre piste',replace(result,position=destination,selection=(destination,destination+size),loop_range=None))
+
+    def set_track_effect(self,label,**fields):
+        ids={t.info.id for t in self.editable_tracks()}
+        return self.commit(label,with_tracks(self.state,tuple(replace(t,**fields) if t.info.id in ids else t for t in self.state.tracks)))
+
+    def set_track_segments(self,identity,segments,label):
+        return self.commit(label,with_tracks(self.state,tuple(replace(t,segments=segments,audio_segments=t.audio)
+            if t.info.id==identity else t for t in self.state.tracks)))
 
     @property
     def dirty(self): return self.signature() != self.saved_signature
 
     def commit(self, label, new):
         new=replace(new,frame_markers=tuple(sorted(set(f for f in new.frame_markers if 0<=f<new.length))))
+        if new.position>new.length: new=replace(new,position=max(0,new.length-1))
+        if new.selection and new.selection[1]>new.length:
+            a,b=new.selection; new=replace(new,selection=(a,new.length) if a<new.length else None)
+        if new.loop_range and new.loop_range[1]>new.length: new=replace(new,loop_range=None)
         if new == self.state: return False
         self.undo_stack.append((label, self.state, new))
         self.redo_stack.clear()
@@ -152,6 +300,7 @@ class Document:
         if self.state.selection: return self.state.selection
         return (self.state.position, min(self.state.length, self.state.position+1))
 
+    @selected_tracks
     def copy(self, include_audio=True):
         a,b = self.selected()
         self.drawing_clipboard = slice_keys(self.state.drawings,a,b,-a) if self.state.drawings_linked else ()
@@ -160,6 +309,7 @@ class Document:
         self.audio_clipboard = slice_segments(self.state.audio,a,b) if include_audio else (Segment(None,0,b-a),) if b>a else ()
         return sum(s.length for s in self.clipboard)
 
+    @selected_tracks
     def cut(self, include_audio=True):
         a,b = self.selected()
         if b <= a: return 0  # Preserve the clipboard at the end of an empty range.
@@ -167,6 +317,7 @@ class Document:
         self.delete('Couper les images')
         return count
 
+    @selected_tracks
     def delete(self, label='Supprimer les images'):
         a,b = self.selected()
         if b <= a: return False
@@ -174,6 +325,7 @@ class Document:
         length = sum(s.length for s in segs)
         return self.commit(label,replace(self.state,drawings=remove_key_range(self.state.drawings,a,b,True) if self.state.drawings_linked else self.state.drawings,segments=segs,audio_segments=compact(slice_segments(self.state.audio,0,a)+slice_segments(self.state.audio,b,self.state.length)),position=min(a,max(0,length-1)),selection=None,loop_range=None))
 
+    @selected_tracks
     def paste(self, include_audio=True):
         if not self.clipboard: return False
         at = max(0,min(self.state.position,self.state.length))
@@ -181,6 +333,7 @@ class Document:
         segs = compact(slice_segments(self.state.segments,0,at)+self.clipboard+slice_segments(self.state.segments,at,self.state.length))
         return self.commit('Coller les images',replace(self.state,drawings=insert_keys(self.state.drawings,at,size,self.drawing_clipboard) if self.state.drawings_linked else self.state.drawings,segments=segs,audio_segments=compact(slice_segments(self.state.audio,0,at)+((self.audio_clipboard or self.clipboard) if include_audio else (Segment(None,0,size),))+slice_segments(self.state.audio,at,self.state.length)),selection=(at,at+size),loop_range=None))
 
+    @selected_tracks
     def append_media(self, items):
         if not items: return False
         for m in items:
@@ -190,6 +343,7 @@ class Document:
         segments=self.state.segments+tuple(Segment(m['id'] if m.get('has_video',True) else None,0,m['frames']) for m in items)
         return self.commit('Ajouter des médias',replace(self.state,segments=segments,audio_segments=self.state.audio+tuple(Segment(m['id'],0,m['frames']) for m in items),position=at,selection=None,loop_range=None))
 
+    @selected_tracks
     def duplicate_range(self,start,end,destination=None):
         n=self.state.length
         if not 0<=start<end<=n: return False
@@ -201,6 +355,7 @@ class Document:
             return compact(slice_segments(segs,0,at)+block+right)
         return self.commit('Dupliquer le média',replace(self.state,drawings=insert_keys(self.state.drawings,at,end-start,slice_keys(self.state.drawings,start,end,-start)) if self.state.drawings_linked else self.state.drawings,segments=insert(self.state.segments),audio_segments=insert(self.state.audio),position=at,selection=(at,at+end-start),loop_range=None))
 
+    @selected_tracks
     def move_range(self, start, end, destination, track='linked', leave_gap=False):
         n=self.state.length
         if track not in ('linked','video','audio'): raise ValueError('Piste invalide')
@@ -236,13 +391,15 @@ class Document:
 
     def snap_destination(self,frame,track='video'):
         frame=max(0,min(int(frame),self.state.length)); at=0
-        for seg in (self.state.audio if track=='audio' else self.state.segments):
+        active=self.active_track
+        for seg in (active.audio if track=='audio' else active.segments):
             end=at+seg.length
             if at<frame<end and seg.media is not None:
                 return at if frame-at<=end-frame else end
             at=end
         return frame
 
+    @selected_tracks
     def split_at(self,frame,track='linked'):
         if not 0<frame<self.state.length: return False
         def split(segs):
@@ -255,6 +412,7 @@ class Document:
             return tuple(out)
         return self.commit('Scinder',replace(self.state,segments=split(self.state.segments) if track!='audio' else self.state.segments,audio_segments=split(self.state.audio) if track!='video' else self.state.audio))
 
+    @selected_tracks
     def mute_range(self,start,end,track):
         if track not in ('video','audio') or not 0<=start<end<=self.state.length: return False
         segs=self.state.segments if track=='video' else self.state.audio
@@ -263,6 +421,7 @@ class Document:
         fields={'segments':changed,'audio_segments':self.state.audio} if track=='video' else {'audio_segments':changed}
         return self.commit('Mute '+track,replace(self.state,**fields))
 
+    @selected_tracks
     def delete_track_range(self,start,end,track):
         if track not in ('video','audio') or not 0<=start<end<=self.state.length: return False
         segs=self.state.segments if track=='video' else self.state.audio
@@ -270,6 +429,7 @@ class Document:
         fields={'segments':changed,'audio_segments':self.state.audio} if track=='video' else {'audio_segments':changed}
         return self.commit('Supprimer '+track,replace(self.state,drawings=remove_key_range(self.state.drawings,start,end) if track=='video' and self.state.drawings_linked else self.state.drawings,**fields,position=min(start,self.state.length-1),selection=None,loop_range=None))
 
+    @selected_tracks
     def delete_ranges(self,ranges):
         ranges=sorted((max(0,a),min(self.state.length,b)) for a,b in ranges if b>a)
         if not ranges: return False
@@ -290,6 +450,7 @@ class Document:
         return self.commit('Retirer la sélection du montage',replace(self.state,drawings=drawings,segments=video,audio_segments=audio,position=min(ranges[0][0],max(0,length-1)),selection=None,loop_range=None))
 
     def remove_media(self,key): return self.remove_media_keys([key])
+    @selected_tracks
     def remove_media_keys(self,keys):
         keys=set(keys)
         drawings=self.state.drawings; at=0; removed=[]
@@ -306,6 +467,7 @@ class Document:
             return segs+((Segment(None,0,missing),) if missing else ())
         return self.commit('Retirer le média du montage',replace(self.state,drawings=drawings,segments=pad(video),audio_segments=pad(audio),position=min(self.state.position,max(0,n-1)),selection=None,loop_range=None))
 
+    @selected_tracks
     def insert_gap(self,frames):
         frames=int(frames)
         if frames<=0: return False
@@ -344,13 +506,15 @@ class Document:
         for key in self.drawing_clipboard: keys=put_key(keys,replace(key,start=key.start+at,end=key.end+at))
         return self.commit('Coller les dessins',replace(self.state,drawings=keys,position=at,selection=(at,at+self.drawing_clipboard_length),loop_range=None))
 
+    @selected_tracks
     def exposure(self, value):
         return self.commit('Régler l’exposition',replace(self.state,exposure=round(float(value),2)))
 
     def to_data(self, all_media=False):
-        return {'format':'cadence-studio','version':self.format_version(),'fps':str(self.fps),'media':[m for k,m in self.media.items() if all_media or any(s.media==k for s in self.state.segments+self.state.audio)],'state':asdict(self.state),'comparison':self.review,'drawing_transfer_id':self.drawing_transfer_id}
+        return {'format':'cadence-studio','version':self.format_version(),'fps':str(self.fps),'media':[m for k,m in self.media.items() if all_media or any(s.media==k for s in self.state.all_segments)],'state':asdict(self.state),'comparison':self.review,'drawing_transfer_id':self.drawing_transfer_id}
 
     def format_version(self):
+        if self.state.second_track is not None or not self.state.track_info.audio_enabled or self.review.get('reference_track'): return 16
         used={s.media for s in self.state.segments+self.state.audio}
         return 15 if len(self.review.get('references',[]))>1 else 14 if self.review.get('reference_cadence') or any(m.get('cadence') for k,m in self.media.items() if k in used) else 13 if any(m.get('has_video') is False for m in self.media.values()) else 12 if self.state.frame_markers else 11
 
@@ -370,7 +534,7 @@ class Document:
 
     @classmethod
     def from_data(cls, data, project_path=None):
-        if data.get('format') != 'cadence-studio' or data.get('version') not in range(1,16):
+        if data.get('format') != 'cadence-studio' or data.get('version') not in range(1,17):
             raise ValueError('Ce fichier n’est pas un projet Cadence compatible.')
         doc = cls(Fraction(data['fps']))
         identity=data.get('drawing_transfer_id')
@@ -390,13 +554,32 @@ class Document:
         segs = tuple(Segment(**s) for s in st['segments'])
         audio=tuple(Segment(**s) for s in st['audio_segments']) if st.get('audio_segments') is not None else None
         if audio is not None and sum(s.length for s in audio)!=sum(s.length for s in segs): raise ValueError('Durées audio et vidéo incohérentes.')
-        for seg in segs+(audio or ()):
+        def info(value,default):
+            if value is None: return default
+            if not isinstance(value,dict) or set(value)-{'id','name','audio_expanded','audio_enabled'}: raise ValueError('Piste média invalide.')
+            result=TrackInfo(**value)
+            if not isinstance(result.id,str) or not 1<=len(result.id)<=64 or not isinstance(result.name,str) or not 1<=len(result.name)<=80 or type(result.audio_expanded) is not bool or type(result.audio_enabled) is not bool:
+                raise ValueError('Piste média invalide.')
+            if result.name in ('Média 1','Média 2'): result=replace(result,name=result.name.replace('Média','Piste'))
+            return result
+        first_info=info(st.get('track_info'),TrackInfo())
+        second=None
+        if st.get('second_track') is not None:
+            value=st['second_track']
+            if not isinstance(value,dict) or set(value)-{'info','segments','audio_segments','exposure','flip_h','flip_v'}: raise ValueError('Seconde piste média invalide.')
+            second=MediaTrack(info(value.get('info'),TrackInfo('media-2','Piste 2')),
+                tuple(Segment(**s) for s in value['segments']),
+                tuple(Segment(**s) for s in value['audio_segments']) if value.get('audio_segments') is not None else None,
+                float(value.get('exposure',0)),bool(value.get('flip_h',False)),bool(value.get('flip_v',False)))
+            if second.info.id==first_info.id or not -10<=second.exposure<=10 or sum(s.length for s in second.audio)!=second.length:
+                raise ValueError('Seconde piste média invalide.')
+        for seg in segs+(audio or ())+((second.segments+second.audio) if second else ()):
             if seg.media is None:
                 if not 0<=seg.start<seg.end: raise ValueError('Vide invalide.')
                 continue
             if seg.media not in doc.media or not 0 <= seg.start < seg.end <= doc.media[seg.media]['frames']:
                 raise ValueError('Plage de média invalide dans le projet.')
-        length = sum(s.length for s in segs)
+        length = max(sum(s.length for s in segs),second.length if second else 0)
         sel = st.get('selection')
         if sel and not 0 <= sel[0] < sel[1] <= length: sel = None
         loop = st.get('loop_range')
@@ -405,7 +588,8 @@ class Document:
         if not -10 <= ev <= 10: raise ValueError('Exposition invalide.')
         markers=st.get('frame_markers',[])
         if not isinstance(markers,(list,tuple)) or any(type(f) is not int or not 0<=f<length for f in markers): raise ValueError('Marqueurs invalides.')
-        doc.state = State(segs,ev,max(0,min(int(st.get('position',0)),length)),tuple(sel) if sel else None,tuple(loop) if loop else None,bool(st.get("flip_h",False)),bool(st.get("flip_v",False)),audio,load_keys(st.get('drawings',[])),bool(st.get('drawings_linked',True)),tuple(sorted(set(markers))))
+        doc.state = State(segs,ev,max(0,min(int(st.get('position',0)),length)),tuple(sel) if sel else None,tuple(loop) if loop else None,bool(st.get("flip_h",False)),bool(st.get("flip_v",False)),audio,load_keys(st.get('drawings',[])),bool(st.get('drawings_linked',True)),tuple(sorted(set(markers))),first_info,second)
+        doc.normalize_tracks()
         doc.project_path = project_path
         doc.saved_signature = doc.signature()
         return doc

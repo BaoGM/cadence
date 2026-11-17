@@ -134,7 +134,7 @@ class ComparisonMixin(ReferenceQueueMixin):
         current=title if enabled else 'Vidéo A seule'
         next_title=MODES[0][0] if not enabled else (MODES[self.compare_mode.currentIndex()+1][0] if self.compare_mode.currentIndex()<len(MODES)-1 else 'Vidéo A seule')
         tip=f'Comparaison : {current}\nClic : {next_title}'
-        if not self.compare_media: tip+='\nChoisir une référence B dans les réglages.'
+        if not self.compare_media and not getattr(self,'reference_track_id',None): tip+='\nChoisir une référence B dans les réglages.'
         self.compare_cycle_btn.setToolTip(tr(tip)); self.compare_cycle_btn.setAccessibleName(tr('Mode de comparaison : '+current))
         self.compare_swap_btn.setSymbol('ba' if swapped else 'ab'); self.compare_swap_btn.setEnabled(self.comparison_active())
         order='B / A' if swapped else 'A / B'; tip=f'Intervertir A / B · ordre actuel : {order}'
@@ -149,22 +149,33 @@ class ComparisonMixin(ReferenceQueueMixin):
         self.compare_mode.setCurrentIndex(index); self.compare_enabled.setChecked(True); self.comparison_panel.show()
     def refresh_reference_choices(self):
         sources={**self.reference_sources,**self.doc.media}
-        signature=(tuple((key,m['path']) for key,m in sources.items()),tuple(self.reference_order))
+        tracks=tuple((track.info.id,track.info.name) for track in self.doc.state.tracks)
+        identity=getattr(self,'reference_track_id',None)
+        if identity and identity not in dict(tracks): self.reference_track_id=None; identity=None
+        signature=(tuple((key,m['path']) for key,m in sources.items()),tuple(self.reference_order),tracks,identity)
         if signature==self.reference_signature: return
         self.reference_signature=signature; selected='__sequence__' if len(self.reference_order)>1 else self.compare_media['id'] if self.compare_media else None
         with QSignalBlocker(self.reference_combo):
             self.reference_combo.clear(); self.reference_combo.addItem(tr('Choisir une référence…'),None)
+            for key,name in tracks: self.reference_combo.addItem(tr('Piste')+' : '+tr(name),'track:'+key)
             if len(self.reference_order)>1: self.reference_combo.addItem(tr('Liste de références')+f' ({len(self.reference_order)})','__sequence__')
             for key,m in sources.items():
                 if m.get('has_video',True): self.reference_combo.addItem(m['name'],key)
-            self.reference_combo.setCurrentIndex(max(0,self.reference_combo.findData(selected)))
+            self.reference_combo.setCurrentIndex(max(0,self.reference_combo.findData('track:'+identity if identity else selected)))
     def choose_reference(self):
         key=self.reference_combo.currentData()
         if key=='__sequence__': return
+        if isinstance(key,str) and key.startswith('track:'): return self.use_track_reference(key[6:])
         media=({**self.reference_sources,**self.doc.media}).get(key)
         self.set_reference_sequence([media] if media else [])
     def use_reference(self,media):
         self.set_reference_sequence([media]); self.comparison_panel.show()
+    def use_track_reference(self,identity):
+        if identity not in {track.info.id for track in self.doc.state.tracks}: return
+        self.reference_track_id=identity
+        self.compare_media=None; self.viewer.reference_rgb=None
+        self.reference_signature=None; self.refresh_reference_choices()
+        self.compare_enabled.setChecked(True); self.comparison_panel.show(); self.comparison_changed()
     def open_reference(self):
         if self.job: return
         paths,_=QFileDialog.getOpenFileNames(self,tr('Ajouter des références B'),'',tr('Vidéos (*.mp4 *.mov *.mkv *.avi *.webm *.m4v *.mpg *.mpeg *.mts);;Tous les fichiers (*)'))
@@ -180,7 +191,9 @@ class ComparisonMixin(ReferenceQueueMixin):
         def ready(entries):
             self.set_reference_sequence(entries,append=True); self.library.show(); self.library_tabs.setCurrentIndex(self.reference_tab)
         self.begin_task('Préparation des références B',prepare,ready)
-    def comparison_active(self): return self.compare_enabled.isChecked() and self.compare_media is not None
+    def comparison_active(self):
+        identity=getattr(self,'reference_track_id',None)
+        return self.compare_enabled.isChecked() and (self.compare_media is not None or identity in {track.info.id for track in self.doc.state.tracks})
     def comparison_visual_changed(self,*args):
         self.viewer.compare_mode=self.compare_mode.currentData(); self.viewer.compare_opacity=self.compare_opacity.value()/100; self.viewer.compare_gain=self.compare_gain.value()
         self.viewer.apply_effect()
@@ -198,6 +211,11 @@ class ComparisonMixin(ReferenceQueueMixin):
     def prepare_reference_frame(self,frame):
         if not self.comparison_active(): self.comparison_pending=None; return
         self.comparison_pending={'token':self.token,'a':None,'b':None}
+        identity=getattr(self,'reference_track_id',None)
+        if identity:
+            from composite_media import frame_layers,canvas_size
+            self.reference_decoder.request_layers(self.token,frame_layers(self.doc.state,self.doc.media,frame+self.compare_offset.value(),{identity}),canvas_size(self.doc.state,self.doc.media))
+            return
         target=self.reference_index.locate(Fraction(frame+self.compare_offset.value(),1)/self.doc.fps)
         media=self.compare_media
         if target: slot,media,index=target
@@ -211,6 +229,8 @@ class ComparisonMixin(ReferenceQueueMixin):
         else:
             self.comparison_pending['b']=np.zeros((max(2,round(640*media['height']/media['width'])),640,3),np.uint8)
     def reference_ready(self,token,arr):
+        from composite_media import LayerFrame
+        if isinstance(arr,LayerFrame): arr=arr.compose()
         pending=self.comparison_pending
         if pending and token==self.token==pending['token']:
             pending['b']=arr; self.flush_comparison()
@@ -230,9 +250,13 @@ class ComparisonMixin(ReferenceQueueMixin):
     def comparison_snapshot(self):
         config=dict(enabled=self.compare_enabled.isChecked(),reference=self.compare_media['path'] if self.compare_media else '',reference_cadence=self.compare_media.get('cadence') if self.compare_media else None,reference_fps=self.compare_media['fps'] if self.compare_media else None,mode=self.compare_mode.currentData(),opacity=self.compare_opacity.value(),gain=self.compare_gain.value(),offset=self.compare_offset.value(),swapped=self.viewer.compare_swapped,wipe=self.viewer.wipe_position)
         if len(self.reference_order)>1: config['references']=reference_snapshot(self.reference_entries())
+        if getattr(self,'reference_track_id',None):
+            config['reference_track']=self.reference_track_id
+            config.pop('references',None)
         return config
     def restore_comparison(self,doc):
         config=doc.review; media=getattr(doc,'reference_media',None)
+        self.reference_track_id=config.get('reference_track') if config.get('reference_track') in {track.info.id for track in doc.state.tracks} else None
         entries=getattr(doc,'reference_sequence',[media] if media else [])
         self.reference_order=[entry['id'] for entry in entries]
         self.reference_sources={entry['id']:entry for entry in entries}
@@ -249,7 +273,7 @@ class ComparisonMixin(ReferenceQueueMixin):
         self.reference_signature=None; self.refresh_reference_choices(); self.refresh_reference_queue()
         self.compare_mode.setCurrentIndex(max(0,self.compare_mode.findData(config.get('mode','horizontal'))))
         self.compare_opacity.setValue(int(number('opacity',50,0,100))); self.compare_gain.setValue(number('gain',1,1,20)); self.compare_offset.setValue(int(number('offset',0,-1000000,1000000)))
-        self.compare_enabled.setChecked(config.get('enabled') is True and media is not None)
+        self.compare_enabled.setChecked(config.get('enabled') is True and (media is not None or self.reference_track_id is not None))
         del blockers
         self.viewer.comparing=self.comparison_active(); self.comparison_visual_changed()
         if hasattr(self,'compare_action'):

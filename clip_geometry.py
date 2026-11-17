@@ -53,7 +53,7 @@ class GeometryTools(QObject):
     def rect(self,value): self.frame.rect=QRectF(value)
     def current(self):
         at=0
-        for i,s in enumerate(self.w.doc.state.segments):
+        for i,s in enumerate(self.w.doc.active_track.segments):
             if at<=min(self.w.doc.state.position,self.w.doc.state.length-1)<at+s.length: return i,s
             at+=s.length
         return None,None
@@ -61,12 +61,14 @@ class GeometryTools(QObject):
         from drawing import active_key
         i,seg=self.current(); st=self.w.doc.state
         if self.mode:
-            invalid=(st.drawings is not self.source or active_key(st.drawings,st.position) is not self.key) if self.target=='drawing' else (st.segments is not self.source or i!=self.index)
+            invalid=(st.drawings is not self.source or active_key(st.drawings,st.position) is not self.key) if self.target=='drawing' else (self.w.doc.active_track.segments is not self.source or i!=self.index)
             if invalid: self.cancel()
         self.v.geometry_segment=self.pending if self.mode=='resize' and self.target=='clip' else seg
+        self.v.layer_geometry_ids=self.w.doc.selected_track_ids if self.mode else ()
         self.v.geometry_source=self.mode=='crop'
-        first=next((self.w.doc.media[s.media] for s in st.segments if s.media and not s.muted),None)
-        self.v.geometry_aspect=first['width']/first['height'] if first else None
+        from composite_media import canvas_size
+        width,height=canvas_size(st,self.w.doc.media)
+        self.v.geometry_aspect=width/height
         self.v.apply_effect()
     def activate(self,mode):
         from drawing import active_key,move_erased_selection
@@ -87,7 +89,7 @@ class GeometryTools(QObject):
         else:
             i,seg=self.current()
             if seg is None or seg.media is None: return
-            d.choose_tool('cursor'); self.target='clip'; self.index=i; self.source=self.w.doc.state.segments; self.original=seg; self.pending=seg
+            d.choose_tool('cursor'); self.target='clip'; self.index=i; self.source=self.w.doc.active_track.segments; self.original=seg; self.pending=seg
             self.original_rect=QRectF(*(seg.crop if mode=='crop' else seg.placement)); self.original_angle=0 if mode=='crop' else seg.rotation
             self.frame=TransformFrame(self.original_rect,aspect,self.original_angle)
         self.mode=mode; self.v.setFocus(); self.sync(); self.v.update()
@@ -106,14 +108,14 @@ class GeometryTools(QObject):
             self.w.drawing.invalidate()
         else:
             segs=list(self.source); segs[self.index]=self.pending; label='Recadrer le clip' if self.mode=='crop' else 'Transformer le clip'
-            self.mode=None; self.drag=None; self.w.doc.commit(label,replace(self.w.doc.state,segments=tuple(segs)))
+            self.mode=None; self.drag=None; self.w.geometry_selected(self.pending,label)
             self.w.refresh(); self.w.request_frame()
         self.v.setCursor(Qt.CursorShape.CrossCursor if self.w.drawing.enabled else Qt.CursorShape.OpenHandCursor)
     def reset(self):
         i,seg=self.current()
         if seg is None: return
-        self.cancel(); seq=list(self.w.doc.state.segments); seq[i]=replace(seg,crop=IDENTITY,placement=IDENTITY,rotation=0)
-        self.w.doc.commit('Réinitialiser le cadrage du clip',replace(self.w.doc.state,segments=tuple(seq))); self.w.refresh(); self.w.request_frame()
+        self.cancel(); seq=list(self.w.doc.active_track.segments); seq[i]=replace(seg,crop=IDENTITY,placement=IDENTITY,rotation=0)
+        self.w.geometry_selected(seq[i],'Réinitialiser le cadrage du clip'); self.w.refresh(); self.w.request_frame()
     def point(self,pos): return self.w.drawing.point(pos,True)
     def handles(self): return self.frame.handles()
     def hit(self,point):

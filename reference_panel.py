@@ -59,6 +59,7 @@ class ReferenceQueueMixin:
                 self.reference_list.addItem(item)
 
     def set_reference_sequence(self,entries,append=False):
+        self.reference_track_id=None
         entries=(self.reference_entries() if append else [])+list(entries)
         for media in entries: self.reference_sources[media['id']]=media
         self.reference_order=[media['id'] for media in entries]

@@ -50,9 +50,6 @@ class DrawingTimeline(QObject):
     def eventFilter(self,obj,e):
         t=self.t; kind=e.type()
         if not t.state or not t.state.length: return False
-        if getattr(t,'simple',False):
-            if kind==QEvent.Type.MouseButtonPress and e.button()==Qt.MouseButton.LeftButton: t.selection_track='video'
-            return False
         if kind==QEvent.Type.MouseButtonPress and e.button()==Qt.MouseButton.LeftButton:
             if not self.contains(e.position()):
                 t.selection_track='audio' if e.position().y()>=t.track_y('audio')-4 else 'video'; return False
@@ -113,13 +110,13 @@ class DrawingTimeline(QObject):
             x2=min(right,max(x1+3,left+(key.end-t.view_start)*scale))
             if (key.end-key.start)*scale<1 and floor(x1)==last_pixel: continue
             last_pixel=floor(x1)
-            yield QRectF(x1,t.simple_track_rect().top(),max(1,x2-x1),4)
+            yield QRectF(x1,t.track_y('drawing'),max(1,x2-x1),4)
     def paint_simple(self,p):
-        p.save(); p.setClipRect(self.t.simple_track_rect())
+        p.save(); p.setClipRect(QRectF(self.t.track_left(),self.t.track_y('drawing')-2,self.t.track_width(),8))
         self.paint_cached(p,self.t.state.drawings,True)
         p.restore()
     def paint_cached(self,p,keys,simple=False):
-        t=self.t; ratio=t.devicePixelRatioF(); y=t.simple_track_rect().top()-2 if simple else t.track_y('drawing')-2
+        t=self.t; ratio=t.devicePixelRatioF(); y=t.track_y('drawing')-2
         signature=(id(keys),t.width(),ratio,t.view_start,t.span(),simple,p.font().toString())
         cached=getattr(self,'raster',None)
         if cached is None or cached[0]!=signature:

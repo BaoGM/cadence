@@ -33,7 +33,7 @@ from comparison import ComparisonMixin
 from draw_ui import DrawController
 from PySide6.QtWidgets import QGridLayout
 
-VERSION='1.16.1'
+VERSION='1.17.0'
 STYLE='''
 QMainWindow, QWidget { background:#11161d; color:#dce4ee; font-family:"Segoe UI"; font-size:13px; }
 QMenuBar { background:#11161d; color:#91a1b5; padding:3px; }
@@ -90,7 +90,10 @@ def button(text,fn,name=None,tip=None):
     if tip: b.setToolTip(tr(tip))
     return b
 
-class MainWindow(ComparisonMixin,QMainWindow):
+from media_track_ui import MediaTrackController
+
+
+class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
     def __init__(self):
         from diagnostics import StartupTimer
         startup=StartupTimer()
@@ -216,6 +219,7 @@ class MainWindow(ComparisonMixin,QMainWindow):
         self.build_library(); self.make_panels_movable(); self.build_comparison(); self.drawing=DrawController(self)
         from clip_geometry import GeometryTools
         self.clip_tools=GeometryTools(self)
+        self.init_media_tracks()
 
     def action(self,menu,text,fn,shortcut=None):
         from ui_text import source,language
@@ -403,17 +407,17 @@ class MainWindow(ComparisonMixin,QMainWindow):
         menu.exec(listing.mapToGlobal(point))
     def change_cadence(self,keys=None,span=None,spans=None):
         if self.job: return
-        from cadence_change import plan_ranges,build_change
+        from track_cadence import plan_tracks,build_tracks
         from cadence_dialog import CadenceDialog
-        ranges=plan_ranges(self.doc.state,self.doc.media,keys,span)
-        if spans is not None: ranges=sorted({entry for selected in spans for entry in plan_ranges(self.doc.state,self.doc.media,span=selected)})
+        plans=plan_tracks(self.doc,keys,span,spans)
+        ranges=[entry for track,entries in plans for entry in entries]
         if not ranges: return
         self._resume_after_scrub=False; self.pause(); self.drawing.finish(); self.commit_exposure()
         dialog=CadenceDialog(self,ranges)
         if not dialog.exec(): dialog.deleteLater(); return
         target,mode,pitch=dialog.values(); dialog.deleteLater()
         document=self.doc; state=document.state; quality=self.preferences.get('preview_quality','native')
-        def prepare(progress,cancel): return build_change(state,document.media,document.fps,ranges,target,mode,pitch,quality,progress,cancel)
+        def prepare(progress,cancel): return build_tracks(state,document.media,document.fps,plans,target,mode,pitch,quality,progress,cancel)
         def apply(result):
             changed,media=result; document.media=media
             document.commit('Changer la cadence',changed); self.library_signature=None; self.refresh(); self.request_frame()
@@ -436,25 +440,27 @@ class MainWindow(ComparisonMixin,QMainWindow):
         if self.doc.delete(): self.refresh(); self.request_frame()
 
     def refresh_library(self):
-        signature=(self.doc.state.segments,self.doc.state.audio)
+        track=self.doc.active_track
+        signature=(self.doc.state.tracks,self.doc.active_track_id)
         if signature==self.library_signature: return
         self.library_signature=signature; self.playlist.clear(); self.media_list.clear(); at=0
-        for i,seg in enumerate(self.doc.state.segments):
-            key=seg.media if seg.media is not None else locate(self.doc.state.audio,at)[0]
+        for i,seg in enumerate(track.segments):
+            key=seg.media if seg.media is not None else locate(track.audio,at)[0]
             name=self.doc.media.get(key,{}).get('name','N/A')
             item=QListWidgetItem(f'{i+1}. {name} · {seg.length} '+tr('images')); item.setData(Qt.ItemDataRole.UserRole,(at,at+seg.length)); self.playlist.addItem(item); at+=seg.length
-        keys=list(dict.fromkeys(s.media for s in self.doc.state.segments+self.doc.state.audio if s.media is not None))
+        keys=list(dict.fromkeys(s.media for s in self.doc.state.all_segments if s.media is not None))
         for key in keys:
             item=QListWidgetItem(self.doc.media[key]['name']); item.setToolTip(self.doc.media[key]['path']); item.setData(Qt.ItemDataRole.UserRole,key); self.media_list.addItem(tr(item))
     def play_list_item(self,item):
         a,b=item.data(Qt.ItemDataRole.UserRole); self.seek(a); self.select(a,b); self.toggle_play()
     def seek_media(self,item):
         key=item.data(Qt.ItemDataRole.UserRole); at=0
-        for track in (self.doc.state.segments,self.doc.state.audio):
-            at=0
-            for seg in track:
-                if seg.media==key: self.seek(at); return
-                at+=seg.length
+        for track in self.doc.state.tracks:
+            for segments in (track.segments,track.audio):
+                at=0
+                for seg in segments:
+                    if seg.media==key: self.select_media_track(track.info.id); self.seek(at); return
+                    at+=seg.length
     def remove_library_media(self):
         if self.job: return
         playlist_mode=self.library_tabs.currentIndex()==0
@@ -532,13 +538,13 @@ class MainWindow(ComparisonMixin,QMainWindow):
     def toggle_flip(self,axis):
         if self.job or self.editing_text(): return
         self.commit_exposure()
-        self.doc.commit('Miroir horizontal' if axis=='flip_h' else 'Miroir vertical',replace(self.doc.state,**{axis:not getattr(self.doc.state,axis)})); self.refresh()
+        self.doc.set_track_effect('Miroir horizontal' if axis=='flip_h' else 'Miroir vertical',**{axis:not getattr(self.doc.active_track,axis)}); self.refresh(); self.request_frame()
     def reset_canvas(self):
         if self.job or self.editing_text(): return
         self.viewer.reset_view()
-        if self.doc.state.flip_h or self.doc.state.flip_v:
+        if any(t.flip_h or t.flip_v for t in self.doc.editable_tracks()):
             self.commit_exposure()
-            self.doc.commit('Réinitialiser les miroirs',replace(self.doc.state,flip_h=False,flip_v=False)); self.refresh()
+            self.doc.set_track_effect('Réinitialiser les miroirs',flip_h=False,flip_v=False); self.refresh(); self.request_frame()
     def escape(self):
         if self.clip_tools.mode: self.clip_tools.cancel(); return
         if self.drawing.size_drag or self.drawing.text_drag or self.drawing.stroke or self.drawing.selection.indices or self.drawing.selection.gesture: self.drawing.cancel(); return
@@ -596,7 +602,7 @@ class MainWindow(ComparisonMixin,QMainWindow):
         self.commit_exposure()
         if not self.doc.dirty: return True
         from dialogs import ConfirmationDialog
-        first=next((self.doc.media[s.media] for s in self.doc.state.segments+self.doc.state.audio if s.media in self.doc.media),None)
+        first=next((self.doc.media[s.media] for s in self.doc.state.all_segments if s.media in self.doc.media),None)
         title=Path(self.doc.project_path).stem if self.doc.project_path else first['name'] if first else tr('Nouveau montage')
         box=ConfirmationDialog(self,title,tr('Enregistrer les modifications avant de continuer ?'),cancel=True)
         choice=box.exec(); box.deleteLater()
@@ -737,10 +743,12 @@ class MainWindow(ComparisonMixin,QMainWindow):
 
     def refresh(self):
         st=self.doc.state; n=st.length
-        first=next((self.doc.media[s.media] for s in st.segments+st.audio if s.media in self.doc.media),None)
+        self.refresh_media_tracks()
+        first=next((self.doc.media[s.media] for s in st.all_segments if s.media in self.doc.media),None)
         title=Path(self.doc.project_path).stem if self.doc.project_path else first['name'] if first else tr('Nouveau montage')
         self.setWindowTitle(('● ' if self.doc.dirty else '')+'Cadence - '+title)
         self.timeline.set_document(st,self.doc.media,self.doc.fps)
+        self.sync_timeline_scroll()
         self.timeline.drawing_clipboard_length=self.doc.drawing_clipboard_length if self.doc.drawing_clipboard else 0
         with QSignalBlocker(self.link_drawings): self.link_drawings.setChecked(st.drawings_linked)
         self.viewer.position=st.position
@@ -751,15 +759,16 @@ class MainWindow(ComparisonMixin,QMainWindow):
         self.sync_loop_button()
         for obj in (self.undo_action,): obj.setEnabled(bool(self.doc.undo_stack))
         for obj in (self.redo_action,): obj.setEnabled(bool(self.doc.redo_stack))
-        with QSignalBlocker(self.exp_spin): self.exp_spin.setValue(st.exposure)
-        self.viewer.flip_h=st.flip_h; self.viewer.flip_v=st.flip_v
-        self.hflip_action.setChecked(st.flip_h); self.vflip_action.setChecked(st.flip_v)
-        self.clip_tools.sync(); self.viewer.set_exposure(st.exposure)
+        with QSignalBlocker(self.exp_spin): self.exp_spin.setValue(self.doc.active_track.exposure)
+        self.viewer.flip_h=st.flip_h if st.second_track is None else False; self.viewer.flip_v=st.flip_v if st.second_track is None else False
+        self.hflip_action.setChecked(self.doc.active_track.flip_h); self.vflip_action.setChecked(self.doc.active_track.flip_v)
+        self.clip_tools.sync(); self.viewer.set_exposure(st.exposure if st.second_track is None else 0)
         self.refresh_library(); self.refresh_reference_choices(); self.drawing.refresh()
+        self.viewer.comparing=self.comparison_active(); self.sync_comparison_controls()
 
     def update_media_info(self,frame):
         st=self.doc.state
-        key=locate(st.segments,min(frame,st.length-1))[0] if st.length else None
+        key=locate(self.doc.active_track.segments,frame)[0] if 0<=frame<self.doc.active_track.length else None
         media=self.doc.media.get(key)
         if media is None and st.length: media=self.doc.media.get(locate(st.audio,min(frame,st.length-1))[0])
         text=f'{media["width"]} × {media["height"]} · {float(self.doc.fps):.3f} i/s' if media and media.get('has_video',True) else tr('Audio') if media else '-'
@@ -772,6 +781,15 @@ class MainWindow(ComparisonMixin,QMainWindow):
             self.timeline.ensure_visible(self.doc.state.position); self.follow_position=self.doc.state.position
         if not self.doc.state.length: self.viewer.clear(); self.display_frame=-1; return
         frame=min(self.doc.state.position,self.doc.state.length-1)
+        if self.doc.state.second_track is not None:
+            from composite_media import frame_layers,canvas_size
+            self.token+=1; self.display_frame=frame; self.prepare_reference_frame(frame)
+            identities=None
+            reference=getattr(self,'reference_track_id',None)
+            if self.comparison_active() and reference:
+                identities={t.info.id for t in self.doc.state.tracks if t.info.id!=reference}
+            self.decoder.request_layers(self.token,frame_layers(self.doc.state,self.doc.media,frame,identities),canvas_size(self.doc.state,self.doc.media))
+            return
         key,idx=locate(self.doc.state.segments,frame)
         self.token+=1; self.display_frame=frame; self.prepare_reference_frame(frame)
         offset=0; muted=False; segment_number=0
@@ -876,21 +894,27 @@ class MainWindow(ComparisonMixin,QMainWindow):
     def undo(self):
         if self.editing_text() or self.job: return
         self.pause(); self.commit_exposure()
-        if self.doc.undo(): self.exp_pending=self.doc.state.exposure; self.refresh(); self.request_frame()
+        if self.doc.undo(): self.exp_pending=self.doc.active_track.exposure; self.refresh(); self.request_frame()
     def redo(self):
         if self.editing_text() or self.job: return
         self.pause()
-        if self.doc.redo(): self.exp_pending=self.doc.state.exposure; self.refresh(); self.request_frame()
+        if self.doc.redo(): self.exp_pending=self.doc.active_track.exposure; self.refresh(); self.request_frame()
     def exposure_spin(self,value):
-        self.exp_pending=value
-        self.viewer.set_exposure(value)
+        self.exp_pending=value; self.exp_dirty=True
+        if self.doc.state.second_track is None: self.viewer.set_exposure(value)
+        else:
+            self.viewer.layer_exposures={t.info.id:value for t in self.doc.editable_tracks()}
+            self.viewer.apply_effect()
         if not self.exp_spin.scrubbing: self.exp_timer.start()
         else: self.exp_timer.stop()
     def commit_exposure(self):
         self.exp_timer.stop()
-        if hasattr(self,'exp_spin') and self.doc.media and self.exp_pending != self.doc.state.exposure:
-            self.doc.exposure(self.exp_pending); self.refresh()
-    def set_exposure(self,value): self.exp_pending=value; self.commit_exposure()
+        if hasattr(self,'exp_spin') and self.doc.media and getattr(self,'exp_dirty',False) and any(self.exp_pending!=t.exposure for t in self.doc.editable_tracks()):
+            self.doc.exposure(self.exp_pending); self.viewer.layer_exposures=None; self.refresh()
+            if self.doc.state.second_track is not None: self.request_frame()
+        self.viewer.layer_exposures=None
+        self.exp_dirty=False
+    def set_exposure(self,value): self.exp_pending=value; self.exp_dirty=True; self.commit_exposure()
     def sync_loop_button(self):
         with QSignalBlocker(self.loop_btn): self.loop_btn.setChecked(self.playback_mode=='loop')
         self.loop_btn.setSymbol('loop' if self.playback_mode=='loop' else 'once')
@@ -975,6 +999,7 @@ class MainWindow(ComparisonMixin,QMainWindow):
             if self.video_fullscreen: self.toggle_fullscreen()
             self.workspaces.capture(); self.workspaces.save()
         QApplication.instance().removeEventFilter(self.background_panel_menu)
+        QApplication.instance().removeEventFilter(self.volume_shortcut)
         self.capture_hotkey.close(); self.pause(); self.decoder.stop(); self.reference_decoder.stop(); self.frame_cache.clear()
         self.drawing.raster_cache.clear(); self.drawing.cache=None
         if self.viewer.surface is not None: self.viewer.surface.compositor.close()

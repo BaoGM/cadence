@@ -37,7 +37,7 @@ class HoverTransport(QObject):
         w = self.window
         bottom = w.centralWidget().geometry().bottom()+1
         size = self.overlay.sizeHint()
-        return QRect(8, max(0, bottom-size.height()-6), size.width(), size.height())
+        return QRect(w.centralWidget().geometry().left()+8, max(0, bottom-size.height()-6), size.width(), size.height())
 
     def update_hover(self, point=None):
         w = self.window

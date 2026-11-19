@@ -77,9 +77,9 @@ def test_simplified_context_toggle_preserves_workspace_and_saved_mode(window,app
         assert action.isChecked()==bool(t.simple)
         action.trigger(); menu.deleteLater(); application.processEvents()
     toggle(60)
-    assert t.simple and t.height()==44 and w.workspaces.mode=='edit'
+    assert t.simple and t.height()==64 and w.workspaces.mode=='edit'
     assert before=={k:p.isHidden() for k,p in w.workspaces.panels.items()} and w.doc.state.selection==(2,8)
     assert json.loads(w.workspaces.path.read_text(encoding='utf-8'))['simple']['edit']
     w.workspaces.switch('read'); w.workspaces.switch('edit'); assert t.simple
-    toggle(35); assert not t.simple and t.height()==100 and w.doc.state.selection==(2,8)
+    toggle(35); assert not t.simple and t.height()==80 and w.doc.state.selection==(2,8)
     assert not json.loads(w.workspaces.path.read_text(encoding='utf-8'))['simple']['edit']

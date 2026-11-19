@@ -13,7 +13,7 @@ from drag import ContinuousDrag
 from shape_gesture import ShapeGesture
 from draw_fonts import DrawingFontCombo
 
-TOOL_SPECS=[('Curseur','cursor','Q'),('Pinceau','brush','B'),('Gomme','eraser','E'),('Lasso / déplacement','lasso','L'),('Texte','text','Shift+T'),('Pipette','picker','P'),('Flèche','arrow','A'),('Carré','rectangle','R'),('Cercle','ellipse','Shift+O')]
+TOOL_SPECS=[('Curseur','cursor','Q'),('Pinceau','brush','B'),('Gomme','eraser','E'),('Lasso / déplacement','lasso','L'),('Translation de la clé','translate','T'),('Texte','text','Shift+T'),('Pipette','picker','P'),('Flèche','arrow','A'),('Carré','rectangle','R'),('Cercle','ellipse','Shift+O')]
 
 class ColorWheel(QWidget):
     changed=Signal(str)

@@ -17,6 +17,8 @@ def restore_language():
 
 
 @pytest.mark.parametrize('original,expected',[
+    ('Ouvrir','Open'),
+    ('Nom','Name'),
     ('Supprimer le marqueur','Delete frame marker'),
     ('Détacher','Float panel'),
     ('Audio prêt','Audio ready'),
@@ -63,7 +65,7 @@ def test_catalog_has_unique_entries_and_valid_patterns():
 def test_french_ui_literals_have_english_translation():
     ui_text._language='en'
     missing=[]
-    for path in Path(__file__).resolve().parents[1].glob('*.py'):
+    for path in Path(__file__).parent.glob('*.py'):
         if path.name.startswith(('test_','bench_')) or path.name in ('ui_text.py','smoke.py','guide.py'): continue
         for node in ast.walk(ast.parse(path.read_text(encoding='utf-8-sig'))):
             if not isinstance(node,ast.Call) or not isinstance(node.func,ast.Name) or node.func.id!='tr' or not node.args: continue

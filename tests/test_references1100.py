@@ -127,11 +127,12 @@ def test_simple_boundaries_and_animated_drag(window,application):
     t=w.timeline; t.simple=True; w.refresh(); t.resize(800,t.height())
     assert t.media_boundaries()==pytest.approx([t.x_for(10),t.x_for(30)])
     moves=[]; t.moved.disconnect(); t.moved.connect(lambda *args:moves.append(args))
-    QTest.mousePress(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.AltModifier,QPoint(round(t.x_for(5)),35))
-    QTest.mouseMove(t,QPoint(round(t.x_for(35)),35)); QTest.qWait(130)
+    y=round(t.simple_track_rect().center().y())
+    QTest.mousePress(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.AltModifier,QPoint(round(t.x_for(5)),y))
+    QTest.mouseMove(t,QPoint(round(t.x_for(35)),y)); QTest.qWait(130)
     assert t.gesture=='move' and t.move_span==(0,10,'video') and t.drop_frame is not None
     picture=QImage(t.size(),QImage.Format.Format_ARGB32); picture.fill(Qt.GlobalColor.transparent)
     painter=QPainter(picture); t.render(painter,QPoint()); painter.end()
-    assert any(picture.pixelColor(x,32).red()>180 and picture.pixelColor(x,32).green()>70 and picture.pixelColor(x,32).blue()<130 for x in range(20,t.width()-20))
-    QTest.mouseRelease(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.AltModifier,QPoint(round(t.x_for(35)),35))
+    assert any(picture.pixelColor(x,y).red()>180 and picture.pixelColor(x,y).green()>70 and picture.pixelColor(x,y).blue()<130 for x in range(20,t.width()-20))
+    QTest.mouseRelease(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.AltModifier,QPoint(round(t.x_for(35)),y))
     assert len(moves)==1 and t.move_span is None

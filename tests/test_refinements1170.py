@@ -44,7 +44,7 @@ def test_cross_track_move_and_copy_preserve_pairing_and_undo():
     old=doc.state
     assert doc.transfer_media(first,second,10,20,30)
     upper,lower=doc.state.tracks
-    assert locate(upper.segments,10)[0] is None and upper.length==40
+    assert locate(upper.segments,10)==locate(upper.audio,10)==('a',20) and upper.length==30
     assert locate(lower.segments,20)[0] is None
     assert locate(lower.segments,30)==locate(lower.audio,30)==('a',10)
     assert doc.undo() and doc.state==old

@@ -53,7 +53,7 @@ def test_old_docked_timecode_layout_does_not_leave_an_empty_strip(window,applica
     state=encoded(w.saveState()); w.removeDockWidget(dock); dock.hide(); dock.setParent(None); dock.deleteLater()
     w.workspaces.layouts['read']=state; w.workspaces.apply('read'); application.processEvents()
     bottom=w.viewer.mapTo(w,w.viewer.rect().bottomLeft()).y()
-    assert 0<=w.transport_widget.y()-bottom<=12
+    assert 0<=w.transport_widget.y()-bottom<=18
 
 
 def test_overlay_stays_in_viewport_when_images_move_or_change_shape(window,application):

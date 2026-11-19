@@ -42,7 +42,10 @@ def to_host(frame, origin, dcc_fps, timeline_fps, offset):
     return float(Fraction(str(origin)) + Fraction(frame - offset) * dcc_fps / timeline_fps)
 
 
-class TimelineLink(QObject):
+from sync3d_instances import InstanceConnections
+
+
+class TimelineLink(InstanceConnections, QObject):
     changed = Signal()
 
     def __init__(self, window):
@@ -54,6 +57,9 @@ class TimelineLink(QObject):
         self.from_start = True
         self.server = None
         self.peer = None
+        self.peers = []
+        self.peer_serial = 0
+        self.selected_instance = None
         self.lock = None
         self.token = None
         self.metadata = None
@@ -66,6 +72,7 @@ class TimelineLink(QObject):
         self.next_rate_check = 0.
         self.rate_decisions = set()
         self.prompt_open = False
+        self.pending_rate = None
         self.dialog = None
         self.drawing_capability = False
         self.drawing_modes = None
@@ -147,11 +154,7 @@ class TimelineLink(QObject):
     def stop(self):
         self.close_import_dialog()
         self.timer.stop()
-        if self.peer:
-            self.send(dict(type='stop'))
-            self.peer.flush()
-            self.peer.disconnectFromHost()
-        self.peer = None
+        self.stop_peers()
         if self.server:
             self.server.close()
             self.server.deleteLater()
@@ -177,98 +180,13 @@ class TimelineLink(QObject):
         self.status = 'Synchronisation désactivée'
         self.changed.emit()
 
-    def accept(self):
-        while self.server and self.server.hasPendingConnections():
-            peer = self.server.nextPendingConnection()
-            if self.peer:
-                peer.abort(); peer.deleteLater(); continue
-            self.peer = peer
-            peer.setReadBufferSize(16385)
-            peer.setSocketOption(QAbstractSocket.SocketOption.LowDelayOption, 1)
-            peer.authenticated = False
-            peer.buffer = b''
-            peer.readyRead.connect(lambda p=peer: self.read(p))
-            peer.disconnected.connect(lambda p=peer: self.disconnected(p))
-            self.last_received = time.monotonic()
-            self.timer.start()
-
-    def disconnected(self, peer):
-        if peer is self.peer:
-            self.close_import_dialog()
-            self.peer = None
-            self.metadata = self.pending = None
-            self.awaiting = None
-            self.drawing_capability = False
-            self.drawing_modes = None
-            self.drawing_removal = False
-            self.drawing_request = None
-            self.cameras = []
-            self.timer.stop()
-            self.status = 'En attente du logiciel 3D' if self.enabled else 'Synchronisation désactivée'
-            self.changed.emit()
-        peer.deleteLater()
-
-    def read(self, peer):
-        if peer is not self.peer:
-            return
-        try:
-            peer.buffer += bytes(peer.readAll())
-            if len(peer.buffer) > 16384:
-                raise ValueError('Timeline message too large')
-            while b'\n' in peer.buffer:
-                line, peer.buffer = peer.buffer.split(b'\n', 1)
-                message = json.loads(line)
-                if not isinstance(message, dict):
-                    raise ValueError('Invalid timeline message')
-                if not peer.authenticated:
-                    if (message.get('type') != 'hello' or message.get('version') != 1 or
-                        message.get('host') != self.host or not isinstance(message.get('token'), str) or
-                        not secrets.compare_digest(message['token'], self.token)):
-                        raise ValueError('Invalid timeline handshake')
-                    peer.authenticated = True
-                    self.send(dict(type='ready'))
-                    self.status = 'Connecté'
-                    self.last_position = None
-                    self.changed.emit()
-                else:
-                    if message.get('type') in ('capabilities','drawing_cameras','drawing_result','drawing_progress'):
-                        self.read_drawing(message)
-                        self.last_received = time.monotonic()
-                        continue
-                    state = state_message(message)
-                    previous = self.metadata
-                    acknowledgement = message.get('type') == 'ack'
-                    if acknowledgement:
-                        if type(message.get('seq')) is not int or message['seq'] != self.awaiting:
-                            raise ValueError('Unexpected frame acknowledgement')
-                        self.awaiting = None
-                    if not acknowledgement and self.awaiting is None and state != self.metadata:
-                        self.pending = state
-                    self.metadata = state
-                    if previous is None or any(previous[k] != state[k] for k in ('fps', 'start', 'end')):
-                        self.changed.emit()
-                self.last_received = time.monotonic()
-        except (ValueError, KeyError, TypeError, OverflowError):
-            logging.warning('Rejected invalid 3D synchronization message', exc_info=True)
-            peer.abort()
-
-    def send(self, message):
-        if not self.peer or not self.peer.authenticated or self.peer.bytesToWrite() > 4096:
-            return False
-        self.peer.write((json.dumps(message, allow_nan=False) + '\n').encode())
-        return True
-
     def origin(self):
         return self.metadata['start'] if self.from_start else 0
 
     def tick(self):
         now = time.monotonic()
-        if now - self.last_received > (180 if self.drawing_request else 5):
-            if self.peer: self.peer.abort()
-            return
-        if now - self.last_ping > 1:
-            self.send(dict(type='ping'))
-            self.last_ping = now
+        self.maintain_peers(now)
+        if self.peer is None: return
         w = self.window
         if not self.metadata or w.job or self.prompt_open or self.drawing_request or not w.doc.state.length:
             return
@@ -454,6 +372,8 @@ class TimelineLink(QObject):
     def check_rate(self):
         from model import locate
         w = self.window
+        if not self.metadata or not w.doc.active_track.length or w.job or self.prompt_open or self.pending_rate: return
+        if self.dialog is not None and self.dialog.isVisible(): return
         key, _ = locate(w.doc.active_track.segments, min(w.doc.state.position, w.doc.active_track.length - 1))
         media = w.doc.media.get(key)
         if not media or not media.get('has_video', True):
@@ -464,23 +384,46 @@ class TimelineLink(QObject):
         if abs(float(current - target)) < .001 or identity in self.rate_decisions:
             return
         self.rate_decisions.add(identity)
-        self.prompt_open = True
-        QTimer.singleShot(0, lambda: self.offer_rate(w.doc, key, current, target))
+        request = (w.doc, key, current, target)
+        self.pending_rate = request
+        QTimer.singleShot(0, lambda: self.show_pending_rate(request))
+
+    def cancel_pending_rate(self):
+        if self.pending_rate is not None:
+            document, key, _, target = self.pending_rate
+            self.rate_decisions.discard((id(document), key, str(target)))
+            self.pending_rate = None
+
+    def show_pending_rate(self, request):
+        if self.pending_rate is not request: return
+        self.pending_rate = None
+        self.offer_rate(*request)
 
     def offer_rate(self, document, key, current, target):
-        from PySide6.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QApplication, QMessageBox
+        opened = False
         try:
             w = self.window
-            if not self.enabled or w.doc is not document or w.job:
+            if (not self.enabled or w.doc is not document or w.job or self.prompt_open or
+                    QApplication.activeModalWidget() is not None or
+                    self.dialog is not None and self.dialog.isVisible()):
                 self.rate_decisions.discard((id(document), key, str(target)))
                 return
+            media = document.media.get(key)
+            if (not self.metadata or self.metadata['fps'] != target or not media or
+                    not any(s.media == key for t in document.state.tracks for s in t.segments)):
+                return
+            current = Fraction(media.get('cadence', {}).get('rate', media.get('original_fps', media['fps'])))
+            if abs(float(current-target)) < .001: return
+            self.prompt_open = True
+            opened = True
             message = tr('Cadence du média : {media} images/s. Cadence 3D : {host} images/s.\nAdapter ce média en conservant sa durée ?\nLa cadence de la timeline reste inchangée.').format(media=f'{float(current):g}', host=f'{float(target):g}')
             answer = QMessageBox.question(w, tr('Synchronisation 3D'), message,
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
             if answer == QMessageBox.StandardButton.Yes:
                 self.adapt_media(document, key, target)
         finally:
-            self.prompt_open = False
+            if opened: self.prompt_open = False
 
     def adapt_media(self, document, key, target):
         return self.adapt_keys(document, {key}, target)
@@ -491,12 +434,14 @@ class TimelineLink(QObject):
         w = self.window
         if not self.metadata or w.job or not w.doc.state.length:
             return
+        if not all_media and not w.doc.active_track.length: return
         keys = ({s.media for t in w.doc.state.tracks for s in t.segments} if all_media else
             {locate(w.doc.active_track.segments, min(w.doc.state.position, w.doc.active_track.length - 1))[0]})
         keys = {key for key in keys if key in w.doc.media and w.doc.media[key].get('has_video', True)}
         if not keys:
             return
         target = self.metadata['fps']
+        self.cancel_pending_rate()
         self.prompt_open = True
         try:
             message = tr('Adapter {count} média(s) à {rate} images/s ?\nLeur durée et la cadence de la timeline restent inchangées.').format(count=len(keys), rate=f'{float(target):g}')

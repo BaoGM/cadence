@@ -248,7 +248,7 @@ class Document:
         tracks[target_id]=replace(target,segments=insert(video,slice_segments(source.segments,start,end)),
                                  audio_segments=insert(audio,slice_segments(source.audio,start,end)))
         if not copy:
-            def remove(segments): return compact(slice_segments(segments,0,start)+(Segment(None,0,size),)+slice_segments(segments,end,source.length))
+            def remove(segments): return compact(slice_segments(segments,0,start)+slice_segments(segments,end,source.length))
             tracks[source_id]=replace(source,segments=remove(source.segments),audio_segments=remove(source.audio))
         result=with_tracks(self.state,tuple(tracks[t.info.id] for t in self.state.tracks))
         self.active_track_id=target_id
@@ -479,11 +479,12 @@ class Document:
         keys=relocate_keys(self.state.drawings,start,end,destination,self.state.length)
         if keys==self.state.drawings: return False
         at=max(0,min(destination,self.state.length-(end-start)))
-        return self.commit('Déplacer les clés de dessin',replace(self.state,drawings=keys,position=at,selection=(at,at+end-start)))
+        selection=(at,at+end-start) if self.state.selection else None
+        return self.commit('Déplacer les clés de dessin',replace(self.state,drawings=keys,position=at,selection=selection))
 
     def resize_drawing(self,start,new_start,new_end):
         keys=resize_key(self.state.drawings,start,new_start,new_end,self.state.length)
-        return self.commit('Redimensionner la plage de dessin',replace(self.state,drawings=keys,selection=None))
+        return self.commit('Redimensionner la plage de dessin',replace(self.state,drawings=keys))
 
     def delete_drawings(self,start,end):
         return self.commit('Supprimer la plage de dessin',replace(self.state,drawings=remove_key_range(self.state.drawings,start,end)))

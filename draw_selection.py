@@ -2,7 +2,7 @@
 from dataclasses import replace
 from PySide6.QtCore import QPointF,QRectF,Qt
 from PySide6.QtGui import QPainterPath, QPainterPathStroker, QTransform, QPen, QColor
-from drawing import active_key,mark_points,move_erased_selection,vector_path,VECTOR_TOOLS
+from drawing import active_key,mark_points,move_erased_selection,translate_mark,vector_path,VECTOR_TOOLS
 from draw_text import text_bounds
 from shape_gesture import ShapeGesture
 from affine import qt,IDENTITY
@@ -10,7 +10,7 @@ from affine import qt,IDENTITY
 class DrawSelection:
     def __init__(self,controller):
         self.c=controller; self.indices=(); self.source=None; self.key_start=None; self.gesture=None; self.path=None; self.preview=None
-    def clear(self): self.indices=(); self.source=None; self.key_start=None; self.gesture=None; self.path=None; self.preview=None
+    def clear(self): self.indices=(); self.source=None; self.key_start=None; self.gesture=None; self.path=None; self.preview=None; self.whole_key=False
     def sync(self):
         st=self.c.win.doc.state
         if self.source is not st.drawings or active_key(st.drawings,st.position) is not active_key(st.drawings,self.key_start if self.key_start is not None else -1): self.clear()
@@ -40,7 +40,11 @@ class DrawSelection:
         return result
     def begin(self,point,tool,force_move=False):
         self.sync(); st=self.c.win.doc.state; key=active_key(st.drawings,st.position); pos=QPointF(*point)
-        if tool=='text':
+        self.whole_key=tool=='translate'
+        if self.whole_key:
+            if not key or not key.marks: self.clear(); return True
+            self.indices=tuple(range(len(key.marks)))
+        elif tool=='text':
             if key and len(self.indices)==1 and not force_move:
                 index=self.indices[0]; mark=key.marks[index]
                 if mark.tool=='text' and mark.transform==IDENTITY:
@@ -73,11 +77,13 @@ class DrawSelection:
             dx,dy=point[0]-self.anchor[0],point[1]-self.anchor[1]
             points=[p for i in self.indices for p in mark_points(self.key.marks[i])]
             dx=max(-4-min(p[0] for p in points),min(dx,5-max(p[0] for p in points))); dy=max(-4-min(p[1] for p in points),min(dy,5-max(p[1] for p in points)))
-            marks,self.preview_indices=move_erased_selection(self.key.marks,self.indices,dx,dy)
+            if getattr(self,'whole_key',False):
+                marks=tuple(translate_mark(mark,dx,dy) for mark in self.key.marks); self.preview_indices=self.indices
+            else: marks,self.preview_indices=move_erased_selection(self.key.marks,self.indices,dx,dy)
             self.preview=replace(self.key,marks=marks)
         self.c.invalidate()
     def finish(self):
-        mode=self.gesture; self.gesture=None
+        mode=self.gesture; whole_key=getattr(self,'whole_key',False); self.gesture=None
         if mode=='lasso':
             self.path.closeSubpath(); self.indices=tuple(i for i,m in enumerate(self.key.marks) if m.tool!='eraser' and (self.path.intersects(self.geometry(m)) or self.path.contains(self.geometry(m)))); self.path=None
         elif mode in ('translate','resize_text'):
@@ -85,6 +91,7 @@ class DrawSelection:
             if self.source is self.c.win.doc.state.drawings and preview!=self.key:
                 self.c.commit_key(preview,'Redimensionner la zone de texte' if mode=='resize_text' else 'Déplacer le texte' if all(self.key.marks[i].tool=='text' for i in indices) else 'Déplacer les dessins')
                 self.indices=getattr(self,'preview_indices',indices) if mode=='translate' else indices; self.key_start=preview.start; self.source=self.c.win.doc.state.drawings
+            if whole_key: self.clear()
         self.c.invalidate()
     def display_transform(self,rect):
         transform=QTransform(); transform.translate(rect.x(),rect.y()); transform.scale(rect.width(),rect.height())

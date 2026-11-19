@@ -5,7 +5,7 @@ from fractions import Fraction
 from dataclasses import replace
 import numpy as np
 import pytest
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0,str(Path(__file__).parent))
 from model import Document,State,Segment,slice_segments,locate,sample_at,TimelinePCM
 from media import prepare_media,PreviewReader,export_video,exposure_lut,ffmpeg,exposure_filter
 
@@ -59,7 +59,7 @@ def test_exposure_ffmpeg_parity(tmp_path):
 def prepared(tmp_path_factory):
     root=tmp_path_factory.mktemp('media')
     os.environ['CADENCE_CACHE']=str(root/'cache')
-    m=prepare_media(Path(__file__).resolve().parents[1]/'assets'/'Demonstration.mp4')
+    m=prepare_media(Path(__file__).parents[1]/'assets'/'Demonstration.mp4')
     return m,root
 
 def test_import_and_precise_seek(prepared):
@@ -977,9 +977,9 @@ def test_vector_transport_loop_toggle():
     from widgets import TransportButton
     app=QApplication.instance() or QApplication([]); win=MainWindow(); win.show()
     try:
-        assert win.loop_btn.symbol=='once' and not win.loop_btn.isChecked()
-        win.loop_btn.click(); assert win.playback_mode=='loop' and win.loop_btn.symbol=='loop' and win.loop_btn.isChecked()
+        assert win.playback_mode=='loop' and win.loop_btn.symbol=='loop' and win.loop_btn.isChecked()
         win.loop_btn.click(); assert win.playback_mode=='once' and not win.loop_btn.isChecked()
+        win.loop_btn.click(); assert win.playback_mode=='loop' and win.loop_btn.symbol=='loop' and win.loop_btn.isChecked()
         win.set_loop(True); assert win.loop_btn.isChecked()
         playback=[b for b in win.transport_widget.findChildren(TransportButton) if type(b) is TransportButton]
         assert len(playback)==6

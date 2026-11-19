@@ -20,6 +20,7 @@ def test_unchanged_effects_not_recomputed(window,monkeypatch):
     v=window.viewer;calls=[];original=comparison.compose
     def counted(*args): calls.append(1);return original(*args)
     monkeypatch.setattr(comparison,'compose',counted)
+    monkeypatch.setattr(window,'comparison_active',lambda:True)
     v.comparing=True;v.reference_rgb=v.rgb.copy();v.compare_mode='difference';v.apply_effect()
     for _ in range(5): window.refresh();window.clip_tools.sync();v.set_exposure(v.ev)
     assert len(calls)==1

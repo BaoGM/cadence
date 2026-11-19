@@ -1,0 +1,9 @@
+Cadence 1.18.3 — Windows
+
+This Windows release includes the 1.18 library, independent video preview, multiple Maya instance selection, and whole-key drawing translation. It also includes the 1.18.1–1.18.3 fixes for key handles, track selection, 3D frame-rate conversion and panel layout.
+
+Library: double-click folders without videos to expand/collapse; open folders with videos to replace the timeline. Leaf folders have no disclosure arrow. Rename nested lists without moving folders on disk. Temporary lists can be renamed or removed and are discarded at shutdown without a separate prompt. Removed folder creation and the redundant help paragraph.
+
+Hidden playback controls expose only the Editing mode checkbox in a compact transparent frame. The independent preview no longer raises the main window. Single playback displays a grey crossed-out loop symbol; looping remains the default and the choice is saved.
+
+Windows preview, unsigned. Linux 1.18.0 remains on feature/linux-port and its existing release tag. Sources and third-party notices accompany Windows downloads. Local FR/EN and Direct3D checks, isolated installer upgrade/uninstall validation and secret scanning are recorded with the release.

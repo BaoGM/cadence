@@ -64,6 +64,7 @@ docs/BUILD.md
 docs/PUBLISHING.md
 docs/SIGNPATH_APPLICATION.md
 docs/UNINSTALL.md
+docs/release-notes-1.18.3.txt
 drag.py
 draw_fonts.py
 draw_selection.py
@@ -80,6 +81,7 @@ export_dialog.py
 file_dialogs.py
 guide.py
 hardware_decode.py
+hover_transport.py
 integrations/cadence_autostart.py
 integrations/cadence_bridge.py
 integrations/cadence_drawings.py
@@ -120,6 +122,8 @@ packaging/test_release_pipeline.py
 packaging/third-party.lock.json
 packaging/toolchain.lock.json
 playback_preferences.py
+playlist_store.py
+playlist_ui.py
 preferences.py
 progress_values.py
 reference_panel.py
@@ -132,8 +136,12 @@ shape_gesture.py
 shortcut_defaults.py
 shortcut_edit.py
 smoke.py
+smoke1180.py
+smoke1181.py
+smoke1182.py
 sync3d.py
 sync3d_dialog.py
+sync3d_instances.py
 sync3d_setup.py
 tests/conftest.py
 tests/test_audio1218.py
@@ -158,16 +166,22 @@ tests/test_drawing_transfer1140.py
 tests/test_export115.py
 tests/test_features0140.py
 tests/test_features0180.py
+tests/test_features1180.py
 tests/test_features1215.py
 tests/test_features1216.py
 tests/test_features182.py
 tests/test_fixes0141.py
+tests/test_fixes1180.py
+tests/test_fixes1181.py
+tests/test_fixes1182.py
+tests/test_fixes1183.py
 tests/test_gaps180.py
 tests/test_gpu160.py
 tests/test_gpu190.py
 tests/test_hardware190.py
 tests/test_import1105.py
 tests/test_import1213.py
+tests/test_instances1180.py
 tests/test_interface0150.py
 tests/test_interface1218.py
 tests/test_keys128.py
@@ -183,6 +197,7 @@ tests/test_options0170.py
 tests/test_picker1110.py
 tests/test_playback117.py
 tests/test_playback160.py
+tests/test_playlists1180.py
 tests/test_preview110.py
 tests/test_preview1162.py
 tests/test_preview181.py
@@ -231,6 +246,7 @@ ui_text.py
 update_ui.py
 updates.py
 version_info.txt
+video_mirror.py
 video_surface.py
 video_surface_d3d.py
 viewer_cursor.py

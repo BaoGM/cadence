@@ -173,6 +173,7 @@ def test_moved_draw_menu_preserves_shortcut_and_transport_centers(window,applica
     action=w.action_registry['Affichage/Afficher les outils de dessin'][0]
     assert action in menus['Affichage'].actions() and action not in menus['Dessin'].actions()
     data=defaults(w.action_registry); data['shortcuts'].pop('Affichage/Afficher les outils de dessin')
+    data['shortcuts'].pop('Synchronisation 3D/Envoyer les dessins')
     data['shortcuts']['Dessin/Afficher les outils de dessin']='Ctrl+Alt+D'
     assert validate(data,w.action_registry)['shortcuts']['Affichage/Afficher les outils de dessin']=='Ctrl+Alt+D'
     w.workspaces.switch('read'); application.processEvents(); strip=w.transport_widget.widget()

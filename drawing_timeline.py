@@ -63,7 +63,7 @@ class DrawingTimeline(QObject):
                 self.mode=t.update_range_drag(self.start_frame,e.modifiers())
             elif self.key:
                 self.mode=self.resize_mode(self.key,e.position().x())
-                t.selected.emit(self.key.start,self.key.end)
+                if self.mode=='click': t.seek.emit(self.key.start)
             else: self.mode=t.update_range_drag(self.start_frame,e.modifiers())
             e.accept(); return True
         if kind==QEvent.Type.MouseMove:
@@ -101,10 +101,10 @@ class DrawingTimeline(QObject):
         if kind==QEvent.Type.KeyPress and e.key()==Qt.Key.Key_Escape and self.mode:
             self.drag.finish(); self.mode=None; self.preview=None; self.change=None; t.update(); t.finish_range_drag(); e.accept(); return True
         return False
-    def simple_markers(self):
+    def simple_markers(self,keys=None):
         t=self.t; left=t.track_left(); right=left+t.track_width()
         scale=t.track_width()/t.span(); last_pixel=None
-        for key in visible_keys(t.state.drawings,t.view_start,t.view_start+t.span()):
+        for key in visible_keys(t.state.drawings if keys is None else keys,t.view_start,t.view_start+t.span()):
             if not key.marks or key.end<=t.view_start or key.start>=t.view_start+t.span(): continue
             x1=max(left,left+(key.start-t.view_start)*scale)
             x2=min(right,max(x1+3,left+(key.end-t.view_start)*scale))
@@ -113,18 +113,19 @@ class DrawingTimeline(QObject):
             yield QRectF(x1,t.track_y('drawing'),max(1,x2-x1),4)
     def paint_simple(self,p):
         p.save(); p.setClipRect(QRectF(self.t.track_left(),self.t.track_y('drawing')-2,self.t.track_width(),8))
-        self.paint_cached(p,self.t.state.drawings,True)
+        keys=self.preview if self.preview is not None else self.t.state.drawings
+        self.paint_cached(p,keys,True)
         p.restore()
     def paint_cached(self,p,keys,simple=False):
         t=self.t; ratio=t.devicePixelRatioF(); y=t.track_y('drawing')-2
-        signature=(id(keys),t.width(),ratio,t.view_start,t.span(),simple,p.font().toString())
+        signature=(id(keys),t.width(),ratio,t.view_start,t.span(),simple,y,p.font().toString())
         cached=getattr(self,'raster',None)
         if cached is None or cached[0]!=signature:
             image=QImage(ceil(t.width()*ratio),ceil(8*ratio),QImage.Format.Format_ARGB32_Premultiplied)
             image.setDevicePixelRatio(ratio); image.fill(Qt.GlobalColor.transparent)
             ink=QPainter(image); ink.setRenderHints(p.renderHints()); ink.setFont(p.font()); ink.translate(0,-y)
             if simple:
-                for rect in self.simple_markers(): ink.fillRect(rect,DRAWING_GOLD)
+                for rect in self.simple_markers(keys): ink.fillRect(rect,DRAWING_GOLD)
             else: self.paint_keys(ink,keys)
             ink.end(); self.raster=(signature,keys,image)
         p.drawImage(QPointF(0,y),self.raster[2])

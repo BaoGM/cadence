@@ -161,7 +161,7 @@ def test_english_update_strings(gui):
     import ast,ui_text
     previous=ui_text._language; ui_text._language='en'
     try:
-        for node in ast.walk(ast.parse((Path(__file__).resolve().parents[1] / 'update_ui.py').read_text(encoding='utf-8'))):
+        for node in ast.walk(ast.parse(Path('update_ui.py').read_text(encoding='utf-8'))):
             if isinstance(node,ast.Call) and isinstance(node.func,ast.Name) and node.func.id=='tr' and isinstance(node.args[0],ast.Constant):
                 source=node.args[0].value
                 assert ui_text.tr(source)!=source or source=='Version',source

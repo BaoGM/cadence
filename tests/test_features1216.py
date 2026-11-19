@@ -28,7 +28,7 @@ def test_conflict_one_dialog_immediate_and_single_response(window,application,mo
  w=window;d=ShortcutDialog(w.action_registry,w.preferences,w);d.shortcutsChanged.connect(w.apply_preferences);d.tabs.setCurrentIndex(1);d.show();d.activateWindow()
  key='Dessin/Ajouter un marqueur';other='Outils/Curseur';original=w.preferences['shortcuts'][key];calls=[]
  def respond(box):
-  calls.append(1)
+  calls.append(time.monotonic())
   d.key_finished(key)
   QTimer.singleShot(30,lambda:QTest.mouseClick(box.findChildren(QPushButton)[0 if accept else 1],Qt.MouseButton.LeftButton))
   QTimer.singleShot(1500,box.reject)
@@ -36,7 +36,7 @@ def test_conflict_one_dialog_immediate_and_single_response(window,application,mo
  monkeypatch.setattr(ConflictDialog,'exec',respond)
  d.show_key(key);editor=d.editors[key];editor.setFocus();QTest.qWait(40);start=time.monotonic()
  QTest.keySequence(editor,w.action_registry[other][0].shortcut());QTest.qWait(120);application.processEvents()
- assert len(calls)==1 and time.monotonic()-start<.8
+ assert len(calls)==1 and calls[0]-start<.8
  assert load_preferences(w.action_registry)['shortcuts'][key]==(w.preferences['shortcuts'][key] if accept else original)
  if accept: assert not w.action_registry[other][0].shortcut().toString()
  QTest.qWait(1100); assert len(calls)==1

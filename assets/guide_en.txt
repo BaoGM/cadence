@@ -1,4 +1,4 @@
-Cadence 1.17.0 - Quick guide
+Cadence 1.18.3 - Quick guide
 
 These are the default shortcuts. The complete list is at the end of the guide; customize them in File > Options > Shortcuts.
 
@@ -20,13 +20,13 @@ Ctrl + wheel raises or lowers the master volume in 5% steps without changing the
 
 Space: play / pause. Left and Right: one frame. Home and End: timeline boundaries. Comma and Period: previous / next keyframe or marker, wrapping at either end.
 
-K switches the keyframe commands and their buttons between keyframe and frame stepping. Left and Right always step one frame. The loop button changes mode without interrupting playback.
+K switches the keyframe commands and their buttons between keyframe and frame stepping. Left and Right always step one frame. Loop playback is enabled by default. The loop button changes mode without interrupting playback; your choice is kept for the next launch.
 
 Drag on the timeline to scrub. With Pointer (Q), you can also drag on the video; Shift makes this more precise. Playback resumes on release if it was running; otherwise it stays paused.
 
 Shift-drag selects a range while displaying the current frame. You can press Shift during a drag already in progress. Release the mouse before Shift to keep the selection; the opposite order returns to scrubbing.
 
-Shift-double-click a media segment to select its whole range, including on the simplified timeline. I and O set boundaries at the playhead; Escape clears the selection. Playback is limited to the selected range, whose length appears at its center.
+Shift-double-click a track, its title or its video/audio lane to select the entire track, including on the simplified timeline. I and O set boundaries at the playhead; Escape clears the selection. Playback is limited to the selected range, whose length appears at its center.
 
 ----------------------------------------
 Edit the timeline
@@ -35,7 +35,7 @@ A media track pairs a video lane and an audio lane. The + Media track button add
 
 The tracks are named Track 1 and Track 2. Click a title to select a track. Ctrl-click adds or removes a track from the selection, on its title or timeline. Edits affect the selected tracks. Drag a title above or below the other to change their order. Right-click a title to move or delete the entire track. Ctrl+Z undoes these actions. Audio lanes start collapsed: click the triangle next to the title to expand them.
 
-Double-click a track title or timeline to expand or collapse its audio lane. Right-click to disable or enable all its audio, including in exports. With both tracks selected, drag media onto the other track to move its video and audio together, leaving a gap at the original position. Alt+Shift-drag copies it. Drawing keys appear above the playback bar without overlapping the numbers, including on the simplified timeline.
+Double-click a track title or timeline to expand or collapse its audio lane. Right-click to disable or enable all its audio, including in exports. With both tracks selected, drag media onto the other track to move its video and audio together. The source range is removed and later clips close the gap, leaving no empty clip. Alt+Shift-drag copies it while preserving the source. Drawing keys appear above the playback bar without overlapping the numbers, including on the simplified timeline.
 
 Drawings, their keys and frame markers remain shared above both tracks. Editing one track keeps drawings in place; when both tracks are selected, linked drawings follow the edits.
 
@@ -102,7 +102,9 @@ View zoom, pan and rotation do not affect export. Mirrors H and Shift+V do, as d
 
 Timecode stays anchored to the video panel. Drag it to reposition it, lock its position with the context menu, and show or hide it with Ctrl+6. It is not exported.
 
-The View menu and a right-click on the background show or hide panels. Edit panel layout enables moving and resizing them. Reset panel layout restores the current mode.
+The View menu and a right-click on the background show or hide panels. Dividers remain resizable in Playback and Editing modes, even with a locked layout. Edit panel layout enables moving and detaching panels. Reset panel layout restores the current mode. The toolbar stays as narrow as its icons when the other panels are hidden.
+
+When playback controls are hidden, hover over the bottom of the video area, just above the timeline, to reveal only the Editing mode checkbox and label in a small transparent frame on the left. It disappears when the pointer leaves the frame and does not change the panels saved for the current mode.
 
 Playback and Editing modes are fully configurable in View > Playback / editing mode settings: choose panels and the simplified timeline separately for each. The Editing mode checkbox switches modes. Each mode retains its layout. File > Options > Preferences > Restore interface resets both modes to their initial state.
 
@@ -166,3 +168,24 @@ Updates
 Cadence checks for new versions at startup, at most once a day. File > Options > Preferences lets you disable this check and include prereleases. Help > Check for updates starts a manual check.
 
 Your approval is requested before downloading and again before installation. Downloads are checked against their SHA-256 checksum. The installed version offers the Windows installer and a chance to save your project before closing. The portable version opens the verified archive's folder: extract it into a new folder. Preferences and projects are preserved. An unavailable connection does not block startup.
+
+----------------------------------------
+New in 1.18 - library and windows
+
+View > Show playlist (Ctrl+8) > Library contains free playlists and watched folders. New… creates an empty playlist, a playlist from files or watches an existing folder. Browse subfolders in the tree; each folder shows its direct videos without flattening its descendants.
+
+Add videos or drop files into a free playlist to store references to their paths. For a watched folder, Cadence copies external files and keeps the originals. Existing names get a suffix without overwriting. Drag items to reorder them. Playlist names and ordering persist between sessions.
+
+Remove from playlist never deletes files. Refresh rescans the selected folder and lists the files still present, including files removed from the playlist. Move to Recycle Bin is a separate context menu action with confirmation. Replace file path… locates a moved video; other playlists and projects are unaffected.
+
+Select a playlist and Open, or double-click its name, to load all its videos sequentially and replace the timeline. The complete previous edit (both tracks, drawings, markers and undo history) goes into Temporary. Opening a temporary edit restores it and stores the current edit. Temporary playlists can be renamed and removed through their context menu. They are discarded at shutdown without a separate confirmation: save projects you want to keep before closing Cadence. Double-click a folder without videos to expand or collapse its subfolders; only folders with videos can be opened. Arrows appear only for folders with subfolders. All playlist names, including nested folders, can be changed through the context menu without renaming folders on disk.
+
+View > Duplicate video view, also available by right-clicking the image, opens a frameless independent preview following the main player's playback, comparison and drawings. Hover over the lower middle area to reveal the overlay controls: playback, always-on-top, opacity and close. Drag the image to move the window and its edges to resize it. Space controls shared playback, Tab reveals keyboard controls and Escape closes this preview while keeping the main player open.
+
+T moves every object in the current drawing key without selecting them first: drag in the preview, then undo or redo normally. Switching timecode/frames now uses Alt+T. Custom shortcuts are preserved.
+
+3D synchronization > Synchronized instance chooses the target Maya or Blender process, identified by version, scene and PID. Time and drawings are sent only to that instance. If it disconnects, Cadence waits for its reconnection; switching to another instance is explicit. Selection is disabled during drawing transfers.
+
+Moving a clip to the other track removes its video and audio from the source track without leaving an empty clip; later items on that track close the gap. Copying keeps the source, and undo restores both tracks.
+
+Clicking the independent preview does not bring the main window to the front. Single playback uses the same loop symbol, greyed out and crossed out.

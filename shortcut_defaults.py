@@ -2,8 +2,9 @@
 from PySide6.QtGui import QKeySequence
 
 
-REVISION=2
+REVISION=3
 CHANGES={
+    'Affichage/Timecode / frames':('T','Alt+T'),
     'Dessin/Copier les clés':('Ctrl+Shift+C','C'),
     'Dessin/Coller les clés':('Ctrl+Shift+V','V'),
     'Dessin/Couper les clés':('Ctrl+Shift+X','X'),

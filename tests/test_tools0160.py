@@ -22,15 +22,16 @@ def mouse(widget,kind,point,mods=Qt.KeyboardModifier.NoModifier):
 def test_simple_timeline_range_draw_delete_and_undo(window,application):
     w=window; w.request_frame=lambda:None; w.workspaces.switch('read'); application.processEvents(); t=w.timeline
     shift=Qt.KeyboardModifier.ShiftModifier
-    mouse(t,QEvent.Type.MouseButtonPress,QPointF(t.x_for(2.25),35),shift)
-    mouse(t,QEvent.Type.MouseMove,QPointF(t.x_for(10.25),35),shift)
-    mouse(t,QEvent.Type.MouseButtonRelease,QPointF(t.x_for(10.25),35),shift)
+    y=t.simple_track_rect().center().y()
+    mouse(t,QEvent.Type.MouseButtonPress,QPointF(t.x_for(2.25),y),shift)
+    mouse(t,QEvent.Type.MouseMove,QPointF(t.x_for(10.25),y),shift)
+    mouse(t,QEvent.Type.MouseButtonRelease,QPointF(t.x_for(10.25),y),shift)
     assert w.doc.state.selection==(2,11) and t.selection_track=='video'
-    color=t.grab().toImage().pixelColor(round(t.x_for(6)),40); assert color.green()>color.red()
+    color=t.grab().toImage().pixelColor(round(t.x_for(6)),round(y)); assert color.green()>color.red()
     d=w.drawing; d.choose_tool('brush'); application.processEvents()
     d.begin(screen_point(d,.2,.3),1); d.move(screen_point(d,.5,.3),1); d.finish()
     assert t.simple and w.workspaces.mode=='read' and [(k.start,k.end) for k in w.doc.state.drawings]==[(2,11)]
-    menu=t.context_menu(QPointF(t.x_for(6),35)); actions=menu.actions(); titles=[a.text() for a in actions]
+    menu=t.context_menu(QPointF(t.x_for(6),y)); actions=menu.actions(); titles=[a.text() for a in actions]
     assert titles[:2]==['Code temporel','Images'] and actions[titles.index('Supprimer l’audio')+1].isSeparator()
     assert actions[titles.index('Supprimer les clés')-1].isSeparator()
     actions[titles.index('Supprimer les clés')].trigger(); assert not w.doc.state.drawings and w.doc.state.length==30
@@ -38,7 +39,7 @@ def test_simple_timeline_range_draw_delete_and_undo(window,application):
     actions[titles.index('Supprimer le média')].trigger(); assert w.doc.state.length==21 and not w.doc.state.drawings
     w.undo(); assert w.doc.state.length==30 and w.doc.state.drawings; menu.deleteLater()
     # Regular dragging returns to scrub, clearing the range.
-    mouse(t,QEvent.Type.MouseButtonPress,QPointF(t.x_for(15.25),35)); mouse(t,QEvent.Type.MouseButtonRelease,QPointF(t.x_for(15.25),35))
+    mouse(t,QEvent.Type.MouseButtonPress,QPointF(t.x_for(15.25),y)); mouse(t,QEvent.Type.MouseButtonRelease,QPointF(t.x_for(15.25),y))
     assert w.doc.state.position==15 and w.doc.state.selection is None
 
 def test_tools_auto_activation_and_clean_panels(window,application):
@@ -169,6 +170,7 @@ def test_reset_panel_layout_preserves_project_and_other_mode(window,application)
 def test_new_tool_shortcuts_preserve_older_custom_keys(window):
     from preferences import defaults,validate
     data=defaults(window.action_registry)
+    data['shortcuts'].pop('Synchronisation 3D/Envoyer les dessins')
     data['shortcuts'].pop('Outils/Flèche')
     data['shortcuts']['Lecture/Image suivante']='A'
     data['shortcuts'].pop('Outils/Curseur')

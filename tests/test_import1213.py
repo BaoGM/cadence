@@ -49,7 +49,7 @@ def test_error_with_no_message_is_identified(application):
 def test_playback_settings_independent_of_media(window):
  from playback_preferences import save,load,path
  w=window;w.volume.setValue(37);w.volume.setMuted(True);w.timeline.set_units('frames');save(w)
- assert json.loads(path().read_text())==dict(volume=37,muted=True,units='frames',key_step=False,timecode_position=[.5,1.],timecode_locked=False)
+ assert json.loads(path().read_text())==dict(volume=37,muted=True,units='frames',key_step=False,timecode_position=[.5,1.],timecode_locked=False,playback_mode='loop')
  w.volume.setValue(80);w.volume.setMuted(False);w.timeline.set_units('time');load(w)
  assert w.volume.value()==37 and w.volume.muted and w.timeline.units=='frames'
  assert w.transport.volume==0
@@ -60,5 +60,5 @@ def test_current_frame_is_visible_without_hover(window,simple):
  w=window;w.workspaces.set_timeline_simple(simple);w.doc.state=replace(w.doc.state,position=8);w.refresh();t=w.timeline;t.hover_x=None
  image=QImage(t.size(),QImage.Format.Format_ARGB32_Premultiplied);image.fill(Qt.GlobalColor.transparent)
  p=QPainter(image);t.paint_current_highlight(p);t.paint_frame_indicator(p);p.end();rgba=pixels(image)
- y=32 if simple else 60;x=int(t.x_for(8))+1
+ y=round(t.simple_track_rect().center().y()) if simple else 60;x=int(t.x_for(8))+1
  assert rgba[y,x,3]>48 and rgba[:30,:,3].max()>0

@@ -45,7 +45,7 @@ def test_handles_commit_cancel_and_shortcuts(window,application):
 def test_reading_mode_restores_panels(window,application):
     w=window; w.header.show(); w.library.show(); application.processEvents()
     w.workspaces.switch('read'); application.processEvents()
-    assert w.timeline.simple and w.timeline.height()==44
+    assert w.timeline.simple and w.timeline.height()==64
     assert w.timeline.x_for(0)==w.timeline.width()-w.timeline.x_for(w.doc.state.length)
     assert w.timeline.frame_for(w.timeline.x_for(0))==0
     assert w.timeline.frame_for(w.timeline.x_for(w.doc.state.length))==w.doc.state.length-1

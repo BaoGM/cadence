@@ -30,6 +30,11 @@ class SyncDialog(QDialog):
         self.offset = ScrubSpinBox()
         self.offset.setRange(-10000000, 10000000)
         form.addRow(tr('Logiciel'), self.host)
+        self.instance = QComboBox()
+        self.instance.setMinimumContentsLength(20)
+        self.instance.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        form.addRow(tr('Instance synchronisée'), self.instance)
+        self.instance.currentIndexChanged.connect(self.select_instance)
         form.addRow(tr('Sens'), self.direction)
         form.addRow(tr('Décalage (images Cadence)'), self.offset)
         layout.addLayout(form)
@@ -88,6 +93,10 @@ class SyncDialog(QDialog):
     def configure(self, *args):
         self.link.configure(self.host.currentData(), self.direction.currentData(), self.offset.value(), self.from_start.isChecked())
 
+    def select_instance(self, index):
+        self.link.select_instance(self.instance.itemData(index))
+        self.refresh()
+
     def refresh(self):
         link = self.link
         for control, value, method in ((self.enabled, link.enabled, 'setChecked'),
@@ -96,6 +105,14 @@ class SyncDialog(QDialog):
                 (self.offset, link.offset, 'setValue'), (self.from_start, link.from_start, 'setChecked')):
             with QSignalBlocker(control): getattr(control, method)(value)
         self.status.setText(tr(link.status))
+        choices=link.instances()
+        with QSignalBlocker(self.instance):
+            current=[(self.instance.itemData(i),self.instance.itemText(i)) for i in range(1,self.instance.count())]
+            if current!=choices:
+                self.instance.clear(); self.instance.addItem(tr('Choisir une instance…'),None)
+                for identity,label in choices: self.instance.addItem(label,identity)
+            self.instance.setCurrentIndex(max(0,self.instance.findData(link.peer.identity if link.peer and link.peer.authenticated else None)))
+        self.instance.setEnabled(bool(choices) and not link.drawing_request and not link.window.job)
         self.adapt.setEnabled(link.metadata is not None)
         self.adapt_all.setEnabled(link.metadata is not None)
         host=link.host

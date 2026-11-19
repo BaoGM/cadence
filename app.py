@@ -33,7 +33,7 @@ from comparison import ComparisonMixin
 from draw_ui import DrawController
 from PySide6.QtWidgets import QGridLayout
 
-VERSION='1.17.0'
+VERSION='1.18.3'
 STYLE='''
 QMainWindow, QWidget { background:#11161d; color:#dce4ee; font-family:"Segoe UI"; font-size:13px; }
 QMenuBar { background:#11161d; color:#91a1b5; padding:3px; }
@@ -107,7 +107,7 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
         from dialogs import install_dialog_presentation
         install_dialog_presentation()
         startup.checkpoint('language and styles')
-        self.display_frame=-1; self.selection_anchor=None; self.last_pass=1; self.playback_mode='once'; self.exp_pending=0; self.rendered_token=-1; self.play_completed=False
+        self.display_frame=-1; self.selection_anchor=None; self.last_pass=1; self.playback_mode='loop'; self.exp_pending=0; self.rendered_token=-1; self.play_completed=False
         self.setAcceptDrops(True)
         self.settings=QSettings('CadenceStudio','CadenceStudio'); self.video_fullscreen=False
         self.setWindowIcon(QIcon(str(Path(getattr(sys,'_MEIPASS',Path(__file__).parent))/'assets'/'cadence.ico')))
@@ -134,6 +134,8 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
         from workspace_modes import WorkspaceModes
         self.initial_dock_state=self.saveState()
         self.workspaces=WorkspaceModes(self)
+        from hover_transport import HoverTransport
+        self.hover_transport=HoverTransport(self)
         from menu_layout import BackgroundPanelMenu
         self.background_panel_menu=BackgroundPanelMenu(self)
         from wipe import WipeInteraction
@@ -257,7 +259,10 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
         self.action(view,'Réinitialiser le canvas',self.reset_canvas,'0'); self.action(view,'Zoom vidéo +',lambda:self.viewer.zoom_by(1.2),'+'); self.action(view,'Zoom vidéo −',lambda:self.viewer.zoom_by(1/1.2),'-'); self.action(view,'Toute la timeline',self.timeline.reset_view,'Ctrl+0')
         view.removeAction(self.action_registry['Affichage/Toute la timeline'][0])
         self.action(view,'Plein écran vidéo',self.toggle_fullscreen,'F11')
-        self.action(view,'Timecode / frames',lambda:self.timeline.set_units('frames' if self.timeline.units=='time' else 'time'),'T')
+        from video_mirror import toggle as toggle_video_mirror
+        self.video_mirror_action=self.action(view,'Dupliquer l’image vidéo',lambda checked:toggle_video_mirror(self,checked))
+        self.video_mirror_action.setCheckable(True)
+        self.action(view,'Timecode / frames',lambda:self.timeline.set_units('frames' if self.timeline.units=='time' else 'time'),'Alt+T')
         self.hflip_action=self.action(view,'Flop - miroir horizontal',lambda:self.toggle_flip('flip_h'),'H'); self.hflip_action.setCheckable(True)
         self.vflip_action=self.action(view,'Flip - miroir vertical',lambda:self.toggle_flip('flip_v'),'Shift+V'); self.vflip_action.setCheckable(True)
         self.comparison_menu(); self.drawing.menus()
@@ -337,7 +342,7 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
             self.apply_preferences(dialog.result_data)
     def set_layout_editable(self,enabled):
         self.layout_editable=enabled
-        self.setStyleSheet('QMainWindow::separator {background:#11161d;border:0;image:none;width:%dpx;height:%dpx;}'%((6,6) if enabled else (0,0)))
+        self.setStyleSheet('QMainWindow::separator {background:#11161d;border:0;image:none;width:6px;height:6px;} QMainWindow::separator:hover {background:#35434e;}')
         for dock in list(self.panel_widgets().values())+[self.library]:
             if not isinstance(dock,QDockWidget): continue
             if not enabled and dock.isFloating(): dock.setFloating(False)
@@ -350,6 +355,8 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
                     b=QToolButton(bar); b.setText(tr(text)); b.setToolTip(tr(tip)); b.clicked.connect(fn); row.addWidget(b)
             dock.setTitleBarWidget(bar)
             if old: old.deleteLater()
+        tools=self.edit_toolbar
+        tools.setFixedWidth(max(48,self.edit_tool_buttons.sizeHint().width(),tools.titleBarWidget().minimumSizeHint().width()))
         self.compact_playback_panels()
 
     def compact_playback_panels(self):
@@ -386,6 +393,8 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
         box.setMinimumHeight(60); tabs.setMinimumHeight(40)
         self.library.setWidget(box); self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea,self.library); self.library.hide(); self.library_signature=None
         self.playlist.itemDoubleClicked.connect(self.play_list_item); self.media_list.itemDoubleClicked.connect(self.seek_media)
+        from playlist_ui import PlaylistPanel
+        self.playlists_panel=PlaylistPanel(self); tabs.addTab(self.playlists_panel,tr('Bibliothèque'))
         for listing in (self.playlist,self.media_list):
             listing.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection); listing.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu); listing.customContextMenuRequested.connect(lambda point,w=listing:self.library_context(w,point))
     def library_context(self,listing,point):
@@ -767,10 +776,15 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
         self.viewer.comparing=self.comparison_active(); self.sync_comparison_controls()
 
     def update_media_info(self,frame):
-        st=self.doc.state
-        key=locate(self.doc.active_track.segments,frame)[0] if 0<=frame<self.doc.active_track.length else None
-        media=self.doc.media.get(key)
-        if media is None and st.length: media=self.doc.media.get(locate(st.audio,min(frame,st.length-1))[0])
+        active=self.doc.active_track
+        tracks=(active,)+tuple(t for t in self.doc.state.tracks if t.info.id!=active.info.id)
+        media=None
+        for track in tracks:
+            for segments in (track.segments,track.audio):
+                if not 0<=frame<sum(s.length for s in segments): continue
+                media=self.doc.media.get(locate(segments,frame)[0])
+                if media is not None: break
+            if media is not None: break
         text=f'{media["width"]} × {media["height"]} · {float(self.doc.fps):.3f} i/s' if media and media.get('has_video',True) else tr('Audio') if media else '-'
         if self.media_info.text()!=text: self.media_info.setText(tr(text))
 
@@ -880,6 +894,10 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
         count=self.doc.copy(self.copy_audio.isChecked()); self.refresh(); self.notify(f'{count} images copiées'+(' avec leur audio.' if self.copy_audio.isChecked() else ' sans audio.'))
     def delete_selection(self):
         if self.editing_text() or self.job: return
+        focus=QApplication.focusWidget()
+        if focus is self.playlists_panel or (focus and self.playlists_panel.isAncestorOf(focus)):
+            if focus is self.playlists_panel.files: self.playlists_panel.remove_files()
+            return
         if self.drawing.edit_objects('delete'): return
         self.pause(); self.commit_exposure()
         if self.timeline.selection_track=='drawing': self.edit_drawing_timeline('delete',*self.doc.selected()); return
@@ -922,6 +940,7 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
     def set_loop(self,enabled):
         self.playback_mode='loop' if enabled else 'once'
         self.transport.set_loop(enabled); self.sync_loop_button()
+        if hasattr(self,'playback_prefs_timer'): self.playback_prefs_timer.start()
     def toggle_play(self):
         self._resume_after_scrub=False
         self.scrub_audio.stop()
@@ -989,6 +1008,7 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
             self.job.cancel.set(); self.notify('Annulation en cours ; fermez la fenêtre une fois terminée.'); e.ignore(); return
         if not getattr(self,'_update_close_approved',False) and not self.confirm_discard(): e.ignore(); return
         if hasattr(self,'update_manager'): self.update_manager.stop()
+        if getattr(self,'video_mirror',None): self.video_mirror.close()
         self.sync3d.stop()
         self.audio_jobs.stop()
         if self.viewer.graphics_startup is not None: self.viewer.graphics_startup.cancel()

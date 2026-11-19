@@ -19,8 +19,9 @@ def load(window):
     window.timecode_overlay.set_locked(data.get('timecode_locked') is True)
     from navigation_modes import set_key_step
     set_key_step(window,data.get('key_step') is True)
+    window.set_loop(data.get('playback_mode')!='once')
 
 
 def save(window):
-    try: write_file(path(),dict(volume=window.volume.value(),muted=window.volume.muted,units=window.timeline.units,key_step=window.key_step,timecode_position=window.timecode_overlay.position(),timecode_locked=window.timecode_overlay.locked))
+    try: write_file(path(),dict(volume=window.volume.value(),muted=window.volume.muted,units=window.timeline.units,key_step=window.key_step,timecode_position=window.timecode_overlay.position(),timecode_locked=window.timecode_overlay.locked,playback_mode=window.playback_mode))
     except OSError: logging.exception('Cannot save playback preferences')

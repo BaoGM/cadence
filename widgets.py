@@ -93,9 +93,12 @@ class TransportButton(QPushButton):
             if symbol in ('first','previous'): p.scale(-1,1)
             path.moveTo(-5,-8); path.lineTo(4,0); path.lineTo(-5,8); p.drawPath(path)
             if symbol in ('first','last'): p.drawLine(QPointF(10,-9),QPointF(10,9))
-        elif symbol=='loop':
+        elif symbol in ('loop','once'):
+            if symbol=='once':
+                pen=QPen(p.pen()); pen.setColor(MUTED); p.setPen(pen)
             path.moveTo(10,2); path.lineTo(10,8); path.lineTo(7,11); path.lineTo(-7,11); path.lineTo(-10,8); path.lineTo(-10,-4); path.lineTo(-7,-7); path.lineTo(10,-7); p.drawPath(path)
             path=QPainterPath(); path.moveTo(5,-12); path.lineTo(10,-7); path.lineTo(5,-2); p.drawPath(path)
+            if symbol=='once': p.drawLine(QPointF(-11,-12),QPointF(11,12))
         else:
             p.drawLine(QPointF(-11,0),QPointF(11,0)); path.moveTo(4,-7); path.lineTo(11,0); path.lineTo(4,7); p.drawPath(path)
 
@@ -146,6 +149,7 @@ class VolumeBars(QWidget):
         menu=QMenu(tr(self)); action=menu.addAction(tr('Unmute' if self.muted else 'Mute')); action.triggered.connect(lambda:self.setMuted(not self.muted)); menu.exec(event.globalPos())
 
 class Viewer(QWidget):
+    presentationChanged=Signal()
     scrub=Signal(int)
     scrubStarted=Signal()
     scrubActiveChanged=Signal(bool)
@@ -168,9 +172,11 @@ class Viewer(QWidget):
     def update(self,*args):
         super().update(*args)
         if getattr(self,'surface',None) is not None: self.surface.update()
+        self.presentationChanged.emit()
     def resizeEvent(self,event):
         super().resizeEvent(event)
         if self.surface is not None: self.surface.setGeometry(self.rect())
+        self.presentationChanged.emit()
     def showEvent(self,event):
         super().showEvent(event)
         self.cursor_guard.activate()
@@ -598,7 +604,7 @@ class Timeline(TrackRows,QWidget):
             bar=self.simple_track_rect(); bar_path=self.simple_media_path()
             p.fillPath(bar_path,QColor('#646a73'))
             if self.state and self.state.length:
-                if self.state.selection:
+                if self.state.selection and self.selection_track!='drawing':
                     a,b=self.state.selection; x1=max(self.track_left(),self.x_for(a)); x2=min(self.track_right(),self.x_for(b))
                     if x2>x1:
                         area=QRectF(x1,bar.top()-2,x2-x1,bar.height()+4)
@@ -615,7 +621,9 @@ class Timeline(TrackRows,QWidget):
         self.paint_media_titles(p)
         p.setPen(QColor('#27313e')); p.drawLine(0,38,self.width(),38)
         if not self.state or not self.state.length:
-            p.setPen(MUTED); p.drawText(90,85,tr('Votre montage apparaîtra ici.')); p.end(); return
+            area=QRectF(self.track_left()+6,47,max(0,self.track_width()-12),26)
+            text=p.fontMetrics().elidedText(tr('Votre montage apparaîtra ici.'),Qt.TextElideMode.ElideRight,int(area.width()))
+            p.setPen(MUTED); p.drawText(area,Qt.AlignmentFlag.AlignVCenter,text); p.end(); return
         n=self.state.length
         self.paint_ruler(p,False)
         track_area=QRectF(self.track_left(),38,self.track_width(),self.height()-38)
@@ -653,7 +661,7 @@ class Timeline(TrackRows,QWidget):
                     else: p.drawLine(QPointF(x1+3,y+h/2),QPointF(x1+w-3,y+h/2))
         if self.drop_frame is not None:
             x=self.animated_x if self.animated_x is not None else self.x_for(self.drop_frame); p.setPen(QPen(QColor('#ff963b'),3)); p.drawLine(QPointF(x,40),QPointF(x,self.height()-4))
-        if self.state.selection:
+        if self.state.selection and self.selection_track!='drawing':
             a,b=self.state.selection; x1,x2=self.x_for(a),self.x_for(b)
             for media_track,y,height in self.media_rows():
                 if media_track.info.id not in getattr(self,'selected_media_ids',(self.active_media.info.id,)): continue
@@ -837,13 +845,19 @@ class Timeline(TrackRows,QWidget):
         if self.double_click_media(e): return
         if e.button()!=Qt.MouseButton.LeftButton or not e.modifiers()&Qt.KeyboardModifier.ShiftModifier:
             return super().mouseDoubleClickEvent(e)
-        if not self.track_left()<=e.position().x()<=self.track_left()+self.track_width(): return
-        target=self.context_target(e.position().x(),e.position().y(),False)
-        if not target: return
-        a,b,track=target
-        if locate(self.active_media.audio if track=='audio' else self.active_media.segments,a)[0] is None: return
+        if self.simple:
+            if not self.simple_track_rect().contains(e.position()): return
+            media=self.active_media; track='video'
+        else:
+            media=self.media_row_at(e.position().y())
+            if media is None: return
+            top=next(y for row,y,height in self.media_rows() if row.info.id==media.info.id)
+            track='audio' if media.info.audio_expanded and e.position().y()>=top+26 else 'video'
+        if not media.length: return
+        self.mediaTrackSelected.emit(media.info.id,'replace')
+        self.active_media_id=media.info.id
         if hasattr(self,'_timeline_drag'): self._timeline_drag.finish()
-        self.anchor=None; self.gesture=None; self.selection_track=track
-        self.selectionDragged.emit(a,b,self.frame_for(e.position().x()))
+        self.media_title_drag=None; self.anchor=None; self.gesture=None; self.selection_track=track
+        self.selectionDragged.emit(0,media.length,min(media.length-1,self.frame_for(e.position().x())))
         self.finish_range_drag(); self.update(); e.accept()
 

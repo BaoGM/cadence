@@ -8,16 +8,17 @@ from model import Document,State,Segment
 
 
 @pytest.mark.parametrize('simple,track',[(True,'video'),(False,'video'),(False,'audio')])
-def test_shift_double_click_selects_whole_segment(window,application,simple,track):
+def test_shift_double_click_selects_whole_track(window,application,simple,track):
     w=window; t=w.timeline; w.request_frame=lambda:None
     w.doc.state=State((Segment('a',0,10),Segment('a',10,25),Segment(None,0,5)),
                       audio_segments=(Segment('a',0,15),Segment('a',15,25),Segment(None,0,5)))
+    if track=='audio': w.doc.expand_track_audio(w.doc.active_track_id,True)
     t.simple=simple; w.refresh(); application.processEvents()
-    point=QPoint(round(t.x_for(18)),35 if simple else t.track_y(track)+9)
+    point=QPoint(round(t.x_for(18)),round(t.simple_track_rect().center().y()) if simple else t.track_y(track)+9)
     QTest.mouseClick(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.ShiftModifier,point)
     QTest.mouseDClick(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.ShiftModifier,point)
     QTest.mouseRelease(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.ShiftModifier,point)
-    assert w.doc.state.selection==((15,25) if track=='audio' else (10,25))
+    assert w.doc.state.selection==(0,30)
     assert t.selection_track==track and t.gesture is None
     assert abs(w.doc.state.position-18)<=1
 
@@ -27,7 +28,7 @@ def test_alt_drag_does_not_select_moved_media(window,application,simple):
     w=window; t=w.timeline; w.request_frame=lambda:None
     w.doc.state=State((Segment('a',0,10),Segment('a',10,20),Segment('a',20,30)),selection=(0,10))
     initial=w.doc.state; t.simple=simple; w.refresh(); application.processEvents()
-    y=35 if simple else t.track_y('video')+9
+    y=round(t.simple_track_rect().center().y()) if simple else t.track_y('video')+9
     start=QPoint(round(t.x_for(4)),y); end=QPoint(round(t.x_for(29)),y)
     QTest.mousePress(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.AltModifier,start)
     QTest.mouseMove(t,end,20)

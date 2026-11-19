@@ -31,6 +31,11 @@ def tool_icon(tool):
         elif tool=='resize':
             p.drawRect(QRectF(7,7,18,18))
             for x,y in ((5,5),(23,5),(23,23),(5,23)): p.fillRect(QRectF(x,y,5,5),color)
+        elif tool=='translate':
+            p.drawLine(QPointF(4,16),QPointF(28,16)); p.drawLine(QPointF(16,4),QPointF(16,28))
+            for x,y,dx,dy in ((4,16,1,0),(28,16,-1,0),(16,4,0,1),(16,28,0,-1)):
+                p.drawLine(QPointF(x,y),QPointF(x+dx*5-dy*4,y+dy*5+dx*4))
+                p.drawLine(QPointF(x,y),QPointF(x+dx*5+dy*4,y+dy*5-dx*4))
         elif tool=='crop':
             p.drawLine(QPointF(9,3),QPointF(9,24)); p.drawLine(QPointF(9,24),QPointF(30,24))
             p.drawLine(QPointF(3,9),QPointF(24,9)); p.drawLine(QPointF(24,9),QPointF(24,30))

@@ -25,10 +25,12 @@ def test_panel_menu_timeline_commands(window,application):
 
 def test_all_tracks_units_and_equal_heights(window,application):
     w=window;t=w.timeline;w.doc.state=replace(w.doc.state,drawings=(DrawingKey(4,9,(Mark(),)),));w.refresh()
-    rectangles=[t.track_rect(track) for track in ('video','audio','drawing')]
+    w.expand_media_audio(w.doc.active_track_id,True)
+    rectangles=[t.track_rect(track) for track in ('video','audio')]
     assert len({r.height() for r in rectangles})==1
-    assert rectangles[1].top()-rectangles[0].bottom()==rectangles[2].top()-rectangles[1].bottom()
-    assert t.height()-rectangles[-1].bottom()<12
+    assert rectangles[1].top()-rectangles[0].bottom()==7
+    assert t.track_y('drawing')<rectangles[0].top()
+    assert t.height()-rectangles[-1].bottom()<20
     for track in ('video','audio','drawing'):
         menu=t.drawing_track.context_menu(t.x_for(5)) if track=='drawing' else t.context_menu(QPoint(round(t.x_for(5)),t.track_y(track)+9))
         action(menu,'units_time').trigger();assert t.units=='time'
@@ -69,6 +71,6 @@ def test_english_new_commands_and_categories(application,tmp_path,monkeypatch):
         for data,text in [('timeline_simple','Simplified timeline'),('units_time','Timecode'),('units_frames','Frames'),('add_marker','Add frame marker'),('delete_markers','Delete frame markers'),('delete_keys','Delete keyframes')]:
             assert action(menu,data).text()==text
         d=ShortcutDialog(w.action_registry,w.preferences,w);d.ensure_keys()
-        assert [d.key_tabs.tabText(i) for i in range(d.key_tabs.count())]==['File','Edit','Playback','View','Compare','Drawing','Tools','Help']
+        assert [d.key_tabs.tabText(i) for i in range(d.key_tabs.count())]==['File','Edit','Playback','View','Compare','Drawing','Tools','Help','3D synchronization']
         d.reject();d.deleteLater();menu.deleteLater()
     finally:w.close();application.processEvents()

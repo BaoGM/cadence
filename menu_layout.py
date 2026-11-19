@@ -27,7 +27,7 @@ GROUPS={
         ['Afficher la timeline','Afficher le bandeau supérieur',
          'Afficher les commandes de lecture','Afficher le time code','Afficher la liste de lecture','Afficher la barre d’outils','Afficher les outils de dessin','Afficher les réglages de comparaison'],
         # Preserve the requested usage order: zoom/reset, fullscreen, mirrors, units.
-        ['Réinitialiser le canvas','Zoom vidéo +','Zoom vidéo −','Plein écran vidéo','Flip - miroir vertical','Flop - miroir horizontal','Timecode / frames'],
+        ['Réinitialiser le canvas','Zoom vidéo +','Zoom vidéo −','Plein écran vidéo','Dupliquer l’image vidéo','Flip - miroir vertical','Flop - miroir horizontal','Timecode / frames'],
         ['Mode Lecture / Édition','Options des modes Lecture / Édition…'],
         ['Modifier la disposition des panneaux'],
         ['Réinitialiser la disposition des panneaux']],
@@ -42,7 +42,7 @@ GROUPS={
         ['Supprimer les clés','Supprimer les marqueurs']],
     'Outils':[
         ['Curseur'],
-        ['Pinceau','Pipette','Gomme','Lasso / déplacement','Texte','Flèche','Carré','Cercle'],
+        ['Pinceau','Pipette','Gomme','Lasso / déplacement','Translation de la clé','Texte','Flèche','Carré','Cercle'],
         ['Recadrer le clip','Transformer la sélection ou le clip','Réinitialiser le cadrage du clip']],
     'Aide':[['Guide rapide','Dossier des journaux'],['À propos']],
 }
@@ -125,6 +125,7 @@ class BackgroundPanelMenu(QObject):
         menu=w.drawing.objects_menu(w.viewer.mapFromGlobal(event.globalPos())) if target is w.viewer else None
         if menu is None: menu=w.createPopupMenu()
         if target is w.viewer:
+            menu.addSeparator(); menu.addAction(w.video_mirror_action)
             menu.addSeparator(); action=menu.addAction(tr('Verrouiller la position du code temporel')); action.setData('timecode_lock'); action.setCheckable(True)
             action.setChecked(w.timecode_overlay.locked); action.toggled.connect(w.timecode_overlay.set_locked)
         menu.exec(event.globalPos()); menu.deleteLater(); event.accept(); return True

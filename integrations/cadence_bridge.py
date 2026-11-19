@@ -7,13 +7,14 @@ import os
 import select
 import socket
 import sys
+import uuid
 
 if __package__:
     from .cadence_runtime import endpoint_path, finite, fs_path, integer_types, load_source, maya_timer, monotonic, read_json, string_types
 else:
     from cadence_runtime import endpoint_path, finite, fs_path, integer_types, load_source, maya_timer, monotonic, read_json, string_types
 
-bl_info = {'name': 'Cadence', 'author': 'Cadence', 'version': (1, 17, 0),
+bl_info = {'name': 'Cadence', 'author': 'Cadence', 'version': (1, 18, 0),
            'blender': (4, 0, 0), 'category': 'Animation',
     'description': 'Synchronize the timeline with Cadence'}
 
@@ -29,6 +30,7 @@ def number(value, limit=100000000):
 class Bridge:
     def __init__(self, host, snapshot, set_frame):
         self.host = host
+        self.instance_id = uuid.uuid4().hex
         self.snapshot = snapshot
         self.set_frame = set_frame
         self.sock = None
@@ -94,7 +96,7 @@ class Bridge:
             return
         self.connecting = True
         self.received = now
-        self.queue({'type': 'hello', 'version': 1, 'host': self.host, 'token': info['token']})
+        self.queue({'type': 'hello', 'version': 1, 'host': self.host, 'token': info['token'], 'instance_id': self.instance_id})
 
     def tick(self):
         if not self.active:
@@ -256,7 +258,9 @@ def start(host=None):
             scene = bpy.context.scene
             return {'frame': scene.frame_current + scene.frame_subframe,
                     'fps': scene.render.fps / scene.render.fps_base,
-                    'start': scene.frame_start, 'end': scene.frame_end}
+                    'start': scene.frame_start, 'end': scene.frame_end,
+                    'instance': {'application': 'Blender ' + bpy.app.version_string, 'pid': os.getpid(),
+                                 'scene': os.path.basename(bpy.data.filepath) or scene.name}}
 
         def set_frame(frame):
             # Timers run on the UI thread; never mutate a scene from a render callback.
@@ -271,12 +275,15 @@ def start(host=None):
     elif host == 'maya':
         import maya.cmds as cmds
         import maya.api.OpenMaya as om
+        application_name = 'Maya ' + str(cmds.about(version=True))
 
         def snapshot():
             seconds = om.MTime(1., om.MTime.uiUnit()).asUnits(om.MTime.kSeconds)
             return {'frame': cmds.currentTime(query=True), 'fps': 1. / seconds,
                     'start': cmds.playbackOptions(query=True, minTime=True),
-                    'end': cmds.playbackOptions(query=True, maxTime=True)}
+                    'end': cmds.playbackOptions(query=True, maxTime=True),
+                    'instance': {'application': application_name, 'pid': os.getpid(),
+                                 'scene': os.path.basename(cmds.file(query=True, sceneName=True))}}
 
         def set_frame(frame):
             if cmds.play(query=True, state=True):

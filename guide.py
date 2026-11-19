@@ -8,7 +8,7 @@ def shortcut_lines(registry):
     french=language()=='fr'
     lines=['Raccourcis clavier par défaut' if french else 'Default keyboard shortcuts','']
     from menu_layout import alphabetical
-    for category in ('Fichier','Édition','Lecture','Affichage','Comparaison','Dessin','Outils','Aide'):
+    for category in ('Fichier','Édition','Lecture','Affichage','Comparaison','Dessin','Outils','Synchronisation 3D','Aide'):
         entries=[(action,key) for path,(action,key) in registry.items() if path.startswith(category+'/') and key]
         if not entries: continue
         lines+=['',tr(category)]

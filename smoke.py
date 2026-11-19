@@ -29,6 +29,8 @@ def run(directory):
     media=prepare_media(source)
     doc=Document(Fraction(media['fps'])); doc.media={media['id']:media}; doc.state=State((Segment(media['id'],0,media['frames']),))
     win=MainWindow(); win.scrub_audio.set_enabled(False); win.show(); app.processEvents()
+    assert win.playback_mode=='loop' and win.loop_btn.isChecked() and win.loop_btn.symbol=='loop'
+    win.set_loop(False)
     assert win.workspaces.mode=='read' and {k for k,p in win.workspaces.panels.items() if not p.isHidden()}=={'timeline','transport','timecode'}
     win.grab().save(str(output/'accueil.png')); win.workspaces.switch('edit'); app.processEvents()
     assert all(not p.isHidden() for p in win.workspaces.panels.values())
@@ -282,6 +284,7 @@ def run(directory):
         # Verify the actual packaged drawing menus and their shared edit routing.
         win.doc.state=replace(doc.state,drawings=(DrawingKey(2,6,(Mark(points=((.2,.3,1.),)),)),),position=20,selection=None)
         win.workspaces.set_timeline_simple(False); win.refresh(); baseline=doc.state
+        t.setFocus(); app.processEvents()
         menu=t.drawing_track.context_menu(t.x_for(3.25))
         next(a for a in menu.actions() if a.data()=='copy').trigger(); menu.deleteLater()
         assert doc.state==baseline and doc.drawing_clipboard_length==4
@@ -318,6 +321,7 @@ def run(directory):
         win.set_exposure(0)
         result={'system_microphone_mix':True,'wasapi_bundled':True,'trimmed_panels':True,'context_workspace_mode':True,'organized_menus':True,'panel_context_menu':True,'reset_mirrors':True,'comparison_buttons':True,'compact_playback_layout':True,'clip_geometry':True,'workspace_modes':True,'text_auto_fit':True,'linked_drawings':True,'drawing_resize':True,'lasso':True,'text_move':True,'cut_paste':True,'draw_over':True,'drawing_save_export':True,'duplicate_media':True,'comparison_modes':len(MODES),'dual_preview':True,'loop_toggle':True,'status':'passed' ,'frozen':bool(getattr(sys,'frozen',False)),'import_frames':media['frames'],'export_frames':count,'undo_redo':True,'exposure_export':True,'preview_rendered':True,'ffmpeg_bundled':Path(ffmpeg()).exists()}
         result.update(drawing_clipboard_menu=True,drawing_clipboard_undo=True)
+        result.update(default_loop_playback=True)
         result.update(comparison_cycle_shortcut=True,key_step_toggle=True)
         result.update(reference_sequence=True,reference_project_format=15,simple_media_boundaries=True)
         result.update(drawing_panel_visibility_preserved=True,automatic_tablet_pressure=True)
@@ -467,6 +471,12 @@ def run(directory):
         result.update(check_media_tracks(win,output,media))
         result.update(check_review_tools(win,output))
         result.update(check_native_import(output))
+        from smoke1180 import check as check1180
+        result.update(check1180(win,output,media))
+        from smoke1181 import check as check1181
+        result.update(check1181(win,output,media))
+        from smoke1182 import check as check1182
+        result.update(check1182(win,output,media))
         (output/'result.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     finally:
         win.doc.saved_signature=win.doc.signature(); win.close(); app.processEvents()
@@ -757,6 +767,8 @@ def run_gpu(directory,renderer='opengl'):
         result.update(gpu_drawing_layers=True,cursor_outside_reset=True)
         result.update(check_native_cursor(win))
         result.update(check_native_render())
+        from smoke1182 import check as check1182
+        result.update(check1182(win,output))
         (output/'result.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     finally:
         win.doc.saved_signature=win.doc.signature(); win.close(); app.processEvents()

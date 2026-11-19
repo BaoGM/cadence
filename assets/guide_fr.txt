@@ -1,4 +1,4 @@
-Cadence 1.17.0 - Guide rapide
+Cadence 1.18.3 - Guide rapide
 
 Les raccourcis indiqués sont ceux par défaut. Leur liste complète figure à la fin du guide ; ils se personnalisent dans Fichier > Options > Raccourcis.
 
@@ -20,13 +20,13 @@ Ctrl + molette augmente ou diminue le volume général par pas de 5 %, sans chan
 
 Espace : lecture / pause. Gauche et Droite : une image. Début et Fin : extrémités de la timeline. Virgule et Point : clé ou marqueur précédent / suivant, avec retour à l'autre extrémité.
 
-K bascule les commandes de clé et leurs boutons entre un pas de clé et un pas d'image. Gauche et Droite restent toujours image par image. Le bouton de boucle change le mode sans interrompre la lecture.
+K bascule les commandes de clé et leurs boutons entre un pas de clé et un pas d'image. Gauche et Droite restent toujours image par image. La lecture en boucle est activée par défaut. Le bouton de boucle change le mode sans interrompre la lecture ; ce choix est conservé au prochain démarrage.
 
 Glissez sur la timeline pour déplacer la lecture. Avec l'outil Curseur (Q), glissez aussi sur la vidéo ; Maj affine le déplacement. Si la lecture était active, elle reprend au relâchement ; sinon elle reste en pause.
 
 Maj + glisser sélectionne une plage tout en affichant l'image courante. On peut appuyer sur Maj pendant un glissement déjà commencé. Relâchez la souris avant Maj pour garder la sélection ; l'ordre inverse repasse en déplacement de lecture.
 
-Maj + double-clic sur un média sélectionne tout son bloc, y compris sur la timeline allégée. I et O posent les bornes au curseur ; Échap efface la sélection. La lecture se limite à la plage sélectionnée, dont la longueur apparaît au centre.
+Maj + double-clic sur une piste, son titre ou sa bande vidéo/audio sélectionne toute la longueur de cette piste, y compris sur la timeline allégée. I et O posent les bornes au curseur ; Échap efface la sélection. La lecture se limite à la plage sélectionnée, dont la longueur apparaît au centre.
 
 ----------------------------------------
 Modifier la timeline
@@ -35,7 +35,7 @@ Une piste média réunit une bande vidéo et une bande audio. Le bouton « + Pis
 
 Les pistes sont nommées Piste 1 et Piste 2. Cliquez sur un titre pour sélectionner une piste. Ctrl+clic ajoute ou retire une piste de la sélection, sur son titre comme dans sa timeline. Les modifications portent sur les pistes sélectionnées. Glissez un titre au-dessus ou au-dessous de l’autre pour changer leur ordre. Le clic droit sur le titre permet aussi de déplacer ou supprimer toute la piste. Ctrl+Z annule ces actions. Les bandes audio sont repliées au départ : cliquez sur le triangle près du titre pour les déployer.
 
-Double-cliquez sur le titre ou la timeline d’une piste pour déployer ou replier sa bande audio. Le clic droit permet de désactiver ou réactiver tout son audio, y compris à l’export. Lorsque les deux pistes sont sélectionnées, glissez un média vers l’autre piste pour y déplacer sa vidéo et son audio ensemble. Son emplacement initial reste vide. Alt+Maj+glisser le copie. Les clés de dessin apparaissent au-dessus de la barre de lecture, sans recouvrir les chiffres, même en timeline simplifiée.
+Double-cliquez sur le titre ou la timeline d’une piste pour déployer ou replier sa bande audio. Le clic droit permet de désactiver ou réactiver tout son audio, y compris à l’export. Lorsque les deux pistes sont sélectionnées, glissez un média vers l’autre piste pour y déplacer sa vidéo et son audio ensemble. La portion d’origine est retirée et les clips suivants sont rapprochés, sans laisser de clip vide. Alt+Maj+glisser le copie en conservant la source. Les clés de dessin apparaissent au-dessus de la barre de lecture, sans recouvrir les chiffres, même en timeline simplifiée.
 
 Les dessins, leurs clés et les marqueurs restent communs, au-dessus des deux pistes. Modifier une seule piste conserve les dessins à leur position ; avec les deux pistes sélectionnées, les dessins liés suivent les modifications.
 
@@ -102,7 +102,9 @@ Zoom, déplacement et rotation de la vue ne modifient pas l'export. Les miroirs 
 
 Le code temporel reste ancré au panneau vidéo. Glissez-le pour le déplacer, verrouillez sa position au clic droit, affichez-le ou cachez-le avec Ctrl+6. Il n'est pas exporté.
 
-Le menu Affichage et le clic droit sur le fond affichent ou cachent les panneaux. « Modifier la disposition des panneaux » autorise leur déplacement et leur redimensionnement. « Réinitialiser la disposition des panneaux » restaure le mode courant.
+Le menu Affichage et le clic droit sur le fond affichent ou cachent les panneaux. Les séparateurs restent redimensionnables en mode Lecture comme en mode Édition, même lorsque la disposition est verrouillée. « Modifier la disposition des panneaux » autorise leur déplacement et leur détachement. « Réinitialiser la disposition des panneaux » restaure le mode courant. La barre d’outils conserve la largeur de ses icônes lorsque les autres panneaux sont cachés.
+
+Lorsque les commandes de lecture sont masquées, survolez le bas de la zone vidéo, juste au-dessus de la timeline, pour retrouver uniquement la case Mode édition et son libellé dans un petit cadre transparent à gauche. Le cadre disparaît lorsque le pointeur le quitte et ne change pas les panneaux mémorisés pour le mode courant.
 
 Les modes Lecture et Édition sont entièrement personnalisables dans Affichage > Options des modes Lecture / Édition : choisissez les panneaux et la timeline allégée séparément pour chacun. Le bouton Mode édition change de mode. Chaque mode conserve sa disposition. Fichier > Options > Préférences > Restaurer l'interface remet les deux modes à leur état initial.
 
@@ -166,3 +168,24 @@ Mises à jour
 Cadence vérifie les nouvelles versions au démarrage, au plus une fois par jour. Fichier > Options > Préférences permet de désactiver cette vérification et d'inclure les préversions. Aide > Rechercher des mises à jour lance une vérification manuelle.
 
 Votre accord est demandé avant le téléchargement, puis avant l'installation. Le fichier téléchargé est contrôlé avec son empreinte SHA-256. La version installée propose l'installateur Windows et l'enregistrement du projet avant fermeture. La version portable ouvre le dossier de l'archive vérifiée : extrayez-la dans un nouveau dossier. Les préférences et les projets restent conservés. Une connexion indisponible ne bloque pas le démarrage.
+
+----------------------------------------
+Nouveautés 1.18 - bibliothèque et fenêtres
+
+Affichage > Afficher la liste de lecture (Ctrl+8) > Bibliothèque réunit les listes libres et les dossiers suivis. Nouveau… crée une liste vide, une liste depuis des fichiers ou suit un dossier existant. Les sous-dossiers se parcourent dans l’arborescence ; chaque dossier affiche ses vidéos directes, sans aplatir ses descendants.
+
+Ajouter des vidéos ou déposer des fichiers dans la liste conserve leurs chemins dans une liste libre. Dans un dossier suivi, Cadence copie les fichiers extérieurs et conserve les originaux. Un nom déjà utilisé reçoit un suffixe, sans écrasement. Glissez les éléments pour modifier leur ordre. Le nom et l’ordre des listes sont conservés entre les sessions.
+
+Retirer de la liste ne supprime aucun fichier. Actualiser relit le dossier sélectionné et réaffiche les fichiers présents, y compris ceux retirés de la liste. Mettre à la corbeille est une action distincte du clic droit, avec confirmation. Remplacer le chemin… permet de retrouver une vidéo déplacée ; les autres listes et projets ne sont pas modifiés.
+
+Sélectionnez une liste puis Ouvrir, ou double-cliquez sur son nom, pour charger toutes ses vidéos à la suite en remplaçant la timeline. Le montage précédent complet (deux pistes, dessins, marqueurs et annulations) rejoint Temporaire. Ouvrir un montage temporaire le restaure et range le montage actuel. Les listes temporaires se renomment et se retirent par clic droit. Elles disparaissent à la fermeture sans confirmation dédiée : enregistrez les projets à conserver avant de fermer Cadence. Un double-clic sur un dossier sans vidéos déplie ou replie ses sous-dossiers ; seuls les dossiers contenant des vidéos peuvent être ouverts. La flèche apparaît uniquement en présence de sous-dossiers. Les noms de toutes les listes, y compris les sous-dossiers, sont modifiables par clic droit dans la bibliothèque, sans renommer les dossiers sur disque.
+
+Affichage > Dupliquer l’image vidéo, également disponible au clic droit sur l’image, ouvre un aperçu indépendant sans cadre qui suit la lecture, la comparaison et les dessins du lecteur principal. Survoler la zone inférieure centrale révèle les commandes en surimpression : lecture, premier plan, opacité et fermeture. Glisser l’image déplace la fenêtre ; ses bords permettent de la redimensionner. Espace commande la lecture commune, Tab affiche les commandes au clavier et Échap ferme cet aperçu en conservant le lecteur principal.
+
+T active la translation de tous les objets de la clé de dessin courante, sans sélection préalable : glissez dans l’aperçu, puis annulez ou rétablissez normalement. Le changement d’affichage code temporel/images passe à Alt+T. Les raccourcis personnalisés sont conservés.
+
+Synchronisation 3D > Instance synchronisée choisit le processus Maya ou Blender cible, identifié par sa version, sa scène et son PID. Le temps et les dessins sont envoyés uniquement à cette instance. Si elle se déconnecte, Cadence attend sa reconnexion ; sélectionner une autre instance reste explicite. Le choix est suspendu pendant un transfert de dessins.
+
+Déplacer un clip vers l’autre piste retire sa portion vidéo et audio de la piste d’origine, sans clip vide ; les éléments suivants de cette piste se rapprochent. La copie conserve la source et l’annulation restaure les deux pistes.
+
+Cliquer sur l’aperçu indépendant ne ramène pas la fenêtre principale au premier plan. La lecture unique affiche le même symbole de boucle, grisé et barré.

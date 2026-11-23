@@ -3,6 +3,16 @@ from __future__ import annotations
 import time as _startup_time
 _STARTUP=_startup_time.perf_counter()
 import sys
+VERSION='1.18.5'
+if __name__=='__main__' and getattr(sys,'frozen',False) and not any(arg.startswith('--self-test') for arg in sys.argv):
+    from pathlib import Path
+    from update_store import base_executable,dispatch
+    if base_executable()==Path(sys.executable).resolve():
+        try:
+            if dispatch(base_executable(),VERSION,sys.argv[1:]): raise SystemExit(0)
+        except (ValueError,OSError):
+            import logging
+            logging.exception('Starting the original Cadence build')
 if __name__=='__main__' and '--register-associations' in sys.argv:
     from association import register
     register()
@@ -33,7 +43,6 @@ from comparison import ComparisonMixin
 from draw_ui import DrawController
 from PySide6.QtWidgets import QGridLayout
 
-VERSION='1.18.4'
 STYLE='''
 QMainWindow, QWidget { background:#11161d; color:#dce4ee; font-family:"Segoe UI"; font-size:13px; }
 QMenuBar { background:#11161d; color:#91a1b5; padding:3px; }
@@ -211,6 +220,7 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
         lower=QWidget(); lower_layout=QVBoxLayout(lower); lower_layout.setContentsMargins(0,0,0,0); lower_layout.setSpacing(8)
         self.timeline=Timeline(); self.timeline.seek.connect(self.timeline_seek); self.timeline.selected.connect(self.select); self.timeline.moved.connect(self.move_section); self.timeline.duplicated.connect(self.duplicate_section); self.timeline.deleteRequested.connect(self.delete_track_range); self.timeline.muteRequested.connect(self.mute_range); self.timeline.splitRequested.connect(self.split_cursor); self.timeline.deleteMediaRequested.connect(self.delete_media_range); self.link_tracks.toggled.connect(lambda v:setattr(self.timeline,'linked',v)); self.leave_gap.toggled.connect(lambda v:setattr(self.timeline,'leave_gap',v)); lower_layout.addWidget(self.timeline)
         self.timeline.selectionDragged.connect(self.select)
+        self.timeline.clipsPicked.connect(self.pick_clips)
         self.timeline.cadenceRequested.connect(lambda a,b:self.change_cadence(span=(a,b)))
         self.viewer.scrubActiveChanged.connect(self.timeline.set_external_scrubbing)
         self.viewer.scrubActiveChanged.connect(lambda active:None if active else self.end_scrub())
@@ -389,7 +399,20 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
 
     def build_library(self):
         self.library=QDockWidget(tr('Liste de lecture et médias'),self); self.library.setObjectName('library'); self.library.setMinimumWidth(180)
-        box=QWidget(); col=QVBoxLayout(box); tabs=QTabWidget(); self.library_tabs=tabs; self.playlist=QListWidget(); self.media_list=QListWidget(); tabs.addTab(self.playlist,tr('Lecture')); tabs.addTab(self.media_list,tr('Médias')); col.addWidget(tabs)
+        from library_style import LibraryTabs, SourceRows, style_button
+        box=QWidget(); col=QVBoxLayout(box); col.setContentsMargins(1,1,1,1)
+        tabs=QTabWidget(); tabs.setTabBar(LibraryTabs(self.settings,tabs)); self.library_tabs=tabs; self.playlist=QListWidget(); self.media_list=QListWidget(); tabs.addTab(self.playlist,tr('Lecture')); media_page=QWidget(); media_layout=QVBoxLayout(media_page)
+        media_layout.setContentsMargins(5,4,5,4)
+        media_layout.addWidget(QLabel(tr('Sources du montage')))
+        self.media_list.setItemDelegate(SourceRows(self.media_list))
+        media_layout.addWidget(self.media_list,1)
+        self.add_reference_button=style_button(QPushButton(tr('Ajouter aux références B')),'refs')
+        self.add_reference_button.clicked.connect(self.add_selected_references)
+        self.media_list.itemSelectionChanged.connect(lambda:self.add_reference_button.setEnabled(bool(self.selected_reference_sources())))
+        self.add_reference_button.setEnabled(False)
+        media_layout.addWidget(self.add_reference_button)
+        tabs.addTab(media_page,tr('Médias')); col.addWidget(tabs)
+        tabs.setStyleSheet('QTabWidget::pane{border:1px solid #303b49;background:#181f28} QListWidget,QTreeWidget{background:#181f28;border:none;outline:0} QListWidget::item,QTreeWidget::item{padding:3px} QListWidget::item:selected,QTreeWidget::item:selected{background:#203a3c;color:#e8f8f5;border-left:2px solid #68e0cf}')
         box.setMinimumHeight(60); tabs.setMinimumHeight(40)
         self.library.setWidget(box); self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea,self.library); self.library.hide(); self.library_signature=None
         self.playlist.itemDoubleClicked.connect(self.play_list_item); self.media_list.itemDoubleClicked.connect(self.seek_media)
@@ -397,6 +420,14 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
         self.playlists_panel=PlaylistPanel(self); tabs.addTab(self.playlists_panel,tr('Bibliothèque'))
         for listing in (self.playlist,self.media_list):
             listing.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection); listing.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu); listing.customContextMenuRequested.connect(lambda point,w=listing:self.library_context(w,point))
+    def selected_reference_sources(self):
+        return [self.doc.media[item.data(Qt.ItemDataRole.UserRole)] for item in self.media_list.selectedItems()
+                if item.data(Qt.ItemDataRole.UserRole) in self.doc.media and self.doc.media[item.data(Qt.ItemDataRole.UserRole)].get('has_video',True)]
+
+    def add_selected_references(self):
+        sources=self.selected_reference_sources()
+        if sources: self.set_reference_sequence(sources,append=True)
+
     def library_context(self,listing,point):
         item=listing.itemAt(point)
         if not item: return
@@ -458,8 +489,15 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
             name=self.doc.media.get(key,{}).get('name','N/A')
             item=QListWidgetItem(f'{i+1}. {name} · {seg.length} '+tr('images')); item.setData(Qt.ItemDataRole.UserRole,(at,at+seg.length)); self.playlist.addItem(item); at+=seg.length
         keys=list(dict.fromkeys(s.media for s in self.doc.state.all_segments if s.media is not None))
+        keys.sort(key=lambda key:not self.doc.media[key].get('has_video',True))
+        group=None
         for key in keys:
-            item=QListWidgetItem(self.doc.media[key]['name']); item.setToolTip(self.doc.media[key]['path']); item.setData(Qt.ItemDataRole.UserRole,key); self.media_list.addItem(tr(item))
+            from library_style import icon,media_details,GROUP_ROLE
+            media=self.doc.media[key]; details=media_details(media)
+            item=QListWidgetItem(icon('film' if media.get('has_video', True) else 'wave'),media['name']+('\n'+details if details else ''))
+            kind=tr('Vidéo') if media.get('has_video',True) else tr('Audio')
+            if kind!=group: item.setData(GROUP_ROLE,kind); group=kind
+            item.setToolTip(media['path']); item.setData(Qt.ItemDataRole.UserRole,key); self.media_list.addItem(item)
     def play_list_item(self,item):
         a,b=item.data(Qt.ItemDataRole.UserRole); self.seek(a); self.select(a,b); self.toggle_play()
     def seek_media(self,item):
@@ -866,7 +904,7 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
         if resume and document is self.doc and not self.job and not self.transport.running:
             self.toggle_play()
     def timeline_seek(self,index):
-        self.doc.state=replace(self.doc.state,selection=None,loop_range=None); self.selection_anchor=None
+        self.doc.state=replace(self.doc.state,selection=None,selected_clips=(),loop_range=None); self.selection_anchor=None
         self.seek(index,audition=True)
     def refresh_position(self):
         st=self.doc.state; self.timeline.state=st; self.timeline.update(); self.viewer.position=st.position
@@ -881,6 +919,16 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
     def step_key(self,amount):
         if self.key_step: self.step(amount)
         else: self.drawing.navigate(amount)
+    def pick_clips(self,ranges,identity,position):
+        self.pause(); self.play_completed=False
+        tracks=tuple(track.info.id for track in self.doc.state.tracks if any(key==track.info.id for key,a,b in ranges))
+        self.doc.selected_track_ids=tracks or (identity,)
+        self.doc.active_track_id=identity if identity in self.doc.selected_track_ids else self.doc.selected_track_ids[0]
+        ordered=sorted(ranges,key=lambda span:span[1])
+        self.doc.state=replace(self.doc.state,selection=tuple(ordered[0][1:]) if ordered else None,
+                               selected_clips=tuple(ordered),position=ordered[0][1] if len(ordered)>1 else position,loop_range=None)
+        self.refresh(); self.request_frame()
+
     def select(self,a,b,position=None):
         self.pause(stop_scrub=position is None); self.play_completed=False; self.doc.select(a,b); self.doc.state=replace(self.doc.state,position=a if position is None else position,loop_range=None); self.refresh_position(); self.request_frame()
         if position is not None: self.scrub_audio.request(self.doc.state,self.doc.media,self.doc.fps,position)
@@ -888,7 +936,7 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
         if self.editing_text(): return
         self.select(0,self.doc.state.length)
     def clear_selection(self,stop_scrub=True):
-        self.pause(stop_scrub=stop_scrub); self.doc.state=replace(self.doc.state,selection=None,loop_range=None); self.selection_anchor=None; self.refresh_position(); self.drawing.refresh()
+        self.pause(stop_scrub=stop_scrub); self.doc.state=replace(self.doc.state,selection=None,selected_clips=(),loop_range=None); self.selection_anchor=None; self.refresh_position(); self.drawing.refresh()
     def mark_in(self):
         if self.editing_text() or not self.doc.state.length: return
         self.selection_anchor=min(self.doc.state.position,self.doc.state.length-1)
@@ -1072,6 +1120,8 @@ def main():
     stamp=_startup_time.perf_counter(); win=MainWindow(); logging.info('Startup window construction: %.3fs',_startup_time.perf_counter()-stamp)
     stamp=_startup_time.perf_counter(); win.show(); logging.info('Startup window show: %.3fs; total Python startup: %.3fs',_startup_time.perf_counter()-stamp,_startup_time.perf_counter()-_STARTUP)
     QTimer.singleShot(0,lambda:startup_ready(_STARTUP))
+    from update_store import startup_ready as confirm_update
+    QTimer.singleShot(0,lambda:confirm_update(VERSION))
     from update_ui import manager
     manager(win,VERSION).start()
     if len(sys.argv)>1 and Path(sys.argv[1]).is_file(): QTimer.singleShot(150,lambda:win.open_path(sys.argv[1]))

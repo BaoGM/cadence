@@ -154,6 +154,7 @@ class ComparisonMixin(ReferenceQueueMixin):
         if identity and identity not in dict(tracks): self.reference_track_id=None; identity=None
         signature=(tuple((key,m['path']) for key,m in sources.items()),tuple(self.reference_order),tracks,identity)
         if signature==self.reference_signature: return
+        self.sync_panel_source()
         self.reference_signature=signature; selected='__sequence__' if len(self.reference_order)>1 else self.compare_media['id'] if self.compare_media else None
         with QSignalBlocker(self.reference_combo):
             self.reference_combo.clear(); self.reference_combo.addItem(tr('Choisir une référence…'),None)
@@ -164,7 +165,7 @@ class ComparisonMixin(ReferenceQueueMixin):
             self.reference_combo.setCurrentIndex(max(0,self.reference_combo.findData('track:'+identity if identity else selected)))
     def choose_reference(self):
         key=self.reference_combo.currentData()
-        if key=='__sequence__': return
+        if key=='__sequence__': return self.set_reference_sequence(self.reference_entries())
         if isinstance(key,str) and key.startswith('track:'): return self.use_track_reference(key[6:])
         media=({**self.reference_sources,**self.doc.media}).get(key)
         self.set_reference_sequence([media] if media else [])
@@ -225,6 +226,7 @@ class ComparisonMixin(ReferenceQueueMixin):
             if media['frames']-index<24 and slot+1<len(self.reference_index.entries):
                 following=self.reference_index.entries[slot+1]
                 if following.get('available') is not False: ahead.extend((following,n) for n in range(min(4,following['frames'])))
+            self.comparison_pending['source']=media['id']
             self.reference_decoder.request(self.token,media,index,ahead)
         else:
             self.comparison_pending['b']=np.zeros((max(2,round(640*media['height']/media['width'])),640,3),np.uint8)
@@ -233,6 +235,7 @@ class ComparisonMixin(ReferenceQueueMixin):
         if isinstance(arr,LayerFrame): arr=arr.compose()
         pending=self.comparison_pending
         if pending and token==self.token==pending['token']:
+            if pending.get('source'): self.remember_thumbnail(pending['source'],arr)
             pending['b']=arr; self.flush_comparison()
     def comparison_a_ready(self,token,arr):
         pending=self.comparison_pending

@@ -12,10 +12,10 @@ DATA = b'cadence-package-test'
 DIGEST = hashlib.sha256(DATA).hexdigest()
 
 def release(version='1.17.0', prerelease=False, installed=True):
-    filename=f'Cadence-{version}-'+('Setup.exe' if installed else 'Windows.zip')
+    filename=f'Cadence-{version}-Windows.zip'
     return dict(tag_name='v'+version,prerelease=prerelease,draft=False,assets=[
         dict(name=filename,size=len(DATA),state='uploaded',digest='sha256:'+DIGEST),
-        dict(name=f'Cadence-{version}-sha256.json',size=100,state='uploaded')])
+        dict(name=f'Cadence-{version}-update.json',size=100,state='uploaded')])
 
 def chosen(installed=True):
     return updates.select_release([release(installed=installed)],'1.16.0',installed)
@@ -39,11 +39,11 @@ def test_reject_untrusted_urls(url):
 
 def test_portable_uses_only_zip():
     assert chosen(False).filename.endswith('Windows.zip')
-    assert updates.select_release([release(installed=True)],'1.16.0',False) is None
+    assert chosen(True).filename==chosen(False).filename
 
 def test_verified_download(tmp_path):
     item=chosen(); values=[]
-    with patch.object(updates,'read_json',return_value={item.filename:DIGEST}), patch.object(updates,'open_url',return_value=io.BytesIO(DATA)):
+    with patch.object(updates,'package_descriptor',return_value={'sha256':DIGEST}), patch.object(updates,'open_url',return_value=io.BytesIO(DATA)):
         path,digest=updates.download(item,tmp_path,threading.Event(),values.append)
     assert path.read_bytes()==DATA and digest==DIGEST and values[-1]==100
     updates.verify_package(path,digest)
@@ -53,20 +53,21 @@ def test_verified_download(tmp_path):
 @pytest.mark.parametrize('payload',[b'',DATA[:-1],DATA+b'overflow',b'x'*len(DATA)])
 def test_bad_download_never_committed(tmp_path,payload):
     item=chosen()
-    with patch.object(updates,'read_json',return_value={item.filename:DIGEST}), patch.object(updates,'open_url',return_value=io.BytesIO(payload)):
+    with patch.object(updates,'package_descriptor',return_value={'sha256':DIGEST}), patch.object(updates,'open_url',return_value=io.BytesIO(payload)):
         with pytest.raises(ValueError): updates.download(item,tmp_path,threading.Event(),lambda value:None)
     assert not list(tmp_path.iterdir())
 
 def test_cancelled_download(tmp_path):
     item=chosen(); event=threading.Event()
-    with patch.object(updates,'read_json',return_value={item.filename:DIGEST}), patch.object(updates,'open_url',return_value=io.BytesIO(DATA)):
+    with patch.object(updates,'package_descriptor',return_value={'sha256':DIGEST}), patch.object(updates,'open_url',return_value=io.BytesIO(DATA)):
         with pytest.raises(updates.UpdateCancelled): updates.download(item,tmp_path,event,lambda value:event.set())
     assert not list(tmp_path.iterdir())
 
 def test_mismatching_manifest():
     item=chosen()
-    with patch.object(updates,'read_json',return_value={item.filename:'0'*64}):
-        with pytest.raises(ValueError): updates.package_hash(item)
+    descriptor=dict(version=item.version,size=item.size,sha256='0'*64,preview=item.prerelease,signature='')
+    with patch.object(updates,'read_json',return_value=descriptor),patch('update_store.verify_signature'):
+        with pytest.raises(ValueError): updates.package_descriptor(item)
 
 def test_local_installed_marker(tmp_path):
     assert not updates.installed_copy(tmp_path/'Cadence.exe')
@@ -95,67 +96,23 @@ def fake_window(gui):
     window.job=None; window.timer=QTimer(); window.confirm_discard=lambda:True
     return window
 
-def test_download_needs_consent(gui):
-    from update_ui import UpdateManager
-    window=fake_window(gui); manager=UpdateManager(window,'1.16.0'); manager.pending=chosen()
-    with patch('update_ui.ConfirmationDialog.exec',return_value=2),patch.object(manager,'run') as start:
-        manager.offer_pending(); start.assert_not_called()
-
-def test_install_requires_consent_and_save(gui,tmp_path):
-    from update_ui import UpdateManager
-    window=fake_window(gui); manager=UpdateManager(window,'1.16.0'); manager.installed=True
-    path=tmp_path/'Setup.exe'; path.write_bytes(DATA)
-    with patch('update_ui.ConfirmationDialog.exec',return_value=2),patch('update_ui.launch_installer') as launch:
-        manager.install_offer(path,DIGEST); launch.assert_not_called()
-    window.confirm_discard=lambda:False
-    with patch('update_ui.ConfirmationDialog.exec',return_value=1),patch('update_ui.launch_installer') as launch:
-        manager.install_offer(path,DIGEST); launch.assert_not_called()
-
-def test_portable_never_runs_installer(gui,tmp_path):
-    from update_ui import UpdateManager
-    window=fake_window(gui); manager=UpdateManager(window,'1.16.0'); manager.installed=False
-    with patch('update_ui.QMessageBox.information'),patch('update_ui.QDesktopServices.openUrl') as folder,patch('update_ui.launch_installer') as launch:
-        manager.install_offer(tmp_path/'Windows.zip',DIGEST)
-        launch.assert_not_called(); folder.assert_called_once()
-
 def test_automatic_disabled_no_network(gui):
     from update_ui import UpdateManager
-    window=fake_window(gui); manager=UpdateManager(window,'1.16.0'); window.preferences['auto_update_check']=False
+    window=fake_window(gui); manager=UpdateManager(window,'1.18.5'); window.preferences['auto_update_check']=False
     with patch.object(manager,'run') as start:
         manager.check_now(False); start.assert_not_called()
 
-def test_wait_while_playing(gui):
+def test_ready_does_not_restart_automatically(gui):
+    from PySide6.QtWidgets import QMainWindow
     from update_ui import UpdateManager
-    window=fake_window(gui); manager=UpdateManager(window,'1.16.0'); manager.pending=chosen(); window.timer.start(100)
-    with patch('update_ui.ConfirmationDialog.exec') as prompt:
-        manager.offer_pending(); prompt.assert_not_called()
-    manager.stop(); window.timer.stop()
-
-def test_download_completion_does_not_cancel(gui,tmp_path):
-    from update_ui import UpdateManager
-    from PySide6.QtWidgets import QProgressDialog
-    window=fake_window(gui); manager=UpdateManager(window,'1.16.0')
-    manager.phase='download'; manager.dialog=QProgressDialog(window)
-    manager.dialog.canceled.connect(manager.cancel.set); manager.dialog.show()
-    with patch.object(manager,'install_offer') as offer:
-        manager.complete((tmp_path/'Windows.zip',DIGEST),'')
-        offer.assert_called_once()
-    assert not manager.cancel.is_set()
-
-def test_pending_offer_not_overwritten(gui):
-    from update_ui import UpdateManager
-    window=fake_window(gui); manager=UpdateManager(window,'1.16.0'); manager.pending=chosen()
-    with patch.object(manager,'run') as start:
-        manager.check_now(True); start.assert_not_called()
-
-def test_successful_installed_update_keeps_save_guard(gui,tmp_path):
-    from update_ui import UpdateManager
-    window=fake_window(gui); manager=UpdateManager(window,'1.16.0'); manager.installed=True
-    path=tmp_path/'Setup.exe'; path.write_bytes(DATA)
-    with patch('update_ui.ConfirmationDialog.exec',return_value=1),patch('update_ui.launch_installer') as launch,patch.object(window,'close') as close:
-        manager.install_offer(path,DIGEST)
-        launch.assert_called_once(); close.assert_called_once()
-    assert window._update_close_approved
+    window=QMainWindow(); manager=UpdateManager(window,'1.18.5')
+    manager.phase='download'; window.job=None
+    with patch('update_ui.spawn') as restart:
+        manager.complete('1.18.6',''); restart.assert_not_called()
+        window.confirm_discard=lambda:False
+        manager.ready_button.click(); restart.assert_not_called()
+        window.confirm_discard=lambda:True
+        manager.ready_button.click(); restart.assert_called_once()
 
 def test_english_update_strings(gui):
     import ast,ui_text
@@ -164,5 +121,5 @@ def test_english_update_strings(gui):
         for node in ast.walk(ast.parse(Path('update_ui.py').read_text(encoding='utf-8'))):
             if isinstance(node,ast.Call) and isinstance(node.func,ast.Name) and node.func.id=='tr' and isinstance(node.args[0],ast.Constant):
                 source=node.args[0].value
-                assert ui_text.tr(source)!=source or source=='Version',source
+                assert ui_text.tr(source)!=source or source in ('Version','Source B'),source
     finally: ui_text._language=previous

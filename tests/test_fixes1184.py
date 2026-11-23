@@ -31,9 +31,10 @@ def test_plain_double_click_selects_clip_or_track_in_gap(window, application, si
     info=w.doc.active_track.info
     y=round(t.simple_track_rect().center().y()) if simple else t.track_y(lane)+9
     point=QPoint(round(t.x_for(frame)), y)
-    QTest.mouseClick(t, Qt.LeftButton, Qt.NoModifier, point)
-    QTest.mouseDClick(t, Qt.LeftButton, Qt.NoModifier, point)
-    QTest.mouseRelease(t, Qt.LeftButton, Qt.NoModifier, point)
+    modifier=Qt.ShiftModifier if frame==27 else Qt.NoModifier
+    QTest.mouseClick(t, Qt.LeftButton, modifier, point)
+    QTest.mouseDClick(t, Qt.LeftButton, modifier, point)
+    QTest.mouseRelease(t, Qt.LeftButton, modifier, point)
     assert w.doc.state.selection==expected
     assert t.selection_track==lane and t.gesture is None and t.anchor is None
     assert w.doc.active_track.info==info
@@ -50,9 +51,10 @@ def test_double_click_uses_clicked_track_without_expanding_audio(window, applica
     row=next(y for track,y,height in t.media_rows() if track.info.id=='second')
     x=40 if target=='title' else round(t.x_for(40 if target=='past_end' else 14))
     point=QPoint(x,row+9)
-    QTest.mouseClick(t,Qt.LeftButton,Qt.NoModifier,point)
-    QTest.mouseDClick(t,Qt.LeftButton,Qt.NoModifier,point)
-    QTest.mouseRelease(t,Qt.LeftButton,Qt.NoModifier,point)
+    modifier=Qt.NoModifier if target=='clip' else Qt.ShiftModifier
+    QTest.mouseClick(t,Qt.LeftButton,modifier,point)
+    QTest.mouseDClick(t,Qt.LeftButton,modifier,point)
+    QTest.mouseRelease(t,Qt.LeftButton,modifier,point)
     assert w.doc.state.selection==((8,28) if target=='clip' else (0,28))
     assert w.doc.selected_track_ids==('second',)
     assert not w.doc.active_track.info.audio_expanded
@@ -77,13 +79,13 @@ def test_library_click_opens_only_chosen_video_and_autoplays(window, application
         root=tmp_path/'root'; child=root/'shot'; child.mkdir(parents=True)
         for index, media in enumerate(clips):shutil.copyfile(media['path'],child/f'{index}.mp4')
         identity=panel.store.create('Root',root=root); panel.rebuild((identity,str(root)))
-        pump(application,lambda:w.job is None,timeout=10)
+        pump(application,lambda:w.job is None and not panel.scans,timeout=10)
         panel.tree.setCurrentItem(panel.tree.currentItem().child(0))
-        pump(application,lambda:w.job is None,timeout=10)
+        pump(application,lambda:w.job is None and not panel.scans,timeout=10)
         selected_folder=str(child)
     if kind=='list': panel.rebuild((identity,None))
     w.library.show(); w.library_tabs.setCurrentWidget(panel); application.processEvents()
-    pump(application,lambda:w.job is None,timeout=10)
+    pump(application,lambda:w.job is None and not panel.scans,timeout=10)
     errors=[]; monkeypatch.setattr(w,'error',errors.append)
     selected_path=panel.files.item(1).data(Qt.ItemDataRole.UserRole)
     point=panel.files.visualItemRect(panel.files.item(1)).center()
@@ -175,7 +177,7 @@ def test_library_lists_do_not_overlap_in_small_window(window,application,mode):
     if mode=='short': panel.setFixedHeight(100)
     QTest.qWait(100)
     tree=panel.tree.geometry(); files=panel.files.geometry()
-    assert tree.bottom()<files.top()
+    assert panel.tree.mapToGlobal(panel.tree.rect().bottomLeft()).y()<panel.files.mapToGlobal(panel.files.rect().topLeft()).y()
     assert panel.files.parentWidget().rect().contains(files)
     assert min(tree.height(),files.height())>=panel.fontMetrics().height()+8
     content=panel.tree.parentWidget().parentWidget()

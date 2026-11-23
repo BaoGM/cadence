@@ -23,7 +23,9 @@ def registration_values(executable):
 def register():
     if not getattr(sys,'frozen',False): raise RuntimeError('Lancez cette commande depuis la version .exe portable.')
     import winreg
-    for path,values in registration_values(sys.executable).items():
+    from update_store import base_executable
+    executable=base_executable()
+    for path,values in registration_values(executable).items():
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER,path) as key: winreg.SetValueEx(key,'',0,winreg.REG_SZ,values[0])
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER,r'Software\Classes\.cadence') as key:
         # Do not replace an unrelated existing default.

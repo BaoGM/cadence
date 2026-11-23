@@ -89,7 +89,7 @@ def test_track_body_selection_doubleclick_drag_and_audio_menu(application,clips,
         QTest.mouseDClick(timeline,Qt.LeftButton,Qt.NoModifier,QPoint(x,88))
         assert doc.state.selection==(0,48) and doc.selected_track_ids==(second,)
         assert not doc.state.second_track.info.audio_expanded
-        QTest.mouseDClick(timeline,Qt.LeftButton,Qt.NoModifier,QPoint(40,88))
+        QTest.mouseDClick(timeline,Qt.LeftButton,Qt.ShiftModifier,QPoint(40,88))
         assert not doc.state.second_track.info.audio_expanded
         doc.select_track(first); doc.select_track(second,extend=True); window.refresh()
         original=doc.state
@@ -127,7 +127,7 @@ def test_platform_release_tag_does_not_select_linux():
     from updates import select_release
     def release(tag):
         return dict(tag_name=tag,assets=[dict(name='Cadence-1.17.0-'+suffix,state='uploaded',size=42)
-            for suffix in ('Windows.zip','sha256.json')])
+            for suffix in ('Windows.zip','update.json')])
     selected=select_release([release('v1.18.0-linux'),release('v1.17.0-windows')],'1.16.1',False)
     assert selected.version=='1.17.0'
     assert '/v1.17.0-windows/' in selected.url

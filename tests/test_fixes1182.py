@@ -59,7 +59,7 @@ def test_real_bulk_conversion_survives_cache_save_and_scrubbing(application, tmp
     paths = []
     for index in range(2):
         path = tmp_path/f'clip-{index}.mp4'
-        shutil.copyfile(Path(__file__).parents[1]/'assets/Demonstration.mp4', path); paths.append(str(path))
+        shutil.copyfile(Path(__file__).resolve().parents[1]/'assets/Demonstration.mp4', path); paths.append(str(path))
     media = prepare_batch(paths, None, lambda *a: None, threading.Event(), quality='480p')
     w = Window(); w.doc = Document(); w.doc.append_media(media)
     w.doc.add_media_track(); w.doc.append_media([media[0]])
@@ -99,8 +99,9 @@ def test_double_click_selects_clicked_clip_or_track(window, application, simple,
     w.doc.select_track('second'); t.simple = simple; w.refresh(); application.processEvents()
     point = QPoint(40 if title else round(t.x_for(13)),
                    round(t.simple_track_rect().center().y()) if simple else t.track_y('video')+9)
-    QTest.mouseDClick(t, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
-    QTest.mouseRelease(t, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
+    modifier=Qt.ShiftModifier if title else Qt.NoModifier
+    QTest.mouseDClick(t, Qt.MouseButton.LeftButton, modifier, point)
+    QTest.mouseRelease(t, Qt.MouseButton.LeftButton, modifier, point)
     assert w.doc.state.selection == ((0, 28) if title else (8, 28))
     assert w.doc.selected_track_ids == ('second',)
     assert t.gesture is None and t.media_title_drag is None

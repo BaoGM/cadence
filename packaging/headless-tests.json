@@ -28,5 +28,7 @@
   "tests/test_instances1180.py",
   "tests/test_fixes1181.py",
   "tests/test_fixes1182.py",
-  "tests/test_features1180.py"
+  "tests/test_features1180.py",
+  "tests/test_fixes1184.py",
+  "tests/test_fixes1185.py"
 ]

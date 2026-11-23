@@ -40,7 +40,7 @@ class TrackRows:
         if self.simple or event.button()!=Qt.MouseButton.LeftButton or event.position().x()>=self.track_left(): return False
         track=self.media_row_at(event.position().y())
         if track is None: return False
-        if event.position().x()<18:
+        if event.position().x()<18 and event.modifiers()==Qt.NoModifier:
             self.mediaAudioExpanded.emit(track.info.id,not track.info.audio_expanded)
         else:
             self.active_media_id=track.info.id

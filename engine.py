@@ -101,6 +101,33 @@ class PCMDevice(QIODevice):
         return b''.join(chunks)
     def writeData(self,data): return -1
 
+class PlaybackSlices:
+    def __init__(self,pcm,ranges,fps):
+        self.pcm=pcm; self.fps=fps; self.parts=[]; self.samples=0
+        for a,b in ranges:
+            start=sample_at(a,fps)
+            count=sample_at(b,fps)-start
+            self.parts.append((self.samples,self.samples+count,start,a,b))
+            self.samples+=count
+
+    def offset(self,frame):
+        for first,last,start,a,b in self.parts:
+            if a<=frame<b: return first+sample_at(frame,self.fps)-start
+        return 0
+
+    def frame(self,sample):
+        for first,last,start,a,b in self.parts:
+            if sample<last: return min(b-1,a+int((sample-first)*float(self.fps)/RATE))
+        return self.parts[-1][4]-1
+
+    def read(self,start,count):
+        chunks=[]
+        for first,last,source,a,b in self.parts:
+            low=max(start,first); high=min(start+count,last)
+            if high>low: chunks.append(self.pcm.read(source+low-first,high-low))
+        return b''.join(chunks)
+
+
 class Transport:
     def __init__(self,parent=None):
         self.parent=parent; self.sink=None; self.device=None; self.pcm=None; self.running=False; self.suspended=False; self.volume=.8
@@ -115,7 +142,15 @@ class Transport:
         self.running=True
         from composite_media import MixedPCM
         self.pcm=MixedPCM(state,media,fps)
-        self.device=PCMDevice(self.pcm,sample_at(self.start_frame,fps),sample_at(a,fps),sample_at(b,fps),self.passes)
+        ranges=state.selection_ranges()
+        self.slices=PlaybackSlices(self.pcm,ranges,fps) if len(ranges)>1 else None
+        if self.slices:
+            self.a,self.b=ranges[0][0],ranges[-1][1]
+            start=self.slices.offset(state.position)
+            self.start_frame=self.slices.frame(start)
+            self.device=PCMDevice(self.slices,start,0,self.slices.samples,self.passes)
+        else:
+            self.device=PCMDevice(self.pcm,sample_at(self.start_frame,fps),sample_at(a,fps),sample_at(b,fps),self.passes)
         fmt=QAudioFormat(); fmt.setSampleRate(RATE); fmt.setChannelCount(2); fmt.setSampleFormat(QAudioFormat.SampleFormat.Int16)
         output=QMediaDevices.defaultAudioOutput()
         self.has_audio_device=not output.isNull() and output.isFormatSupported(fmt)
@@ -128,25 +163,25 @@ class Transport:
         if not self.running: return self.start_frame,1,True
         elapsed=self.sink.processedUSecs()/1e6 if self.sink else time.perf_counter()-self.started
         consumed=int(elapsed*RATE)
-        first=sample_at(self.b,self.fps)-sample_at(self.start_frame,self.fps)
-        full=sample_at(self.b,self.fps)-sample_at(self.a,self.fps)
+        first=self.device.b-self.device.start
+        full=self.device.b-self.device.a
         total=first+(self.passes-1)*full if self.passes else None
         done=total is not None and consumed>=total
         if self.sink and self.device.finished and self.sink.state().name=='IdleState': done=True
         if done: return self.b-1,max(1,self.passes),True
         if consumed<first:
-            frame=self.start_frame+int(consumed*float(self.fps)/RATE); p=1
+            frame=self.slices.frame(self.device.start+consumed) if self.slices else self.start_frame+int(consumed*float(self.fps)/RATE); p=1
         else:
             left=consumed-first
-            p=2+left//full; frame=self.a+int((left%full)*float(self.fps)/RATE)
+            p=2+left//full; frame=self.slices.frame(left%full) if self.slices else self.a+int((left%full)*float(self.fps)/RATE)
         return min(self.b-1,frame),p,False
     def set_loop(self,enabled):
         if not (self.running or self.suspended): return
         if self.suspended:
             elapsed=self.sink.processedUSecs()/1e6 if self.sink else self.held_at-self.started
             consumed=int(elapsed*RATE)
-            first=sample_at(self.b,self.fps)-sample_at(self.start_frame,self.fps)
-            full=sample_at(self.b,self.fps)-sample_at(self.a,self.fps)
+            first=self.device.b-self.device.start
+            full=self.device.b-self.device.a
             current=1 if consumed<first else 2+(consumed-first)//full
         else: current=self.clock()[1]
         self.passes=0 if enabled else current

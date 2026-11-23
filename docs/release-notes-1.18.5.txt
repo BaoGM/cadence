@@ -1,0 +1,13 @@
+Cadence 1.18.5 pour Windows (préversion non signée)
+
+- Les onglets Lecture, Médias, Bibliothèque et Références ont des pictogrammes. En mode compact, l’onglet actif affiche son nom. Un clic sur un dossier charge son contenu en arrière-plan et un clic sur une vidéo lance uniquement cette vidéo.
+- Le panneau Médias affiche les caractéristiques des sources. Dans Références, choisissez la source B et réordonnez les vidéos avec les flèches ou par glisser-déposer.
+- Double-cliquez sur le titre d’une piste pour déplier ou replier son audio et sur un clip pour le sélectionner. Maj + double-clic sélectionne toute la piste. Ctrl + double-clic ajoute ou retire un clip. La lecture, la copie, la coupe et la suppression suivent les portions sélectionnées.
+- À partir de cette version, les installations par utilisateur et les copies portables accessibles en écriture peuvent préparer les mises à jour en arrière-plan. Cadence vérifie la signature du manifeste et l’empreinte du paquet avant de l’activer au redémarrage. Si le premier lancement échoue, la version précédente reprend la main. La première mise à niveau depuis la 1.18.4 utilise l’installateur ou le ZIP portable.
+
+Windows 1.18.5 (unsigned preview)
+
+- The Playback, Media, Library and References tabs have icons. Compact mode shows the active tab name. Click a folder to browse its contents in the background, or click a video to play just that file.
+- The Media panel shows source details. In References, choose source B and reorder videos using the arrows or drag and drop.
+- Double-click a track title to expand or collapse its audio, or double-click a clip to select it. Shift-double-click selects the whole track. Ctrl-double-click adds or removes a clip. Playback, copy, cut and delete follow the selected portions.
+- Starting with this version, per-user installations and writable portable copies can prepare updates in the background. Cadence checks the signed manifest and package checksum before activating the update on restart. If the first launch fails, the previous version resumes. Use the installer or portable ZIP for the first upgrade from 1.18.4.

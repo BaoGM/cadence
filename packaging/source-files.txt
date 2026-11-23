@@ -42,6 +42,7 @@ assets/guide_fr.txt
 assets/qtbase_fr.qm
 assets/ui_en.txt
 assets/ui_patterns.json
+assets/update-key.txt
 association.py
 audio_jobs.py
 audio_prepare.py
@@ -66,6 +67,7 @@ docs/SIGNPATH_APPLICATION.md
 docs/UNINSTALL.md
 docs/release-notes-1.18.3.txt
 docs/release-notes-1.18.4.txt
+docs/release-notes-1.18.5.txt
 drag.py
 draw_fonts.py
 draw_selection.py
@@ -89,6 +91,7 @@ integrations/cadence_drawings.py
 integrations/cadence_drawings_blender.py
 integrations/cadence_drawings_maya.py
 integrations/cadence_runtime.py
+library_style.py
 media.py
 media_track_ui.py
 menu_layout.py
@@ -117,6 +120,8 @@ packaging/fetch_release_inputs.py
 packaging/generate_fixture.py
 packaging/headless-tests.json
 packaging/release.py
+packaging/sign_update.ps1
+packaging/sign_update.py
 packaging/source-files.txt
 packaging/test_installer.py
 packaging/test_release_pipeline.py
@@ -178,6 +183,7 @@ tests/test_fixes1181.py
 tests/test_fixes1182.py
 tests/test_fixes1183.py
 tests/test_fixes1184.py
+tests/test_fixes1185.py
 tests/test_gaps180.py
 tests/test_gpu160.py
 tests/test_gpu190.py
@@ -246,6 +252,7 @@ track_rows.py
 transform_frame.py
 ui_style.py
 ui_text.py
+update_store.py
 update_ui.py
 updates.py
 version_info.txt

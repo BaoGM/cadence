@@ -47,6 +47,7 @@ def main():
     parser.add_argument('--dependency-root', type=Path, required=True)
     parser.add_argument('--output', type=Path, default=SOURCE / 'dist/unsigned')
     parser.add_argument('--compiler', type=Path)
+    parser.add_argument('--sign-update', choices=('preview','stable'), help='Sign the portable update descriptor with the release operator’s Windows key.')
     args = parser.parse_args()
     directory, output = args.build_dir.resolve(), args.output.resolve()
     payload = directory / 'dist/Cadence'
@@ -81,6 +82,11 @@ def main():
     archive(portable, {f'Cadence/{f.relative_to(stage).as_posix()}': f for f in stage.rglob('*') if f.is_file()})
     installer = build(version, stage, output, args.compiler)
     artifacts = {f.name: sha256(f) for f in (sources, third, portable, installer)}
+    if args.sign_update:
+        from sign_update import sign_package
+        sign_package(portable, version, args.sign_update == 'preview', output)
+        descriptor = output / f'Cadence-{version}-update.json'
+        artifacts[descriptor.name] = sha256(descriptor)
     provenance = {'status': 'unsigned', 'version': version, 'source': identity,
                   'tools': evidence['tools'], 'dependency_manifest_sha256': sha256(SOURCE / 'packaging/third-party.lock.json'),
                   'verification_sha256': sha256(directory / 'verification.json'), 'audit': report, 'artifacts': artifacts}

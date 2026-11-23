@@ -12,16 +12,16 @@ Cadence is a Windows video review and annotation application for animation. Its 
 - MP4, MOV, GIF, WAV and MP3 export.
 - Screen capture, with optional system audio, microphone and input indicators.
 - Optional timeline synchronisation and drawing transfer with Blender and Maya.
-- Optional automatic update checks, with confirmation before downloading and installing.
+- Background updates for per-user and writable portable installations, with signed package verification and rollback after an unsuccessful start.
 - Persistent playlists, watched folders and temporary edits for the current session.
 - Independent video overlay with optional always-on-top and opacity.
 - Multiple Maya instances with explicit target selection.
 
 ## Installation
 
-Windows 10 or 11, 64-bit. The [1.18.4 Windows preview](https://github.com/BaoGM/cadence/releases/tag/v1.18.4-windows) includes an installer, a portable archive, corresponding sources, checksums and build provenance. It is unsigned and marked as a prerelease. SignPath Foundation acceptance is not claimed; see the [code signing policy](CODE_SIGNING_POLICY.md).
+Windows 10 or 11, 64-bit. The [1.18.5 Windows preview](https://github.com/BaoGM/cadence/releases/tag/v1.18.5-windows) includes an installer, a portable archive, corresponding sources, checksums and build provenance. It is unsigned and marked as a prerelease. SignPath Foundation acceptance is not claimed; see the [code signing policy](CODE_SIGNING_POLICY.md).
 
-The installer requires administrator permission to install in Program Files. For the portable edition, extract the whole archive and run `Cadence.exe`; keep `_internal` and `Licences` beside it. Third-party source archives accompany full releases but are not needed to run the application.
+The default installation is per user. Installing for everyone in Program Files requires administrator permission. For the portable edition, extract the whole archive and run `Cadence.exe`; keep `_internal` and `Licences` beside it. Third-party source archives accompany full releases but are not needed to run the application.
 
 Linux 1.18.0 remains available from its existing release and `feature/linux-port` branch. This branch contains the current Windows release.
 

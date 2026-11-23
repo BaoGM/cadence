@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-3.0-only
-# SPDX-License-Identifier: GPL-3.0-only
 from dataclasses import dataclass
 import hashlib
 import json
@@ -83,10 +82,10 @@ def select_release(releases, current, installed, previews=False):
                 continue
         except (ValueError, AttributeError):
             continue
-        filename = f'Cadence-{version}-' + ('Setup.exe' if installed else 'Windows.zip')
+        filename = f'Cadence-{version}-Windows.zip'
         assets = {a.get('name'): a for a in item.get('assets', []) if isinstance(a, dict) and a.get('state') == 'uploaded'}
         asset = assets.get(filename)
-        if not asset or f'Cadence-{version}-sha256.json' not in assets:
+        if not asset or f'Cadence-{version}-update.json' not in assets:
             continue
         size = asset.get('size')
         if type(size) is not int or not 0 < size <= MAX_PACKAGE:
@@ -100,18 +99,18 @@ def select_release(releases, current, installed, previews=False):
 def check(current, installed, previews=False):
     return select_release(read_json(RELEASES_URL), current, installed, previews)
 
-def package_hash(release):
-    manifest = read_json(release.base + f'Cadence-{release.version}-sha256.json', 65536)
-    digest = manifest.get(release.filename) if isinstance(manifest, dict) else None
-    if not isinstance(digest, str) or not re.fullmatch(r'[a-fA-F0-9]{64}', digest):
-        raise ValueError('Missing SHA-256 checksum')
-    digest = digest.lower()
-    if release.digest and digest != release.digest:
-        raise ValueError('Conflicting SHA-256 checksums')
-    return digest
+def package_descriptor(release):
+    from update_store import verify_signature,signed_message
+    manifest=read_json(release.base+f'Cadence-{release.version}-update.json',65536)
+    if manifest['version']!=release.version or manifest['size']!=release.size or manifest['preview'] is not release.prerelease:
+        raise ValueError('Wrong update descriptor')
+    digest=manifest['sha256']
+    verify_signature(signed_message(release.version,release.size,digest,release.prerelease),manifest['signature'])
+    if release.digest and digest!=release.digest: raise ValueError('Conflicting SHA-256 checksums')
+    return manifest
 
-def download(release, directory, cancel, progress):
-    digest = package_hash(release)
+def download(release, directory, cancel, progress, descriptor=None):
+    digest=(descriptor or package_descriptor(release))['sha256']
     if cancel.is_set():
         raise UpdateCancelled()
     directory = Path(directory)
@@ -156,15 +155,3 @@ def verify_package(path, digest):
 
 def installed_copy(executable):
     return (Path(executable).resolve().parent / 'uninstall' / 'unins000.exe').is_file()
-
-def launch_installer(path, directory):
-    import ctypes
-    import subprocess
-    # Keep the normal installer and UAC; never force-close another Cadence instance.
-    arguments = subprocess.list2cmdline(['/SP-', '/NORESTART', '/NOFORCECLOSEAPPLICATIONS', '/DIR='+str(directory)])
-    shell = ctypes.windll.shell32.ShellExecuteW
-    shell.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_int]
-    shell.restype = ctypes.c_ssize_t
-    result = shell(None, 'open', str(path), arguments, str(Path(path).parent), 1)
-    if result <= 32:
-        raise OSError(f'Installer launch rejected ({result})')

@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from datetime import datetime
 from fractions import Fraction
+from threading import Thread
+from library_style import icon, style_button
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal, QTimer, QFile, QSignalBlocker
@@ -66,10 +68,13 @@ class PlaylistFiles(QListWidget):
 
 
 class PlaylistPanel(QWidget):
+    scanFinished = Signal(object, object, str)
+
     def __init__(self, window):
         super().__init__(window)
         self.w = window; self.temporary = []; self.serial = 0; self.current = None; self.rebuilding = False
-        self.browsing = None; self.pending_open = None
+        self.scans = {}; self.pending_open = None
+        self.scanFinished.connect(self.folder_scanned)
         self.pending_playback = None
         self.play_timer = QTimer(self); self.play_timer.setInterval(20)
         self.play_timer.timeout.connect(self.start_file_playback)
@@ -87,6 +92,7 @@ class PlaylistPanel(QWidget):
         self.open_button = QPushButton(tr('Ouvrir')); self.open_button.clicked.connect(self.open_current); row.addWidget(self.open_button)
         self.refresh_button = QPushButton(tr('Actualiser')); self.refresh_button.clicked.connect(lambda: self.browse(refresh=True)); row.addWidget(self.refresh_button)
         layout.addLayout(row)
+        style_button(new,'plus'); style_button(self.open_button,'open'); style_button(self.refresh_button,'refresh',True)
         splitter = QSplitter(Qt.Orientation.Vertical)
         self.tree = QTreeWidget(); self.tree.setHeaderHidden(True)
         self.tree.setMinimumHeight(self.tree.fontMetrics().height()+8)
@@ -94,6 +100,7 @@ class PlaylistPanel(QWidget):
         self.tree.setExpandsOnDoubleClick(False)
         self.tree.itemDoubleClicked.connect(self.double_clicked)
         self.tree.itemExpanded.connect(self.expanded)
+        self.tree.itemCollapsed.connect(lambda item: self.folder_icon(item,False))
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self.tree_menu)
         splitter.addWidget(self.tree)
@@ -103,7 +110,10 @@ class PlaylistPanel(QWidget):
         self.files.playRequested.connect(self.play_file)
         self.files.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.files.customContextMenuRequested.connect(self.files_menu)
-        splitter.addWidget(self.files); layout.addWidget(splitter, 1)
+        files_panel=QWidget(); file_layout=QVBoxLayout(files_panel)
+        file_layout.setContentsMargins(0,0,0,0)
+        self.folder_label=QLabel(); file_layout.addWidget(self.folder_label); file_layout.addWidget(self.files)
+        splitter.addWidget(files_panel); layout.addWidget(splitter, 1)
         self.file_error = QLabel()
         self.file_error.setTextFormat(Qt.TextFormat.PlainText)
         self.file_error.setWordWrap(True)
@@ -113,7 +123,8 @@ class PlaylistPanel(QWidget):
         self.add_button = QPushButton(tr('Ajouter des vidéos…')); self.add_button.clicked.connect(self.add_files); row.addWidget(self.add_button)
         self.remove_button = QPushButton(tr('Retirer de la liste')); self.remove_button.clicked.connect(self.remove_files); row.addWidget(self.remove_button)
         layout.addLayout(row)
-        scroll.setMinimumWidth(280+scroll.verticalScrollBar().sizeHint().width())
+        style_button(self.add_button,'plus'); style_button(self.remove_button,'minus',True)
+        scroll.setMinimumWidth(230)
         self.rebuild()
 
     def run(self, operation):
@@ -122,7 +133,14 @@ class PlaylistPanel(QWidget):
 
     def add_node(self, parent, title, data):
         item = QTreeWidgetItem(parent, [title]); item.setData(0, Qt.ItemDataRole.UserRole, data)
+        if data:
+            item.setIcon(0,icon('time' if data[0]=='temporary' else 'folder' if data[1] else 'list'))
         return item
+
+    def folder_icon(self,item,opened):
+        data=item.data(0,Qt.ItemDataRole.UserRole)
+        if data and data[0]!='temporary' and data[1]:
+            item.setIcon(0,icon('opened' if opened else 'folder'))
 
     def rebuild(self, select=None):
         self.rebuilding = True
@@ -133,6 +151,7 @@ class PlaylistPanel(QWidget):
             followed = self.add_node(self.tree, tr('Dossiers suivis'), None)
             temporary = self.add_node(self.tree, tr('Temporaire'), None)
             self.temporary_group = temporary
+            for group,symbol in ((saved,'list'),(followed,'library'),(temporary,'time')): group.setIcon(0,icon(symbol))
             selection = None
             for entry in self.store.entries if self.store else []:
                 folder = entry.get('root')
@@ -157,6 +176,7 @@ class PlaylistPanel(QWidget):
         if self.current and self.current[0] != 'temporary' and self.current[1]: self.browse()
 
     def expanded(self, item):
+        self.folder_icon(item,True)
         if self.rebuilding: return
         data = item.data(0, Qt.ItemDataRole.UserRole)
         if data and data[0] != 'temporary' and data[1]: self.browse(item=item)
@@ -165,9 +185,9 @@ class PlaylistPanel(QWidget):
         data = item.data(0, Qt.ItemDataRole.UserRole)
         if not data:
             item.setExpanded(not item.isExpanded()); return
-        if self.w.job:
-            if self.browsing == data: self.pending_open = data
-            return
+        if id(item) in self.scans:
+            self.pending_open = data; return
+        if self.w.job: return
         if data[0] != 'temporary' and data[1] and not self.store.files(*data):
             item.setExpanded(not item.isExpanded())
         else: self.open_current()
@@ -185,52 +205,67 @@ class PlaylistPanel(QWidget):
             record = next((r for r in self.temporary if r['id'] == data[1]), None)
             if record: paths = [m['path'] for m in record['doc'].media.values()]
         for path in paths:
-            item = QListWidgetItem(Path(path).name); item.setData(Qt.ItemDataRole.UserRole, path)
+            item = QListWidgetItem(icon('film'), Path(path).name); item.setData(Qt.ItemDataRole.UserRole, path)
             item.setToolTip(path); self.files.addItem(item)
             if not Path(path).is_file(): item.setText(item.text() + ' — ' + tr('Introuvable'))
+        current=self.tree.currentItem()
+        self.folder_label.setText(f'{current.text(0)}  ·  {len(paths)}' if current and data else '')
+        self.folder_label.setVisible(bool(current and data))
         self.open_button.setEnabled(bool(paths) or bool(data and data[0] == 'temporary'))
         self.rebuilding = False
 
     def browse(self, refresh=False, item=None):
         if not self.store: return
-        if self.w.job:
-            if item is None:
-                selected = self.current
-                self.w.job.finished.connect(lambda: QTimer.singleShot(0, lambda: self.browse(refresh) if self.current == selected else None))
-            return
         item = item or self.tree.currentItem()
         data = item.data(0, Qt.ItemDataRole.UserRole) if item else None
         if not data or data[0] == 'temporary': return
         identity, folder = data
         if not folder: self.show_files(); return
-        self.browsing = data
-        def scan(progress, cancel):
-            directories, files = scan_folder(folder)
-            return directories, files, {p for p in directories if has_subfolders(p)}
-        def success(result):
-            self.browsing = None
-            directories, files, expandable = result
-            if not isValid(item): return
-            def apply():
-                self.store.scanned(identity, folder, files, refresh)
-                existing = {item.child(i).data(0, Qt.ItemDataRole.UserRole): item.child(i) for i in range(item.childCount())}
-                for key, child in list(existing.items()):
-                    if key is None or key[1] not in directories: item.removeChild(child)
-                for directory in directories:
-                    if (identity, directory) not in existing:
-                        child = self.add_node(item, self.store.folder_name(identity, directory), (identity, directory))
-                        child.setToolTip(0, directory)
-                        if directory in expandable: self.add_node(child, '…', None)
-                    elif directory not in expandable:
-                        child = existing[(identity, directory)]
-                        while child.childCount(): child.takeChild(0)
-                    elif not existing[(identity, directory)].childCount():
-                        self.add_node(existing[(identity, directory)], '…', None)
-                if self.current == data: self.show_files()
-            self.run(apply)
-            pending = self.pending_open; self.pending_open = None
-            if pending == data and self.current == data: self.double_clicked(item)
-        self.w.begin_task('Lecture du dossier', scan, success)
+        token=id(item)
+        if token in self.scans:
+            self.scans[token]=(item,refresh or self.scans[token][1])
+            return
+        self.scans[token]=(item,refresh)
+        def scan():
+            try:
+                dirs,files=scan_folder(folder)
+                result=(dirs,files,{p for p in dirs if has_subfolders(p)})
+                error=''
+            except (OSError,ValueError) as exc:
+                result,error=None,str(exc)
+            try: self.scanFinished.emit(token,result,error)
+            except RuntimeError: pass
+        Thread(target=scan, name='Cadence library', daemon=True).start()
+
+    def folder_scanned(self,token,result,error):
+        item,refresh=self.scans.pop(token)
+        if not isValid(item): return
+        data=item.data(0,Qt.ItemDataRole.UserRole)
+        identity,folder=data
+        pending=self.pending_open==data
+        if pending: self.pending_open=None
+        if error:
+            if self.current==data: self.file_error.setText(error); self.file_error.show()
+            return
+        directories,files,expandable=result
+        def apply():
+            self.store.scanned(identity, folder, files, refresh)
+            existing = {item.child(i).data(0, Qt.ItemDataRole.UserRole): item.child(i) for i in range(item.childCount())}
+            for key, child in list(existing.items()):
+                if key is None or key[1] not in directories: item.removeChild(child)
+            for directory in directories:
+                if (identity, directory) not in existing:
+                    child = self.add_node(item, self.store.folder_name(identity, directory), (identity, directory))
+                    child.setToolTip(0, directory)
+                    if directory in expandable: self.add_node(child, '…', None)
+                elif directory not in expandable:
+                    child = existing[(identity, directory)]
+                    while child.childCount(): child.takeChild(0)
+                elif not existing[(identity, directory)].childCount():
+                    self.add_node(existing[(identity, directory)], '…', None)
+            if self.current == data: self.show_files()
+        self.run(apply)
+        if pending and self.current==data: self.double_clicked(item)
 
     def create_menu(self):
         if self.w.job or not self.store: return

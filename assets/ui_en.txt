@@ -789,3 +789,13 @@ Choisir une instance… => Choose an instance…
 Instance sélectionnée déconnectée => Selected instance disconnected
 Ouvrir => Open
 Nom => Name
+
+Onglets compacts => Compact tabs
+Sources du montage => Timeline sources
+Vidéo => Video
+Ordre de comparaison => Comparison order
+Fichiers de référence => Reference files
+Source B => Source B
+
+Mise à jour prête · Redémarrer maintenant => Update ready · Restart now
+Cette installation est gérée pour tous les utilisateurs. La mise à jour doit être faite par un administrateur. => This installation is managed for all users. An administrator must update it.

@@ -86,6 +86,22 @@ class State:
     frame_markers: tuple[int, ...] = ()
     track_info: TrackInfo = TrackInfo()
     second_track: MediaTrack | None = None
+    selected_clips: tuple[tuple[str, int, int], ...] = ()
+
+    def selection_ranges(self, track_id=None):
+        if not self.selection:
+            return ()
+        if not self.selected_clips:
+            return (self.selection,)
+        spans=sorted({(a,b) for track,a,b in self.selected_clips if track_id is None or track==track_id})
+        merged=[]
+        for a,b in spans:
+            if merged and a<merged[-1][1]:
+                merged[-1]=(merged[-1][0],max(b,merged[-1][1]))
+            else:
+                merged.append((a,b))
+        return tuple(merged)
+
     @property
     def audio(self): return self.segments if self.audio_segments is None else self.audio_segments
     @cached_property
@@ -266,6 +282,8 @@ class Document:
     def dirty(self): return self.signature() != self.saved_signature
 
     def commit(self, label, new):
+        if new.selected_clips and (new.selection!=self.state.selection or new.tracks!=self.state.tracks):
+            new=replace(new,selected_clips=())
         new=replace(new,frame_markers=tuple(sorted(set(f for f in new.frame_markers if 0<=f<new.length))))
         if new.position>new.length: new=replace(new,position=max(0,new.length-1))
         if new.selection and new.selection[1]>new.length:
@@ -294,7 +312,7 @@ class Document:
     def select(self, start, end):
         n = self.state.length
         start, end = max(0, min(start, n)), max(0, min(end, n))
-        self.state = replace(self.state, selection=(min(start,end),max(start,end)) if start != end else None)
+        self.state = replace(self.state, selection=(min(start,end),max(start,end)) if start != end else None,selected_clips=())
 
     def selected(self):
         if self.state.selection: return self.state.selection
@@ -302,11 +320,16 @@ class Document:
 
     @selected_tracks
     def copy(self, include_audio=True):
-        a,b = self.selected()
-        self.drawing_clipboard = slice_keys(self.state.drawings,a,b,-a) if self.state.drawings_linked else ()
-        self.drawing_clipboard_length = b-a
-        self.clipboard = slice_segments(self.state.segments,a,b)
-        self.audio_clipboard = slice_segments(self.state.audio,a,b) if include_audio else (Segment(None,0,b-a),) if b>a else ()
+        ranges=self.state.selection_ranges() or (self.selected(),)
+        self.clipboard=tuple(seg for a,b in ranges for seg in slice_segments(self.state.segments,a,b))
+        self.audio_clipboard=tuple(seg for a,b in ranges for seg in slice_segments(self.state.audio,a,b)) if include_audio else ()
+        keys=[]; length=0
+        for a,b in ranges:
+            if self.state.drawings_linked: keys.extend(slice_keys(self.state.drawings,a,b,length-a))
+            length+=b-a
+        if not include_audio and length: self.audio_clipboard=(Segment(None,0,length),)
+        self.drawing_clipboard=tuple(keys)
+        self.drawing_clipboard_length=length
         return sum(s.length for s in self.clipboard)
 
     @selected_tracks
@@ -319,6 +342,8 @@ class Document:
 
     @selected_tracks
     def delete(self, label='Supprimer les images'):
+        if len(self.state.selection_ranges())>1:
+            return self.delete_ranges(self.state.selection_ranges(),label)
         a,b = self.selected()
         if b <= a: return False
         segs = compact(slice_segments(self.state.segments,0,a)+slice_segments(self.state.segments,b,self.state.length))
@@ -430,7 +455,7 @@ class Document:
         return self.commit('Supprimer '+track,replace(self.state,drawings=remove_key_range(self.state.drawings,start,end) if track=='video' and self.state.drawings_linked else self.state.drawings,**fields,position=min(start,self.state.length-1),selection=None,loop_range=None))
 
     @selected_tracks
-    def delete_ranges(self,ranges):
+    def delete_ranges(self,ranges,label='Retirer la sélection du montage'):
         ranges=sorted((max(0,a),min(self.state.length,b)) for a,b in ranges if b>a)
         if not ranges: return False
         def keep(segs):
@@ -447,7 +472,7 @@ class Document:
                 if merged and a<=merged[-1][1]: merged[-1]=(merged[-1][0],max(b,merged[-1][1]))
                 else: merged.append((a,b))
             for a,b in reversed(merged): drawings=remove_key_range(drawings,a,b,True)
-        return self.commit('Retirer la sélection du montage',replace(self.state,drawings=drawings,segments=video,audio_segments=audio,position=min(ranges[0][0],max(0,length-1)),selection=None,loop_range=None))
+        return self.commit(label,replace(self.state,drawings=drawings,segments=video,audio_segments=audio,position=min(ranges[0][0],max(0,length-1)),selection=None,loop_range=None))
 
     def remove_media(self,key): return self.remove_media_keys([key])
     @selected_tracks
@@ -590,6 +615,16 @@ class Document:
         markers=st.get('frame_markers',[])
         if not isinstance(markers,(list,tuple)) or any(type(f) is not int or not 0<=f<length for f in markers): raise ValueError('Marqueurs invalides.')
         doc.state = State(segs,ev,max(0,min(int(st.get('position',0)),length)),tuple(sel) if sel else None,tuple(loop) if loop else None,bool(st.get("flip_h",False)),bool(st.get("flip_v",False)),audio,load_keys(st.get('drawings',[])),bool(st.get('drawings_linked',True)),tuple(sorted(set(markers))),first_info,second)
+        ids={t.info.id for t in doc.state.tracks}
+        clips=st.get('selected_clips') or ()
+        if doc.state.selection and isinstance(clips,(list,tuple)):
+            valid=tuple((key,a,b) for v in clips if isinstance(v,(list,tuple)) and len(v)==3
+                        for key,a,b in [v] if isinstance(key,str) and key in ids and type(a) is int and type(b) is int and 0<=a<b<=length)
+            if valid:
+                doc.state=replace(doc.state,selected_clips=valid)
+                doc.selected_track_ids=tuple(t.info.id for t in doc.state.tracks if any(key==t.info.id for key,a,b in valid))
+                doc.active_track_id=doc.selected_track_ids[0]
+
         doc.normalize_tracks()
         doc.project_path = project_path
         doc.saved_signature = doc.signature()

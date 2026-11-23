@@ -12,7 +12,14 @@ from test_drawing import application, window
 
 
 def immediate_tasks(w):
-    w.begin_task = lambda title, work, done: done(work(lambda *a: None, threading.Event()))
+    from unittest.mock import patch
+    from PySide6.QtWidgets import QApplication
+    original=w.playlists_panel.browse
+    def browse(*args,**kwargs):
+        with patch('playlist_ui.Thread',side_effect=lambda target,**kw:type('Inline',(),{'start':staticmethod(target)})()):
+            original(*args,**kwargs)
+        QApplication.processEvents()
+    w.playlists_panel.browse=browse
 
 
 def test_folder_arrows_and_double_click_navigation(window, tmp_path, monkeypatch):
@@ -39,14 +46,13 @@ def test_folder_arrows_and_double_click_navigation(window, tmp_path, monkeypatch
 def test_double_click_during_folder_scan_is_applied_after_scan(window, tmp_path, monkeypatch):
     panel=window.playlists_panel; folder=tmp_path/'folder'; folder.mkdir()
     (folder/'clip.mp4').write_bytes(b'data')
-    jobs=[]
-    def begin(title, work, done):
-        jobs.append((work,done)); window.job=True
-    monkeypatch.setattr(window,'begin_task',begin)
+    workers=[]
+    monkeypatch.setattr('playlist_ui.Thread',lambda target,**kw:type('Deferred',(),{'start':staticmethod(lambda:workers.append(target))})())
     identity=panel.store.create('Folder',root=folder); panel.rebuild((identity,str(folder)))
     item=panel.tree.currentItem(); panel.double_clicked(item)
     opened=[]; monkeypatch.setattr(panel,'open_current',lambda:opened.append(panel.current))
-    work,done=jobs[0]; result=work(lambda *a:None,threading.Event()); window.job=None; done(result)
+    assert window.job is None and window.dialog is None
+    workers[0]()
     assert opened==[(identity,str(folder))]
 
 

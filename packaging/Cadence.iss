@@ -29,10 +29,12 @@ DefaultDirName={autopf}\Cadence
 DisableDirPage=no
 DefaultGroupName=Cadence
 DisableProgramGroupPage=yes
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
 #ifdef TestBuild
 PrivilegesRequiredOverridesAllowed=commandline
 UsePreviousPrivileges=no
+#else
+PrivilegesRequiredOverridesAllowed=dialog
 #endif
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -44,8 +46,13 @@ SetupIconFile=..\assets\cadence.ico
 UninstallDisplayIcon={app}\Cadence.exe
 UninstallFilesDir={app}\uninstall
 OutputBaseFilename=Cadence-{#AppVersion}-Setup
+#ifdef TestBuild
+Compression=none
+SolidCompression=no
+#else
 Compression=lzma2/normal
 SolidCompression=yes
+#endif
 LZMANumBlockThreads=1
 CloseApplications=yes
 CloseApplicationsFilter=Cadence.exe
@@ -83,6 +90,9 @@ Name: "{autodesktop}\Cadence"; Filename: "{app}\Cadence.exe"; WorkingDir: "{app}
 #else
 Name: "{app}\Test Start Menu\Cadence"; Filename: "{app}\Cadence.exe"; WorkingDir: "{app}"
 #endif
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\.cadence-updates"; Check: not IsAdminInstallMode and FileExists(ExpandConstant('{app}\.cadence-updates\state.json'))
 
 [Registry]
 Root: HKA; Subkey: "{#RegistryBase}\Classes\Cadence.Installed.Project"; ValueType: string; ValueData: "Cadence Project"; Flags: uninsdeletekey; Tasks: filetypes

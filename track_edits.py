@@ -10,6 +10,9 @@ def selected_tracks(operation):
         from model import MediaTrack, Segment, with_tracks, track_state
         tracks=document.state.tracks
         targets=document.editable_tracks()
+        clip_operation=bool(document.state.selected_clips and document.state.selection and operation.__name__ in ('copy','cut','delete'))
+        if clip_operation:
+            targets=[t for t in targets if document.state.selection_ranges(t.info.id)]
         if not targets: return 0 if operation.__name__ in ('copy','cut') else False
         if len(tracks)==1:
             result=operation(document,*args,**kwargs)
@@ -20,6 +23,9 @@ def selected_tracks(operation):
         for target in targets:
             proxy=copy(document)
             proxy.state=track_state(document.state,target)
+            if clip_operation:
+                spans=document.state.selection_ranges(target.info.id)
+                proxy.state=replace(proxy.state,selection=spans[0],selected_clips=tuple((target.info.id,a,b) for a,b in spans))
             proxy.state=replace(proxy.state,drawings_linked=document.state.drawings_linked and all_selected)
             proxy.undo_stack=[]; proxy.redo_stack=[]; proxy.track_clipboards={}
             proxy.selected_track_ids=(target.info.id,); proxy.active_track_id=target.info.id
@@ -29,7 +35,7 @@ def selected_tracks(operation):
                 proxy.clipboard,proxy.audio_clipboard,proxy.drawing_clipboard,proxy.drawing_clipboard_length=clipboard
             required=0
             if operation.__name__ in ('paste','insert_gap'): required=document.state.position
-            elif operation.__name__ in ('copy','cut'): required=document.selected()[1]
+            elif operation.__name__ in ('copy','cut'): required=max(b for a,b in (proxy.state.selection_ranges() or (document.selected(),)))
             elif operation.__name__ in ('move_range','duplicate_range'):
                 required=max(int(value) for value in args[:3] if isinstance(value,(int,float))) if args else 0
             missing=max(0,required-target.length)

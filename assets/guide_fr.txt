@@ -1,4 +1,4 @@
-Cadence 1.18.4 - Guide rapide
+Cadence 1.18.5 - Guide rapide
 
 Les raccourcis indiqués sont ceux par défaut. Leur liste complète figure à la fin du guide ; ils se personnalisent dans Fichier > Options > Raccourcis.
 
@@ -26,7 +26,7 @@ Glissez sur la timeline pour déplacer la lecture. Avec l'outil Curseur (Q), gli
 
 Maj + glisser sélectionne une plage tout en affichant l'image courante. On peut appuyer sur Maj pendant un glissement déjà commencé. Relâchez la souris avant Maj pour garder la sélection ; l'ordre inverse repasse en déplacement de lecture.
 
-Un double-clic sur un média sélectionne toute sa durée, y compris sur la timeline allégée. Un double-clic sur le titre d’une piste ou sur une zone vide de celle-ci sélectionne toute la piste. Aucune touche supplémentaire n’est nécessaire. I et O posent les bornes au curseur ; Échap efface la sélection. La lecture se limite à la plage sélectionnée, dont la longueur apparaît au centre.
+Double-cliquez sur un clip pour le sélectionner, ou sur le titre de piste pour déplier ou replier son audio. Maj + double-clic sur le titre ou un clip sélectionne toute la piste. Ctrl + double-clic ajoute ou retire un clip. La lecture enchaîne les portions sélectionnées dans leur ordre, en sautant les intervalles. Copier, couper et supprimer respectent ces portions. I et O posent les bornes au curseur. Échap efface la sélection.
 
 ----------------------------------------
 Modifier la timeline
@@ -167,7 +167,7 @@ Mises à jour
 
 Cadence vérifie les nouvelles versions au démarrage, au plus une fois par jour. Fichier > Options > Préférences permet de désactiver cette vérification et d'inclure les préversions. Aide > Rechercher des mises à jour lance une vérification manuelle.
 
-Votre accord est demandé avant le téléchargement, puis avant l'installation. Le fichier téléchargé est contrôlé avec son empreinte SHA-256. La version installée propose l'installateur Windows et l'enregistrement du projet avant fermeture. La version portable ouvre le dossier de l'archive vérifiée : extrayez-la dans un nouveau dossier. Les préférences et les projets restent conservés. Une connexion indisponible ne bloque pas le démarrage.
+Les mises à jour des copies par utilisateur et portables sont téléchargées en arrière-plan. Cadence vérifie la signature du manifeste et l’empreinte du paquet. La nouvelle version prend effet à la prochaine ouverture, ou via « Mise à jour prête · Redémarrer maintenant ». En cas d’échec au premier démarrage, la version précédente reprend la main. Une installation partagée reste gérée par l’administrateur.
 
 ----------------------------------------
 Nouveautés 1.18 - bibliothèque et fenêtres
@@ -191,3 +191,5 @@ Synchronisation 3D > Instance synchronisée choisit le processus Maya ou Blender
 Déplacer un clip vers l’autre piste retire sa portion vidéo et audio de la piste d’origine, sans clip vide ; les éléments suivants de cette piste se rapprochent. La copie conserve la source et l’annulation restaure les deux pistes.
 
 Cliquer sur l’aperçu indépendant ne ramène pas la fenêtre principale au premier plan. La lecture unique affiche le même symbole de boucle, grisé et barré.
+
+Le volet affiche par défaut ses quatre pictogrammes et le nom de l’onglet actif. Le clic droit sur les onglets permet d’afficher tous les libellés. Dans Bibliothèque, un clic sur un dossier en affiche le contenu en arrière-plan. Dans Références, choisissez la source B et changez l’ordre avec les flèches ou par glisser-déposer.

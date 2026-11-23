@@ -1,4 +1,4 @@
-Cadence 1.18.4 - Quick guide
+Cadence 1.18.5 - Quick guide
 
 These are the default shortcuts. The complete list is at the end of the guide; customize them in File > Options > Shortcuts.
 
@@ -26,7 +26,7 @@ Drag on the timeline to scrub. With Pointer (Q), you can also drag on the video;
 
 Shift-drag selects a range while displaying the current frame. You can press Shift during a drag already in progress. Release the mouse before Shift to keep the selection; the opposite order returns to scrubbing.
 
-Double-click a media clip to select its entire duration, including on the simplified timeline. Double-click a track title or an empty part of the track to select the entire track. No modifier key is needed. I and O set boundaries at the playhead; Escape clears the selection. Playback is limited to the selected range, whose length appears at its center.
+Double-click a clip to select it, or a track title to expand or collapse its audio. Shift + double-click a title or clip to select the whole track. Ctrl + double-click adds or removes a clip. Playback follows the selected spans in order and skips the gaps. Copy, cut and delete respect those spans. I and O set boundaries at the playhead. Escape clears the selection.
 
 ----------------------------------------
 Edit the timeline
@@ -167,7 +167,7 @@ Updates
 
 Cadence checks for new versions at startup, at most once a day. File > Options > Preferences lets you disable this check and include prereleases. Help > Check for updates starts a manual check.
 
-Your approval is requested before downloading and again before installation. Downloads are checked against their SHA-256 checksum. The installed version offers the Windows installer and a chance to save your project before closing. The portable version opens the verified archive's folder: extract it into a new folder. Preferences and projects are preserved. An unavailable connection does not block startup.
+Per-user and portable installations download updates in the background. Cadence verifies the signed manifest and package checksum. The update takes effect on the next launch or via “Update ready · Restart now”. If the first startup fails, the previous version starts again. An administrator manages shared installations.
 
 ----------------------------------------
 New in 1.18 - library and windows
@@ -191,3 +191,5 @@ T moves every object in the current drawing key without selecting them first: dr
 Moving a clip to the other track removes its video and audio from the source track without leaving an empty clip; later items on that track close the gap. Copying keeps the source, and undo restores both tracks.
 
 Clicking the independent preview does not bring the main window to the front. Single playback uses the same loop symbol, greyed out and crossed out.
+
+By default the panel shows four icons and the active tab name. Right-click the tabs to show all labels. Click a library folder to browse it in the background. In References, choose source B and reorder with the arrows or by dragging.

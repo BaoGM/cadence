@@ -25,8 +25,8 @@ def check(window, output, media=None):
             t.grab().save(str(output/f'double-click-clip-{simple}.png'))
             if not simple:
                 point = QPoint(40, t.track_y('video')+9)
-                QTest.mouseDClick(t, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
-                QTest.mouseRelease(t, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
+                QTest.mouseDClick(t, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.ShiftModifier, point)
+                QTest.mouseRelease(t, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.ShiftModifier, point)
                 assert doc.state.selection == (0, 60)
                 t.grab().save(str(output/'double-click-track.png'))
     w.set_layout_editable(False); w.library.show(); w.comparison_panel.show()

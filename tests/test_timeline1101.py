@@ -8,17 +8,17 @@ from model import Document,State,Segment
 
 
 @pytest.mark.parametrize('simple,track',[(True,'video'),(False,'video'),(False,'audio')])
-def test_shift_double_click_selects_whole_track(window,application,simple,track):
+def test_double_click_selects_whole_clip(window,application,simple,track):
     w=window; t=w.timeline; w.request_frame=lambda:None
     w.doc.state=State((Segment('a',0,10),Segment('a',10,25),Segment(None,0,5)),
                       audio_segments=(Segment('a',0,15),Segment('a',15,25),Segment(None,0,5)))
     if track=='audio': w.doc.expand_track_audio(w.doc.active_track_id,True)
     t.simple=simple; w.refresh(); application.processEvents()
     point=QPoint(round(t.x_for(18)),round(t.simple_track_rect().center().y()) if simple else t.track_y(track)+9)
-    QTest.mouseClick(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.ShiftModifier,point)
-    QTest.mouseDClick(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.ShiftModifier,point)
-    QTest.mouseRelease(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.ShiftModifier,point)
-    assert w.doc.state.selection==(0,30)
+    QTest.mouseClick(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.NoModifier,point)
+    QTest.mouseDClick(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.NoModifier,point)
+    QTest.mouseRelease(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.NoModifier,point)
+    assert w.doc.state.selection==((15,25) if track=='audio' else (10,25))
     assert t.selection_track==track and t.gesture is None
     assert abs(w.doc.state.position-18)<=1
 

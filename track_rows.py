@@ -56,16 +56,6 @@ class TrackRows:
         self.mediaTrackSelected.emit(track.info.id,'toggle')
         event.accept(); return True
 
-    def double_click_media(self,event):
-        if self.simple or event.button()!=Qt.MouseButton.LeftButton or event.modifiers()!=Qt.KeyboardModifier.NoModifier: return False
-        track=self.media_row_at(event.position().y())
-        if track is None: return False
-        self.media_title_drag=None; self.anchor=None; self.gesture=None
-        if hasattr(self,'_timeline_drag'): self._timeline_drag.finish()
-        self.finish_range_drag()
-        if event.position().x()>=18: self.mediaAudioExpanded.emit(track.info.id,not track.info.audio_expanded)
-        event.accept(); return True
-
     def begin_cross_drag(self,event):
         self.cross_origin=None; self.cross_target=None; self.cross_copy=False
         if self.simple or len(getattr(self,'selected_media_ids',()))!=2: return

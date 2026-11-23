@@ -1,4 +1,4 @@
-Cadence 1.18.3 - Quick guide
+Cadence 1.18.4 - Quick guide
 
 These are the default shortcuts. The complete list is at the end of the guide; customize them in File > Options > Shortcuts.
 
@@ -26,7 +26,7 @@ Drag on the timeline to scrub. With Pointer (Q), you can also drag on the video;
 
 Shift-drag selects a range while displaying the current frame. You can press Shift during a drag already in progress. Release the mouse before Shift to keep the selection; the opposite order returns to scrubbing.
 
-Shift-double-click a track, its title or its video/audio lane to select the entire track, including on the simplified timeline. I and O set boundaries at the playhead; Escape clears the selection. Playback is limited to the selected range, whose length appears at its center.
+Double-click a media clip to select its entire duration, including on the simplified timeline. Double-click a track title or an empty part of the track to select the entire track. No modifier key is needed. I and O set boundaries at the playhead; Escape clears the selection. Playback is limited to the selected range, whose length appears at its center.
 
 ----------------------------------------
 Edit the timeline
@@ -35,7 +35,7 @@ A media track pairs a video lane and an audio lane. The + Media track button add
 
 The tracks are named Track 1 and Track 2. Click a title to select a track. Ctrl-click adds or removes a track from the selection, on its title or timeline. Edits affect the selected tracks. Drag a title above or below the other to change their order. Right-click a title to move or delete the entire track. Ctrl+Z undoes these actions. Audio lanes start collapsed: click the triangle next to the title to expand them.
 
-Double-click a track title or timeline to expand or collapse its audio lane. Right-click to disable or enable all its audio, including in exports. With both tracks selected, drag media onto the other track to move its video and audio together. The source range is removed and later clips close the gap, leaving no empty clip. Alt+Shift-drag copies it while preserving the source. Drawing keys appear above the playback bar without overlapping the numbers, including on the simplified timeline.
+Click the chevron next to a track title, or use the context menu, to expand or collapse its audio lane. Right-click to disable or enable all its audio, including in exports. With both tracks selected, drag media onto the other track to move its video and audio together. The source range is removed and later clips close the gap, leaving no empty clip. Alt+Shift-drag copies it while preserving the source. Drawing keys appear above the playback bar without overlapping the numbers, including on the simplified timeline.
 
 Drawings, their keys and frame markers remain shared above both tracks. Editing one track keeps drawings in place; when both tracks are selected, linked drawings follow the edits.
 
@@ -175,6 +175,8 @@ New in 1.18 - library and windows
 View > Show playlist (Ctrl+8) > Library contains free playlists and watched folders. New… creates an empty playlist, a playlist from files or watches an existing folder. Browse subfolders in the tree; each folder shows its direct videos without flattening its descendants.
 
 Add videos or drop files into a free playlist to store references to their paths. For a watched folder, Cadence copies external files and keeps the originals. Existing names get a suffix without overwriting. Drag items to reorder them. Playlist names and ordering persist between sessions.
+
+Single-click a video in the library to open only that video and start playback. The previous edit goes into Temporary for the session. Ctrl-click or Shift-click selects multiple files without opening them; dragging still reorders videos. For one file, progress and a Cancel button appear after one second if needed. For multiple files, they appear immediately.
 
 Remove from playlist never deletes files. Refresh rescans the selected folder and lists the files still present, including files removed from the playlist. Move to Recycle Bin is a separate context menu action with confirmation. Replace file path… locates a moved video; other playlists and projects are unaffected.
 

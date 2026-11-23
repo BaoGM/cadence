@@ -4,7 +4,7 @@ from ui_text import tr
 import math
 import numpy as np
 from PySide6.QtCore import Qt, Signal, QRectF, QPointF, QEvent, QVariantAnimation, QEasingCurve, QSize
-from PySide6.QtGui import QColor, QPainter, QPen, QFont, QImage, QPainterPath, QPolygonF
+from PySide6.QtGui import QColor, QPainter, QPen, QFont, QImage, QPainterPath, QPainterPathStroker, QPolygonF
 from PySide6.QtWidgets import QWidget, QDoubleSpinBox, QSpinBox, QMenu, QPushButton
 from media import exposure_lut
 from model import locate
@@ -96,9 +96,19 @@ class TransportButton(QPushButton):
         elif symbol in ('loop','once'):
             if symbol=='once':
                 pen=QPen(p.pen()); pen.setColor(MUTED); p.setPen(pen)
-            path.moveTo(10,2); path.lineTo(10,8); path.lineTo(7,11); path.lineTo(-7,11); path.lineTo(-10,8); path.lineTo(-10,-4); path.lineTo(-7,-7); path.lineTo(10,-7); p.drawPath(path)
-            path=QPainterPath(); path.moveTo(5,-12); path.lineTo(10,-7); path.lineTo(5,-2); p.drawPath(path)
-            if symbol=='once': p.drawLine(QPointF(-11,-12),QPointF(11,12))
+            path.moveTo(10, 2)
+            for x, y in ((10, 8), (7, 11), (-7, 11), (-10, 8), (-10, -4), (-7, -7), (8.5, -7)):
+                path.lineTo(x, y)
+            path.moveTo(5, -12)
+            path.lineTo(10, -7)
+            path.lineTo(5, -2)
+            outline = QPainterPathStroker(p.pen()).createStroke(path)
+            p.fillPath(outline, p.pen().brush())
+            if symbol=='once':
+                corner_center = QPointF(-8.5, -5.5)
+                lower_tip = QPointF(11, 12)
+                upper_tip = corner_center + (corner_center - lower_tip) / 6
+                p.drawLine(upper_tip, lower_tip)
         else:
             p.drawLine(QPointF(-11,0),QPointF(11,0)); path.moveTo(4,-7); path.lineTo(11,0); path.lineTo(4,7); p.drawPath(path)
 
@@ -842,8 +852,7 @@ class Timeline(TrackRows,QWidget):
         self.drag_animation.stop(); self.anchor=None; self.gesture=None; self.move_span=None; self.drop_frame=None; self.ghost_x=None; self.animated_x=None; self.update(); self.finish_range_drag()
 
     def mouseDoubleClickEvent(self,e):
-        if self.double_click_media(e): return
-        if e.button()!=Qt.MouseButton.LeftButton or not e.modifiers()&Qt.KeyboardModifier.ShiftModifier:
+        if e.button()!=Qt.MouseButton.LeftButton or e.modifiers()!=Qt.KeyboardModifier.NoModifier:
             return super().mouseDoubleClickEvent(e)
         if self.simple:
             if not self.simple_track_rect().contains(e.position()): return
@@ -853,11 +862,23 @@ class Timeline(TrackRows,QWidget):
             if media is None: return
             top=next(y for row,y,height in self.media_rows() if row.info.id==media.info.id)
             track='audio' if media.info.audio_expanded and e.position().y()>=top+26 else 'video'
+            if e.position().x()<18: e.accept(); return
         if not media.length: return
+        a,b=0,media.length
+        frame=self.raw_frame(e.position().x())
+        if e.position().x()>=self.track_left():
+            at=0
+            for segment in (media.audio if track=='audio' else media.segments):
+                end=at+segment.length
+                if at<=frame<end:
+                    if segment.media is not None: a,b=at,end
+                    break
+                at=end
         self.mediaTrackSelected.emit(media.info.id,'replace')
         self.active_media_id=media.info.id
         if hasattr(self,'_timeline_drag'): self._timeline_drag.finish()
         self.media_title_drag=None; self.anchor=None; self.gesture=None; self.selection_track=track
-        self.selectionDragged.emit(0,media.length,min(media.length-1,self.frame_for(e.position().x())))
+        self.cross_origin=None; self.cross_target=None; self.move_span=None
+        self.selectionDragged.emit(a,b,min(b-1,max(a,int(frame))))
         self.finish_range_drag(); self.update(); e.accept()
 

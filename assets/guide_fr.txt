@@ -1,4 +1,4 @@
-Cadence 1.18.3 - Guide rapide
+Cadence 1.18.4 - Guide rapide
 
 Les raccourcis indiqués sont ceux par défaut. Leur liste complète figure à la fin du guide ; ils se personnalisent dans Fichier > Options > Raccourcis.
 
@@ -26,7 +26,7 @@ Glissez sur la timeline pour déplacer la lecture. Avec l'outil Curseur (Q), gli
 
 Maj + glisser sélectionne une plage tout en affichant l'image courante. On peut appuyer sur Maj pendant un glissement déjà commencé. Relâchez la souris avant Maj pour garder la sélection ; l'ordre inverse repasse en déplacement de lecture.
 
-Maj + double-clic sur une piste, son titre ou sa bande vidéo/audio sélectionne toute la longueur de cette piste, y compris sur la timeline allégée. I et O posent les bornes au curseur ; Échap efface la sélection. La lecture se limite à la plage sélectionnée, dont la longueur apparaît au centre.
+Un double-clic sur un média sélectionne toute sa durée, y compris sur la timeline allégée. Un double-clic sur le titre d’une piste ou sur une zone vide de celle-ci sélectionne toute la piste. Aucune touche supplémentaire n’est nécessaire. I et O posent les bornes au curseur ; Échap efface la sélection. La lecture se limite à la plage sélectionnée, dont la longueur apparaît au centre.
 
 ----------------------------------------
 Modifier la timeline
@@ -35,7 +35,7 @@ Une piste média réunit une bande vidéo et une bande audio. Le bouton « + Pis
 
 Les pistes sont nommées Piste 1 et Piste 2. Cliquez sur un titre pour sélectionner une piste. Ctrl+clic ajoute ou retire une piste de la sélection, sur son titre comme dans sa timeline. Les modifications portent sur les pistes sélectionnées. Glissez un titre au-dessus ou au-dessous de l’autre pour changer leur ordre. Le clic droit sur le titre permet aussi de déplacer ou supprimer toute la piste. Ctrl+Z annule ces actions. Les bandes audio sont repliées au départ : cliquez sur le triangle près du titre pour les déployer.
 
-Double-cliquez sur le titre ou la timeline d’une piste pour déployer ou replier sa bande audio. Le clic droit permet de désactiver ou réactiver tout son audio, y compris à l’export. Lorsque les deux pistes sont sélectionnées, glissez un média vers l’autre piste pour y déplacer sa vidéo et son audio ensemble. La portion d’origine est retirée et les clips suivants sont rapprochés, sans laisser de clip vide. Alt+Maj+glisser le copie en conservant la source. Les clés de dessin apparaissent au-dessus de la barre de lecture, sans recouvrir les chiffres, même en timeline simplifiée.
+Cliquez sur le chevron près du titre, ou utilisez le clic droit, pour déployer ou replier la bande audio. Le clic droit permet aussi de désactiver ou réactiver tout son audio, y compris à l’export. Lorsque les deux pistes sont sélectionnées, glissez un média vers l’autre piste pour y déplacer sa vidéo et son audio ensemble. La portion d’origine est retirée et les clips suivants sont rapprochés, sans laisser de clip vide. Alt+Maj+glisser le copie en conservant la source. Les clés de dessin apparaissent au-dessus de la barre de lecture, sans recouvrir les chiffres, même en timeline simplifiée.
 
 Les dessins, leurs clés et les marqueurs restent communs, au-dessus des deux pistes. Modifier une seule piste conserve les dessins à leur position ; avec les deux pistes sélectionnées, les dessins liés suivent les modifications.
 
@@ -175,6 +175,8 @@ Nouveautés 1.18 - bibliothèque et fenêtres
 Affichage > Afficher la liste de lecture (Ctrl+8) > Bibliothèque réunit les listes libres et les dossiers suivis. Nouveau… crée une liste vide, une liste depuis des fichiers ou suit un dossier existant. Les sous-dossiers se parcourent dans l’arborescence ; chaque dossier affiche ses vidéos directes, sans aplatir ses descendants.
 
 Ajouter des vidéos ou déposer des fichiers dans la liste conserve leurs chemins dans une liste libre. Dans un dossier suivi, Cadence copie les fichiers extérieurs et conserve les originaux. Un nom déjà utilisé reçoit un suffixe, sans écrasement. Glissez les éléments pour modifier leur ordre. Le nom et l’ordre des listes sont conservés entre les sessions.
+
+Un clic simple sur une vidéo de la bibliothèque ouvre uniquement cette vidéo et lance sa lecture. Le montage précédent rejoint Temporaire pour la session. Ctrl+clic ou Maj+clic permet de sélectionner plusieurs fichiers sans les ouvrir ; le glisser-déposer conserve le réordonnancement des vidéos. Pour un seul fichier, la progression et le bouton Annuler apparaissent après une seconde si nécessaire. Pour plusieurs fichiers, ils apparaissent immédiatement.
 
 Retirer de la liste ne supprime aucun fichier. Actualiser relit le dossier sélectionné et réaffiche les fichiers présents, y compris ceux retirés de la liste. Mettre à la corbeille est une action distincte du clic droit, avec confirmation. Remplacer le chemin… permet de retrouver une vidéo déplacée ; les autres listes et projets ne sont pas modifiés.
 

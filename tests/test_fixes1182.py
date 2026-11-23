@@ -92,16 +92,16 @@ def test_real_bulk_conversion_survives_cache_save_and_scrubbing(application, tmp
 
 
 @pytest.mark.parametrize('simple,title', [(True, False), (False, False), (False, True)])
-def test_shift_double_click_selects_clicked_track(window, application, simple, title):
+def test_double_click_selects_clicked_clip_or_track(window, application, simple, title):
     w = window; t = w.timeline; w.request_frame = lambda: None
     second = MediaTrack(TrackInfo('second', 'Piste 2'), (Segment('a', 0, 8), Segment('a', 10, 30)))
     w.doc.state = State((Segment('a', 0, 30), Segment('a', 0, 30)), second_track=second)
     w.doc.select_track('second'); t.simple = simple; w.refresh(); application.processEvents()
     point = QPoint(40 if title else round(t.x_for(13)),
                    round(t.simple_track_rect().center().y()) if simple else t.track_y('video')+9)
-    QTest.mouseDClick(t, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.ShiftModifier, point)
-    QTest.mouseRelease(t, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.ShiftModifier, point)
-    assert w.doc.state.selection == (0, 28)
+    QTest.mouseDClick(t, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
+    QTest.mouseRelease(t, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
+    assert w.doc.state.selection == ((0, 28) if title else (8, 28))
     assert w.doc.selected_track_ids == ('second',)
     assert t.gesture is None and t.media_title_drag is None
 

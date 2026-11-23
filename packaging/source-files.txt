@@ -65,6 +65,7 @@ docs/PUBLISHING.md
 docs/SIGNPATH_APPLICATION.md
 docs/UNINSTALL.md
 docs/release-notes-1.18.3.txt
+docs/release-notes-1.18.4.txt
 drag.py
 draw_fonts.py
 draw_selection.py
@@ -139,6 +140,7 @@ smoke.py
 smoke1180.py
 smoke1181.py
 smoke1182.py
+smoke1184.py
 sync3d.py
 sync3d_dialog.py
 sync3d_instances.py
@@ -175,6 +177,7 @@ tests/test_fixes1180.py
 tests/test_fixes1181.py
 tests/test_fixes1182.py
 tests/test_fixes1183.py
+tests/test_fixes1184.py
 tests/test_gaps180.py
 tests/test_gpu160.py
 tests/test_gpu190.py

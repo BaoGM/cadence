@@ -87,7 +87,8 @@ def test_track_body_selection_doubleclick_drag_and_audio_menu(application,clips,
         assert doc.selected_track_ids==(first,)
         QTest.mouseClick(timeline,Qt.LeftButton,Qt.ControlModifier,QPoint(x,88))
         QTest.mouseDClick(timeline,Qt.LeftButton,Qt.NoModifier,QPoint(x,88))
-        assert doc.state.second_track.info.audio_expanded
+        assert doc.state.selection==(0,48) and doc.selected_track_ids==(second,)
+        assert not doc.state.second_track.info.audio_expanded
         QTest.mouseDClick(timeline,Qt.LeftButton,Qt.NoModifier,QPoint(40,88))
         assert not doc.state.second_track.info.audio_expanded
         doc.select_track(first); doc.select_track(second,extend=True); window.refresh()

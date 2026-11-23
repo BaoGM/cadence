@@ -1,0 +1,13 @@
+Cadence 1.18.4 pour Windows (préversion non signée)
+
+- Un clic sur une vidéo de la bibliothèque ouvre uniquement cette vidéo et lance sa lecture. Le montage précédent reste dans Temporaire pour la session.
+- Un fichier qui s’ouvre rapidement ne fait plus apparaître de fenêtre de chargement. La progression et le bouton Annuler apparaissent après une seconde pour un fichier seul et immédiatement pour plusieurs fichiers. Une erreur de lecture depuis la bibliothèque s’affiche dans le panneau.
+- Un double-clic sur un clip sélectionne toute sa durée. Sur le titre d’une piste ou dans une zone vide, il sélectionne toute la piste.
+- Le bouton de lecture unique et les outils Flèche et Translation ont des pointes plus nettes. La bibliothèque reste utilisable en petite fenêtre.
+
+Windows 1.18.4 (unsigned preview)
+
+- Click a library video to play just that file. The previous edit is kept in Temporary for the session.
+- Quick single-file opens stay quiet. Cancellable progress appears after one second for one file and immediately for multiple files. Library playback errors appear in the panel.
+- Double-click a clip to select its duration, or a track title or gap to select the whole track.
+- Refined arrowheads for playback and drawing tools, with improved library layout in small windows.

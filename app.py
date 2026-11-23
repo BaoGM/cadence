@@ -33,7 +33,7 @@ from comparison import ComparisonMixin
 from draw_ui import DrawController
 from PySide6.QtWidgets import QGridLayout
 
-VERSION='1.18.3'
+VERSION='1.18.4'
 STYLE='''
 QMainWindow, QWidget { background:#11161d; color:#dce4ee; font-family:"Segoe UI"; font-size:13px; }
 QMenuBar { background:#11161d; color:#91a1b5; padding:3px; }
@@ -596,7 +596,7 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
             if not existing: self.doc=Document(Fraction(items[0]['fps']))
             self.doc.append_media(items); self.install_doc(self.doc)
             self.notify('Médias ajoutés dans l’ordre de sélection. Cadence harmonisée avec le projet ; audio lié.')
-        self.begin_task('Ajout de médias',prepare,success)
+        self.begin_media_open(paths, 'Ajout de médias', prepare, success)
 
     def editing_text(self): return isinstance(QApplication.focusWidget(),(QLineEdit,QAbstractSpinBox))
     def notify(self,text): self.last_notice=text; logging.info(text)
@@ -619,32 +619,60 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
         if choice==1: return self.save_project()
         return True
 
-    def begin_task(self,title,fn,success):
+    def begin_media_open(self, paths, title, prepare, success, on_error=None):
+        self.begin_task(title, prepare, success, progress_delay_ms=1000 if len(paths)==1 else 0, on_error=on_error)
+
+    def begin_task(self,title,fn,success,*,progress_delay_ms=0,on_error=None):
         if self.job: return
-        self.pause(); self.dialog=QProgressDialog(tr(title),tr('Annuler'),0,100,self); self.dialog.setWindowTitle(tr('Cadence')); self.dialog.setWindowModality(Qt.WindowModality.WindowModal); self.dialog.setMinimumDuration(0); self.dialog.setAutoClose(False); self.dialog.setAutoReset(False); self.dialog.setValue(0)
-        self.dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.pause()
         self._task_progress_value=0.
+        self._task_progress_message=title
         task=Task(fn,self); self.job=task
-        self.dialog.canceled.connect(task.cancel.set)
-        task.progress.connect(lambda p,m:self.task_progress(p,m))
+        timer=QTimer(task)
+        timer.setSingleShot(True)
+        timer.setTimerType(Qt.TimerType.PreciseTimer)
+        def show_progress():
+            if self.job is not task or task.isFinished() or task.cancel.is_set(): return
+            dialog=QProgressDialog(tr(self._task_progress_message),tr('Annuler'),0,100,self)
+            self.dialog=dialog
+            dialog.setWindowTitle(tr('Cadence'))
+            dialog.setWindowModality(Qt.WindowModality.WindowModal)
+            dialog.setAutoClose(False)
+            dialog.setAutoReset(False)
+            dialog.canceled.connect(task.cancel.set)
+            dialog.setValue(int(self._task_progress_value*100))
+            dialog.show()
+        def dismiss_progress():
+            timer.stop()
+            dialog,self.dialog=self.dialog,None
+            if dialog is not None:
+                dialog.reset()
+                dialog.hide()
+                dialog.deleteLater()
+        task.progress.connect(self.task_progress)
         def result(value):
-            if self.dialog: self.dialog.close(); self.dialog=None
+            dismiss_progress()
             success(value)
         def failed(text):
-            if self.dialog: self.dialog.close(); self.dialog=None
-            self.error(text)
+            dismiss_progress()
+            (on_error or self.error)(text)
         def cancelled():
-            if self.dialog: self.dialog.close(); self.dialog=None
+            dismiss_progress()
             self.notify('Opération annulée.')
         task.result.connect(result); task.failed.connect(failed); task.cancelled.connect(cancelled)
+        if progress_delay_ms:
+            timer.timeout.connect(show_progress)
+            timer.start(progress_delay_ms)
+        else:
+            show_progress()
         task.finished.connect(lambda:self.finish_task(task)); task.start()
     def task_progress(self,p,m):
         dialog = self.dialog
-        if dialog is None:
-            return
         from progress_values import bounded_progress
         value=bounded_progress(p,getattr(self,'_task_progress_value',0.),'Qt task_progress')
         self._task_progress_value=value
+        self._task_progress_message=m
+        if dialog is None: return
         percent=int(value*100)
         logging.info('Task progress: value=%r type=%s normalized=%r percent=%r percent_type=%s message=%r',p,type(p).__name__,value,percent,type(percent).__name__,m)
         dialog.setLabelText(tr(m))
@@ -682,7 +710,7 @@ class MainWindow(MediaTrackController,ComparisonMixin,QMainWindow):
             doc=Document(Fraction(media['fps'])); doc.append_media([media]); doc.undo_stack.clear(); doc.saved_signature=doc.signature(); self.install_doc(doc)
             self.notify('Média prêt. Glissez sur la vidéo pour scrubber ; Maj + glissez sur la timeline pour sélectionner.')
         quality=self.preferences.get('preview_quality','native')
-        self.begin_task('Préparation du média',lambda p,c:prepare_media(path,progress=p,cancel=c,quality=quality,defer_audio=True),success)
+        self.begin_media_open([path], 'Préparation du média',lambda p,c:prepare_media(path,progress=p,cancel=c,quality=quality,defer_audio=True),success)
     def install_doc(self,doc):
         self.scrub_audio.close()
         self.drawing.cancel(); self.timeline.selection_track='video'; self.clipboard_kind='media'

@@ -9,7 +9,8 @@ from PySide6.QtCore import QUrl
 from shiboken6 import isValid
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
                               QListWidget, QListWidgetItem, QAbstractItemView, QPushButton,
-                              QMenu, QFileDialog, QInputDialog, QMessageBox, QLabel, QSplitter)
+                              QMenu, QFileDialog, QInputDialog, QMessageBox, QSplitter, QApplication,
+                              QScrollArea, QLayout, QLabel)
 
 from playlist_store import PlaylistStore, scan_folder, has_subfolders, copy_into_folder, path_key, VIDEO_EXTENSIONS
 from ui_text import tr
@@ -17,12 +18,37 @@ from ui_text import tr
 
 class PlaylistFiles(QListWidget):
     filesDropped = Signal(list)
+    playRequested = Signal(str)
 
     def __init__(self):
         super().__init__()
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self.play_press = None
+
+    def mousePressEvent(self, event):
+        item = self.itemAt(event.position().toPoint())
+        self.play_press = (item.data(Qt.ItemDataRole.UserRole), event.position().toPoint()) if item and event.button() == Qt.MouseButton.LeftButton and event.modifiers() == Qt.KeyboardModifier.NoModifier else None
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self.play_press and (event.position().toPoint()-self.play_press[1]).manhattanLength() >= QApplication.startDragDistance():
+            self.play_press = None
+        super().mouseMoveEvent(event)
+
+    def startDrag(self, actions):
+        self.play_press = None
+        super().startDrag(actions)
+
+    def mouseReleaseEvent(self, event):
+        pressed = self.play_press; self.play_press = None
+        item = self.itemAt(event.position().toPoint())
+        path = item.data(Qt.ItemDataRole.UserRole) if item else None
+        super().mouseReleaseEvent(event)
+        if pressed and pressed[0] == path and event.button() == Qt.MouseButton.LeftButton and event.modifiers() == Qt.KeyboardModifier.NoModifier:
+            if (event.position().toPoint()-pressed[1]).manhattanLength() < QApplication.startDragDistance():
+                self.playRequested.emit(path)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls(): event.acceptProposedAction()
@@ -44,18 +70,26 @@ class PlaylistPanel(QWidget):
         super().__init__(window)
         self.w = window; self.temporary = []; self.serial = 0; self.current = None; self.rebuilding = False
         self.browsing = None; self.pending_open = None
+        self.pending_playback = None
+        self.play_timer = QTimer(self); self.play_timer.setInterval(20)
+        self.play_timer.timeout.connect(self.start_file_playback)
         self.store = None
         try: self.store = PlaylistStore()
         except (OSError, ValueError) as error:
             QTimer.singleShot(0, lambda text=str(error): window.error(text))
-        layout = QVBoxLayout(self); layout.setContentsMargins(2, 2, 2, 2)
+        outer = QVBoxLayout(self); outer.setContentsMargins(0, 0, 0, 0)
+        scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        content = QWidget(); scroll.setWidget(content); outer.addWidget(scroll)
+        layout = QVBoxLayout(content); layout.setContentsMargins(2, 2, 2, 2)
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         row = QHBoxLayout()
         new = QPushButton(tr('Nouveau…')); new.clicked.connect(self.create_menu); row.addWidget(new)
         self.open_button = QPushButton(tr('Ouvrir')); self.open_button.clicked.connect(self.open_current); row.addWidget(self.open_button)
         self.refresh_button = QPushButton(tr('Actualiser')); self.refresh_button.clicked.connect(lambda: self.browse(refresh=True)); row.addWidget(self.refresh_button)
         layout.addLayout(row)
         splitter = QSplitter(Qt.Orientation.Vertical)
-        self.tree = QTreeWidget(); self.tree.setHeaderHidden(True); self.tree.setMinimumHeight(60)
+        self.tree = QTreeWidget(); self.tree.setHeaderHidden(True)
+        self.tree.setMinimumHeight(self.tree.fontMetrics().height()+8)
         self.tree.currentItemChanged.connect(self.selected)
         self.tree.setExpandsOnDoubleClick(False)
         self.tree.itemDoubleClicked.connect(self.double_clicked)
@@ -63,16 +97,23 @@ class PlaylistPanel(QWidget):
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self.tree_menu)
         splitter.addWidget(self.tree)
-        self.files = PlaylistFiles(); self.files.setMinimumHeight(60)
+        self.files = PlaylistFiles(); self.files.setMinimumHeight(self.files.fontMetrics().height()+8)
         self.files.model().rowsMoved.connect(self.reordered)
         self.files.filesDropped.connect(self.add_paths)
+        self.files.playRequested.connect(self.play_file)
         self.files.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.files.customContextMenuRequested.connect(self.files_menu)
         splitter.addWidget(self.files); layout.addWidget(splitter, 1)
+        self.file_error = QLabel()
+        self.file_error.setTextFormat(Qt.TextFormat.PlainText)
+        self.file_error.setWordWrap(True)
+        self.file_error.hide()
+        layout.addWidget(self.file_error)
         row = QHBoxLayout()
         self.add_button = QPushButton(tr('Ajouter des vidéos…')); self.add_button.clicked.connect(self.add_files); row.addWidget(self.add_button)
         self.remove_button = QPushButton(tr('Retirer de la liste')); self.remove_button.clicked.connect(self.remove_files); row.addWidget(self.remove_button)
         layout.addLayout(row)
+        scroll.setMinimumWidth(280+scroll.verticalScrollBar().sizeHint().width())
         self.rebuild()
 
     def run(self, operation):
@@ -91,6 +132,7 @@ class PlaylistPanel(QWidget):
             saved = self.add_node(self.tree, tr('Listes enregistrées'), None)
             followed = self.add_node(self.tree, tr('Dossiers suivis'), None)
             temporary = self.add_node(self.tree, tr('Temporaire'), None)
+            self.temporary_group = temporary
             selection = None
             for entry in self.store.entries if self.store else []:
                 folder = entry.get('root')
@@ -131,6 +173,7 @@ class PlaylistPanel(QWidget):
         else: self.open_current()
 
     def show_files(self):
+        self.file_error.hide()
         self.rebuilding = True; self.files.clear()
         data = self.current; editable = bool(data and data[0] != 'temporary')
         self.refresh_button.setEnabled(editable)
@@ -343,6 +386,22 @@ class PlaylistPanel(QWidget):
         name = Path(doc.project_path).stem if doc.project_path else next((m['name'] for m in doc.media.values()), tr('Montage'))
         self.temporary.append(dict(id=self.serial, name=f'{self.serial}. {name} · {datetime.now():%H:%M:%S}', doc=doc,
                                    zoom=w.timeline.zoom, start=w.timeline.view_start))
+        self.add_node(self.temporary_group, self.temporary[-1]['name'], ('temporary', self.serial))
+
+    def play_file(self, path):
+        if self.w.job: return
+        self.open_paths([path], autoplay=True)
+
+    def show_file_error(self, message):
+        self.file_error.setText(tr(message))
+        self.file_error.show()
+
+    def start_file_playback(self):
+        doc = self.pending_playback
+        if doc is self.w.doc and self.w.job: return
+        self.play_timer.stop(); self.pending_playback = None
+        if doc is self.w.doc and not self.w.transport.running:
+            self.w.toggle_play()
 
     def open_current(self):
         if self.w.job or not self.current: return
@@ -354,17 +413,29 @@ class PlaylistPanel(QWidget):
             w.install_doc(record['doc']); w.timeline.zoom = record['zoom']; w.timeline.view_start = record['start']
             w.sync_timeline_scroll(); self.current = None; self.rebuild(); return
         paths = self.store.files(identity, folder)
+        self.open_paths(paths)
+
+    def open_paths(self, paths, autoplay=False):
+        w = self.w
+        if w.job: return
         if not paths: return
+        self.file_error.hide()
+        report_error = self.show_file_error if autoplay else w.error
         missing = [p for p in paths if not Path(p).is_file()]
         if missing:
-            w.error(tr('Vidéos introuvables. Actualisez le dossier ou corrigez les chemins avant d’ouvrir la liste.') + '\n\n' + '\n'.join(missing)); return
+            report_error(tr('Vidéos introuvables. Actualisez le dossier ou corrigez les chemins avant d’ouvrir la liste.') + '\n\n' + '\n'.join(missing)); return
         quality = w.preferences.get('preview_quality', 'native')
         def prepare(progress, cancel):
             from media import prepare_batch
             from model import Document
             items = prepare_batch(paths, None, progress, cancel, quality=quality, defer_audio=True)
             doc = Document(Fraction(items[0]['fps'])); doc.append_media(items); doc.undo_stack.clear()
+            if autoplay: doc.saved_signature = doc.signature()
             return doc
         def success(doc):
-            self.archive_current(); w.install_doc(doc); w.timeline.reset_view(); w.viewer.reset_view(); self.rebuild()
-        w.begin_task('Ouverture de la liste', prepare, success)
+            self.archive_current(); w.install_doc(doc); w.timeline.reset_view(); w.viewer.reset_view()
+            if autoplay:
+                self.pending_playback = doc; self.play_timer.start()
+            else: self.rebuild()
+        title = 'Préparation du média' if len(paths)==1 else 'Ouverture de la liste'
+        w.begin_media_open(paths, title, prepare, success, report_error)

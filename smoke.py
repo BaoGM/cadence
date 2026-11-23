@@ -477,6 +477,8 @@ def run(directory):
         result.update(check1181(win,output,media))
         from smoke1182 import check as check1182
         result.update(check1182(win,output,media))
+        from smoke1184 import check as check1184
+        result.update(check1184(win,output,media))
         (output/'result.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     finally:
         win.doc.saved_signature=win.doc.signature(); win.close(); app.processEvents()

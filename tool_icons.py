@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from PySide6.QtCore import Qt,QRectF,QPointF
-from PySide6.QtGui import QIcon,QPixmap,QPainter,QPen,QColor,QPainterPath,QPolygonF
+from PySide6.QtGui import QIcon,QPixmap,QPainter,QPen,QColor,QPainterPath,QPainterPathStroker,QPolygonF
 
 
 def tool_icon(tool):
@@ -12,7 +12,9 @@ def tool_icon(tool):
         if tool=='cursor':
             path=QPainterPath(QPointF(7,3)); path.lineTo(25,18); path.lineTo(17,19); path.lineTo(13,27); path.closeSubpath(); p.drawPath(path)
         elif tool=='arrow':
-            p.drawLine(QPointF(5,26),QPointF(26,5)); p.drawLine(QPointF(13,5),QPointF(26,5)); p.drawLine(QPointF(26,5),QPointF(26,18))
+            path=QPainterPath(QPointF(5,26)); path.lineTo(25.4,5.6)
+            path.moveTo(13,5); path.lineTo(26,5); path.lineTo(26,18)
+            p.fillPath(QPainterPathStroker(p.pen()).createStroke(path),color)
         elif tool=='rectangle': p.drawRoundedRect(QRectF(6,6,20,20),1,1)
         elif tool=='ellipse': p.drawEllipse(QRectF(5,5,22,22))
         elif tool=='brush':
@@ -32,10 +34,13 @@ def tool_icon(tool):
             p.drawRect(QRectF(7,7,18,18))
             for x,y in ((5,5),(23,5),(23,23),(5,23)): p.fillRect(QRectF(x,y,5,5),color)
         elif tool=='translate':
-            p.drawLine(QPointF(4,16),QPointF(28,16)); p.drawLine(QPointF(16,4),QPointF(16,28))
+            path=QPainterPath(QPointF(5,16)); path.lineTo(27,16)
+            path.moveTo(16,5); path.lineTo(16,27)
             for x,y,dx,dy in ((4,16,1,0),(28,16,-1,0),(16,4,0,1),(16,28,0,-1)):
-                p.drawLine(QPointF(x,y),QPointF(x+dx*5-dy*4,y+dy*5+dx*4))
-                p.drawLine(QPointF(x,y),QPointF(x+dx*5+dy*4,y+dy*5-dx*4))
+                path.moveTo(x+dx*5-dy*4,y+dy*5+dx*4)
+                path.lineTo(x,y)
+                path.lineTo(x+dx*5+dy*4,y+dy*5-dx*4)
+            p.fillPath(QPainterPathStroker(p.pen()).createStroke(path),color)
         elif tool=='crop':
             p.drawLine(QPointF(9,3),QPointF(9,24)); p.drawLine(QPointF(9,24),QPointF(30,24))
             p.drawLine(QPointF(3,9),QPointF(24,9)); p.drawLine(QPointF(24,9),QPointF(24,30))

@@ -2,7 +2,7 @@
 from PySide6.QtGui import QKeySequence
 
 
-REVISION=3
+REVISION=4
 CHANGES={
     'Affichage/Timecode / frames':('T','Alt+T'),
     'Dessin/Copier les clés':('Ctrl+Shift+C','C'),
@@ -18,7 +18,9 @@ CHANGES={
 
 def migrate(supplied,registry,revision):
     if revision==REVISION: return supplied
-    pending={key:new for key,(old,new) in CHANGES.items() if key in registry and isinstance(supplied.get(key,old),str) and QKeySequence(supplied.get(key,old))==QKeySequence(old)}
+    changes={} if revision==3 else dict(CHANGES)
+    changes['Aide/Guide rapide']=('','F1')
+    pending={key:new for key,(old,new) in changes.items() if key in registry and isinstance(supplied.get(key,old),str) and QKeySequence(supplied.get(key,old))==QKeySequence(old)}
     result={key:value for key,value in supplied.items() if key not in pending}
     for key,value in pending.items():
         candidate=QKeySequence(value)
@@ -26,3 +28,13 @@ def migrate(supplied,registry,revision):
             for other,saved in result.items() if other in registry and saved and isinstance(saved,str))
         result[key]='' if conflict else value
     return result
+
+
+def apply_aliases(registry):
+    assigned=[action.shortcut() for action,_ in registry.values() if not action.shortcut().isEmpty()]
+    for key,alternate in (('Aide/Guide rapide','?'),('Édition/Rétablir','Ctrl+Shift+Z')):
+        action,default=registry[key]
+        primary=action.shortcut()
+        alias=QKeySequence(alternate)
+        if primary==QKeySequence(default) and not any(alias.matches(s)!=QKeySequence.NoMatch or s.matches(alias)!=QKeySequence.NoMatch for s in assigned):
+            action.setShortcuts([primary,alias])

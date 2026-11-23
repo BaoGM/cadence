@@ -4,7 +4,7 @@ from dataclasses import replace
 import math
 from PySide6.QtCore import Qt,QObject,QEvent,QPointF,QRectF,QSignalBlocker,Signal,QSize
 from PySide6.QtGui import QColor,QPainter,QPen,QConicalGradient,QLinearGradient,QTransform,QPointingDevice,QFont,QActionGroup,QPainterPath,QCursor
-from PySide6.QtWidgets import QWidget, QFrame, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QComboBox, QCheckBox, QPushButton, QDockWidget, QScrollArea, QLineEdit, QListWidget, QListWidgetItem, QInputDialog, QTabWidget, QAbstractItemView, QMenu, QToolButton, QButtonGroup
+from PySide6.QtWidgets import QWidget, QFrame, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QComboBox, QCheckBox, QPushButton, QDockWidget, QScrollArea, QLineEdit, QListWidget, QListWidgetItem, QInputDialog, QTabWidget, QAbstractItemView, QMenu, QToolButton, QButtonGroup, QSizePolicy
 from widgets import ScrubDoubleSpinBox,ScrubSpinBox
 from draw_selection import DrawSelection
 from tool_icons import tool_icon
@@ -61,32 +61,38 @@ class DrawController(QObject):
     def __init__(self,window):
         super().__init__(window); self.win=window; self.viewer=window.viewer; self.enabled=False; self.stroke=None; self.tablet_down=False; self.cache=None; self.list_signature=None; self.selection=DrawSelection(self); self.text_drag=None; self.tool_buttons={}; self.tool_actions={}
         from drawing_cache import DrawingRasterCache
+        self.text_editor=None
         self.raster_cache=DrawingRasterCache()
         self.panel=QDockWidget(tr('Draw over'),window); self.panel.setObjectName('draw_over'); self.panel.setMinimumWidth(200)
-        content=QWidget(); col=QVBoxLayout(content); col.setContentsMargins(14,12,14,12)
-        def title(text): col.addWidget(QLabel(tr(text)))
+        from library_style import INSPECTOR_STYLE, inspector_heading, style_button, icon
+        content=QWidget(); content.setObjectName('studioInspector'); content.setStyleSheet(INSPECTOR_STYLE)
+        col=QVBoxLayout(content); col.setContentsMargins(10,6,10,10); col.setSpacing(5)
+        inspector_heading(col,'Calque','refs')
         self.size_drag=None; self.shape_drag=None; self.sampling=False; self.temporary_picker=False; self.last_tool='brush'
         self.visible=QCheckBox(tr('Afficher le calque de dessins')); self.visible.setChecked(True); self.visible.toggled.connect(self.invalidate); col.addWidget(self.visible)
         self.export=QCheckBox(tr('Inclure les dessins à l’export')); self.export.setChecked(True); col.addWidget(self.export)
         outer=col; tabs=QTabWidget(); outer.addWidget(tabs)
         tools_page=QWidget(); keys_page=QWidget()
-        tabs.addTab(tools_page,tr('Outils')); tabs.addTab(keys_page,tr('Clés'))
-        col=QVBoxLayout(tools_page); col.setContentsMargins(4,8,4,4)
+        tabs.addTab(tools_page,icon('pen'),tr('Outils')); tabs.addTab(keys_page,icon('key'),tr('Clés'))
+        col=QVBoxLayout(tools_page); col.setContentsMargins(0,7,0,2); col.setSpacing(5)
         self.tool=QComboBox()
         for text,value,key in TOOL_SPECS: self.tool.addItem(tr(text),value)
         self.tool.currentIndexChanged.connect(self.tool_changed); self.tool.hide()
         toolrow=QGridLayout(); self.tool_group=QButtonGroup(self); self.tool_group.setExclusive(True)
         for i,(tool_title,name,key) in enumerate(TOOL_SPECS):
             tip=tool_title+' · '+key.replace('Shift','Maj')
-            b=QToolButton(); b.setIcon(tool_icon(name)); b.setIconSize(QSize(26,26)); b.setFixedSize(44,40); b.setCheckable(True); b.setChecked(name=='cursor'); b.setToolTip(tr(tip)); b.setAccessibleName(tr(tool_title)); b.clicked.connect(lambda checked=False,t=name:self.choose_tool(t)); self.tool_group.addButton(b); toolrow.addWidget(b,i//3,i%3); self.tool_buttons[name]=b
-        toolrow.setAlignment(Qt.AlignmentFlag.AlignHCenter); col.addLayout(toolrow)
-        tool_separator=QFrame(); tool_separator.setObjectName('drawing_tool_separator'); tool_separator.setFrameShape(QFrame.Shape.HLine); tool_separator.setStyleSheet('color:#354354;'); col.addWidget(tool_separator)
+            b=QToolButton(); b.setIcon(tool_icon(name)); b.setIconSize(QSize(18,18)); b.setMinimumWidth(26); b.setFixedHeight(29); b.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Fixed); b.setCheckable(True); b.setChecked(name=='cursor'); b.setToolTip(tr(tip)); b.setAccessibleName(tr(tool_title)); b.clicked.connect(lambda checked=False,t=name:self.choose_tool(t)); self.tool_group.addButton(b); toolrow.addWidget(b,i//5,i%5); self.tool_buttons[name]=b
+        for column in range(5): toolrow.setColumnStretch(column,1)
+        toolrow.setSpacing(3); col.addLayout(toolrow)
+        inspector_heading(col,'Trait','brush-size')
         self.text_controls=QWidget(); textcol=QVBoxLayout(self.text_controls); textcol.setContentsMargins(0,0,0,0)
         self.font_combo=DrawingFontCombo(); self.font_combo.currentFontChanged.connect(self.text_style_changed); textcol.addWidget(self.font_combo)
-        stylerow=QHBoxLayout(); self.style_buttons={}
+        stylerow=QHBoxLayout(); stylerow.setSpacing(3); self.style_buttons={}
         for name,label,tip in [('bold','G','Gras'),('italic','I','Italique'),('underline','S','Souligné'),('strikeout','abc','Barré')]:
-            b=QToolButton(); b.setText(tr(label)); b.setToolTip(tr(tip)); b.setAccessibleName(tr(tip)); b.setCheckable(True); b.setMinimumSize(32,28); font=QFont('Arial'); getattr(font,{'bold':'setBold','italic':'setItalic','underline':'setUnderline','strikeout':'setStrikeOut'}[name])(True); b.setFont(font); b.toggled.connect(self.text_style_changed); stylerow.addWidget(b); self.style_buttons[name]=b
-        textcol.addLayout(stylerow); hint=QLabel(tr('Glisser pour tracer une zone. Le texte s’ajuste à sa taille. Tirer un coin pour redimensionner ; double-clic pour éditer.')); hint.setWordWrap(True); textcol.addWidget(hint); col.addWidget(self.text_controls); self.text_controls.hide()
+            b=QToolButton(); b.setText(tr(label)); b.setToolTip(tr(tip)); b.setAccessibleName(tr(tip)); b.setCheckable(True); b.setMinimumSize(32,28); b.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Fixed); font=QFont('Arial'); getattr(font,{'bold':'setBold','italic':'setItalic','underline':'setUnderline','strikeout':'setStrikeOut'}[name])(True); b.setFont(font); b.toggled.connect(self.text_style_changed); stylerow.addWidget(b,1); self.style_buttons[name]=b
+        textcol.addLayout(stylerow)
+        col.addWidget(self.text_controls)
+        self.text_controls.hide()
         self.size=ScrubDoubleSpinBox(); self.size.setRange(.5,400); self.size.setValue(8); self.size.setSuffix(tr(' px')); self.size.setSingleStep(1)
         self.opacity=ScrubDoubleSpinBox(); self.opacity.setRange(1,100); self.opacity.setValue(100); self.opacity.setSuffix(tr(' %')); self.opacity.setSingleStep(5); self.opacity.valueChanged.connect(self.change_selection_opacity); self.opacity.editingFinished.connect(self.finish_opacity_edit)
         self.sensitivity=ScrubDoubleSpinBox(); self.sensitivity.setRange(.1,5); self.sensitivity.setValue(1); self.sensitivity.setSingleStep(.1); self.sensitivity.setDecimals(2)
@@ -95,22 +101,23 @@ class DrawController(QObject):
         for row,(text,widget) in enumerate([('Taille',self.size),('Opacité',self.opacity),('Sensibilité',self.sensitivity)]):
             values.addWidget(QLabel(tr(text)),row,0); values.addWidget(widget,row,1)
         col.addLayout(values)
+        inspector_heading(col,'Couleur','color')
         self.wheel=ColorWheel(); col.addWidget(self.wheel); self.hex=QLineEdit(self.wheel.color()); self.hex.setMaxLength(7); self.hex.setPlaceholderText(tr('#RRGGBB')); col.addWidget(self.hex)
         self.wheel.changed.connect(self.hex.setText); self.wheel.edited.connect(self.recolor_selection); self.wheel.editFinished.connect(self.finish_color_edit); self.hex.editingFinished.connect(self.read_color)
-        tools_col=col; col=QVBoxLayout(keys_page); col.setContentsMargins(4,8,4,4)
+        tools_col=col; col=QVBoxLayout(keys_page); col.setContentsMargins(0,7,0,2); col.setSpacing(5)
         row=QHBoxLayout()
         for text,fn in [('Dupliquer la clé au curseur',self.copy_key)]:
-            b=QPushButton(tr(text)); b.clicked.connect(fn); row.addWidget(b)
+            b=style_button(QPushButton(tr(text)),'plus'); b.clicked.connect(fn); row.addWidget(b)
         col.addLayout(row)
         self.scope=QLabel(); self.scope.setWordWrap(True); col.addWidget(self.scope)
         self.keys=QListWidget(); self.keys.setMinimumHeight(150); self.keys.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection); self.keys.itemClicked.connect(self.key_clicked); self.keys.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu); self.keys.customContextMenuRequested.connect(self.keys_context); col.addWidget(self.keys)
         row=QHBoxLayout()
         for text,fn in [('Supprimer la sélection',self.delete_key)]:
-            b=QPushButton(tr(text)); b.clicked.connect(fn); row.addWidget(b)
+            b=style_button(QPushButton(tr(text)),'minus'); b.clicked.connect(fn); row.addWidget(b)
         col.addLayout(row)
         col.addStretch()
         col=tools_col
-        separator=QFrame(); separator.setFrameShape(QFrame.Shape.HLine); separator.setStyleSheet('color:#354354;'); col.addWidget(separator)
+        inspector_heading(col,'Pelure d’oignon','refs')
         onion_values=QGridLayout(); onion_values.setColumnStretch(1,1)
         self.onion=QCheckBox(tr('Activer la pelure d’oignon')); col.addWidget(self.onion); self.onion.toggled.connect(self.invalidate)
         self.before=ScrubSpinBox(); self.after=ScrubSpinBox()
@@ -118,7 +125,8 @@ class DrawController(QObject):
         for row,(text,widget) in enumerate([('Images précédentes',self.after),('Images suivantes',self.before)]):
             widget.setRange(0,300); widget.setValue(3); onion_values.addWidget(QLabel(tr(text)),row,0); onion_values.addWidget(widget,row,1); widget.setToolTip(tr('Portée continue en images vidéo ; 0 désactive ce sens.')); widget.valueChanged.connect(self.invalidate)
         self.ghost=ScrubSpinBox(); self.ghost.setRange(1,100); self.ghost.setValue(100); self.ghost.setSuffix(tr(' %')); self.ghost.valueChanged.connect(self.invalidate); onion_values.addWidget(QLabel(tr('Opacité')),2,0); onion_values.addWidget(self.ghost,2,1); col.addLayout(onion_values); col.addStretch()
-        scroll=QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(content); self.panel.setWidget(scroll)
+        scroll=QScrollArea(); scroll.setFrameShape(QScrollArea.Shape.NoFrame); scroll.setWidgetResizable(True); scroll.setWidget(content); self.panel.setWidget(scroll)
+        self.panel.setMinimumWidth(max(200,content.minimumSizeHint().width()+scroll.verticalScrollBar().sizeHint().width()))
         window.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea,self.panel); self.panel.hide()
         self.viewer.installEventFilter(self); self.viewer.draw_controller=self
     def menus(self):
@@ -138,7 +146,10 @@ class DrawController(QObject):
         w.timeline.drawingClipboardRequested.connect(lambda op,a,b:self.edit_clipboard(op,a,b))
         w.action(menu,'Supprimer les clés',self.delete_selected_keys,'D')
         w.action(menu,'Supprimer les marqueurs',self.delete_markers)
+        w.timeline.drawingKeyAdded.connect(self.add_single_key)
         w.timeline.markerAdded.connect(self.add_marker)
+        w.timeline.renameMarker.connect(self.rename_marker)
+        w.timeline.markerMoved.connect(self.move_marker)
         w.timeline.markersDeleted.connect(self.delete_markers)
     def navigate(self,sign):
         if self.win.editing_text() or self.win.job: return
@@ -154,12 +165,29 @@ class DrawController(QObject):
         frame=min(st.position,st.length-1) if frame is None or isinstance(frame,bool) else frame
         if not 0<=frame<st.length: return
         if w.doc.commit('Supprimer le marqueur' if frame in st.frame_markers else 'Ajouter un marqueur',replace(st,frame_markers=tuple(sorted(set(st.frame_markers)^{frame})))): w.refresh(); w.request_frame()
+    def move_marker(self,source,destination):
+        w=self.win
+        if w.job: return
+        w.pause(); self.finish()
+        if w.doc.move_marker(source,destination): w.refresh(); w.request_frame()
+    def rename_marker(self,frame):
+        w=self.win
+        if w.job or frame not in w.doc.state.frame_markers: return
+        w.pause()
+        name,accepted=QInputDialog.getText(w,tr('Renommer le marqueur…'),tr('Nom du marqueur'),text=dict(w.doc.state.marker_names).get(frame,''))
+        if accepted and w.doc.rename_marker(frame,name): w.refresh()
     def delete_markers(self,a=None,b=None):
         w=self.win
         if w.editing_text() or w.job: return
         st=w.doc.state
         if a is None or isinstance(a,bool): a,b=st.selection or (st.position,st.position+1)
         if w.doc.commit('Supprimer les marqueurs',replace(st,frame_markers=tuple(f for f in st.frame_markers if not a<=f<b))): w.refresh(); w.request_frame()
+    def add_single_key(self):
+        w=self.win
+        if w.editing_text() or w.job or not w.timeline.can_add_at_cursor(False): return
+        w.pause(); self.finish()
+        frame=w.doc.state.position
+        self.commit_key(DrawingKey(frame,frame+1),'Ajouter une clé de dessin vide')
     def blank_key(self):
         if self.win.editing_text() or self.win.job: return
         self.win.pause(); self.finish(); st=self.win.doc.state; a,b=st.selection or (st.position,st.position+1)
@@ -187,20 +215,20 @@ class DrawController(QObject):
         if not self.text_drag: return
         data=self.text_drag; rect=self.pending_text_rect(); self.text_drag=None; self.invalidate()
         if data['source'] is not self.win.doc.state.drawings: return
-        text,ok=QInputDialog.getMultiLineText(self.win,tr('Texte'),tr('Texte à ajouter dans la zone :'))
-        if ok and text.strip():
-            mark=replace(data['mark'],text=text[:10000],points=((rect.x(),rect.y(),1.),),box=(rect.width(),rect.height()),**self.text_style())
-            key=replace(data['key'],marks=data['key'].marks+(mark,)); self.commit_key(key,'Ajouter une zone de texte'); self.select_text(len(key.marks)-1,key)
+        mark=replace(data['mark'],points=((rect.x(),rect.y(),1.),),box=(rect.width(),rect.height()),**self.text_style())
+        self.open_text_editor(data['key'],None,mark)
+    def open_text_editor(self,key,index,mark):
+        from canvas_text import CanvasTextEditor
+        self.text_editor=CanvasTextEditor(self,key,index,mark)
+        self.text_editor.activate()
+        self.invalidate()
     def edit_text(self,pos):
         if self.tool.currentData()!='text': return
         self.text_drag=None; self.selection.gesture=None; self.selection.preview=None
         point=self.point(pos)
         if point is None or not self.selection.begin(point,'text'): return
         self.selection.gesture=None; self.selection.preview=None; key=self.selection.key; index=self.selection.indices[0]; mark=key.marks[index]; self.read_text_style(mark)
-        text,ok=QInputDialog.getMultiLineText(self.win,tr('Modifier le texte'),tr('Texte :'),mark.text)
-        if ok:
-            marks=tuple(replace(m,text=text[:10000]) if i==index else m for i,m in enumerate(key.marks)); updated=replace(key,marks=marks)
-            self.commit_key(updated,'Modifier le texte'); self.select_text(index,updated)
+        self.open_text_editor(key,index,mark)
     def read_color(self):
         if not self.wheel.set_color(self.hex.text()): self.hex.setText(tr(self.wheel.color()))
         else: self.recolor_selection(self.wheel.color())
@@ -285,6 +313,8 @@ class DrawController(QObject):
     def invalidate(self,*args): self.cache=None; self.viewer.update()
     def refresh(self):
         st=self.win.doc.state
+        if self.text_editor and (self.text_editor.source is not st.drawings or not self.text_editor.key.start<=st.position<self.text_editor.key.end):
+            self.text_editor.finish(True)
         if not st.drawings: self.raster_cache.clear(); self.cache=None
         self.selection.sync()
         if self.stroke and (st.position!=self.stroke_frame or st.drawings is not self.stroke_keys): self.cancel()
@@ -458,6 +488,7 @@ class DrawController(QObject):
         if math.hypot(point[0]-old[0],point[1]-old[1])<.0003 and abs(pressure-old[2])<.01: return
         self.stroke=replace(self.stroke,points=self.stroke.points+(point+(pressure,),)); self.invalidate()
     def finish(self):
+        if self.text_editor: self.text_editor.finish(True)
         self.finish_size_drag()
         self.finish_text_box()
         self.selection.finish()
@@ -473,10 +504,14 @@ class DrawController(QObject):
             self.viewer.setCursor(Qt.CursorShape.CrossCursor if self.enabled else Qt.CursorShape.OpenHandCursor)
             self.viewer.update()
     def cancel(self):
+        if self.text_editor: self.text_editor.finish(False)
         if self.size_drag: self.size.setValue(self.size_base)
         self.finish_size_drag(); self.text_drag=None; self.shape_drag=None; self.selection.clear(); self.stroke=None; self.tablet_down=False; self.invalidate()
     def eventFilter(self,obj,e):
         if not self.enabled or not self.viewer.loaded: return False
+        if self.text_editor and self.text_editor.pointer(e):
+            e.accept()
+            return True
         kind=e.type()
         pointer_press=kind in (QEvent.Type.MouseButtonPress,QEvent.Type.MouseButtonDblClick,QEvent.Type.TabletPress) and e.button()==Qt.MouseButton.LeftButton
         if pointer_press and (self.tool.currentData()=='picker' or self.picker_available(e.modifiers())):
@@ -516,7 +551,9 @@ class DrawController(QObject):
             self.finish(); e.accept(); return True
         if kind==QEvent.Type.MouseButtonDblClick and e.button()==Qt.MouseButton.LeftButton:
             self.edit_text(e.position()); e.accept(); return True
-        if kind in (QEvent.Type.Hide,QEvent.Type.WindowDeactivate): self.finish()
+        if kind in (QEvent.Type.Hide,QEvent.Type.WindowDeactivate):
+            self.text_drag=None
+            self.finish()
         return False
     def sample(self,point):
         color=self.viewer.sample_color(point)
@@ -527,6 +564,8 @@ class DrawController(QObject):
         rect=self.a_rect(size)
         if rect is None: return
         st=self.win.doc.state; keys=st.drawings; frame=st.position
+        if adornments and self.text_editor and self.text_editor.hidden_key:
+            keys=put_key(keys,self.text_editor.hidden_key)
         if self.selection.preview: keys=put_key(keys,self.selection.preview)
         if self.stroke: keys=put_key(keys,replace(self.stroke_key,marks=self.stroke_key.marks+(self.stroke,)))
         before=after=0
@@ -555,7 +594,10 @@ class DrawController(QObject):
             _,image,origin=self.cache
             target=QRectF(rect.x()+origin[0]*rect.width()/width,rect.y()+origin[1]*rect.height()/height,image.width()*rect.width()/width,image.height()*rect.height()/height)
             painter.drawImage(target,image)
-        if adornments and not (getattr(self.win,'clip_tools',None) and self.win.clip_tools.mode): self.selection.paint(painter,rect)
+        if adornments and self.text_editor:
+            self.text_editor.paint(painter,rect)
+        elif adornments and not (getattr(self.win,'clip_tools',None) and self.win.clip_tools.mode):
+            self.selection.paint(painter,rect)
         if self.size_drag and self.size_point:
             reference=next(iter(self.win.doc.media.values()),{}); radius=self.size.value()/max(1,reference.get('height',720))*rect.height()/2
             center=self.selection.display_transform(rect).map(QPointF(*self.size_point)); painter.save(); pen=QPen(QColor('#ffffff'),1); pen.setCosmetic(True); painter.setPen(pen); painter.setBrush(Qt.BrushStyle.NoBrush); painter.drawEllipse(center,radius,radius); painter.restore()

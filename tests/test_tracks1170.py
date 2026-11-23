@@ -148,7 +148,7 @@ def test_cadence_change_on_selected_or_both_tracks(monkeypatch):
     import threading
     from track_cadence import plan_tracks,build_tracks
     doc,first,second=two_tracks()
-    doc.state=replace(doc.state,drawings=(DrawingKey(30,31,()),),frame_markers=(35,))
+    doc.state=replace(doc.state,drawings=(DrawingKey(30,31,()),),frame_markers=(35,),marker_names=((35,'Contact'),))
     def prepare(path,fps,progress,cancel,quality,cadence):
         old=next(m for m in doc.media.values() if m['path']==path)
         return dict(old,id=old['id']+'-converted',frames=old['frames']*2,cadence=cadence)
@@ -158,7 +158,9 @@ def test_cadence_change_on_selected_or_both_tracks(monkeypatch):
     changed=convert()
     assert [t.length for t in changed.tracks]==[40,120]
     assert changed.drawings==doc.state.drawings and changed.frame_markers==(35,)
+    assert changed.marker_names==((35,'Contact'),)
     doc.select_track(first,extend=True)
     changed=convert()
     assert [t.length for t in changed.tracks]==[80,120]
     assert changed.drawings[0].start==60 and changed.frame_markers==(70,)
+    assert changed.marker_names==((70,'Contact'),)

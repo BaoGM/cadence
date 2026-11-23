@@ -53,7 +53,7 @@ def test_selected_cursor_decodes_live_video(window,application,prepared,simple):
     from media import PreviewReader
     w=window; media,_=prepared; d=Document(); d.media={media['id']:media}; d.state=State((Segment(media['id'],0,media['frames']),))
     d.saved_signature=d.signature(); w.install_doc(d); w.workspaces.set_timeline_simple(simple); application.processEvents()
-    t=w.timeline; y=35 if simple else 60
+    t=w.timeline; y=35 if simple else t.track_y('video')+9
     points={f:QPointF(t.x_for(f+.25),y) for f in (20,70,8)}
     mouse(t,QEvent.Type.MouseButtonPress,points[20],SHIFT)
     reader=PreviewReader()
@@ -76,10 +76,10 @@ def test_simplified_context_toggle_preserves_workspace_and_saved_mode(window,app
         action=next(a for a in menu.actions() if a.data()=='timeline_simple')
         assert action.isChecked()==bool(t.simple)
         action.trigger(); menu.deleteLater(); application.processEvents()
-    toggle(60)
-    assert t.simple and t.height()==64 and w.workspaces.mode=='edit'
+    toggle(t.track_y('video')+9)
+    assert t.simple and t.height()==52 and w.workspaces.mode=='edit'
     assert before=={k:p.isHidden() for k,p in w.workspaces.panels.items()} and w.doc.state.selection==(2,8)
     assert json.loads(w.workspaces.path.read_text(encoding='utf-8'))['simple']['edit']
     w.workspaces.switch('read'); w.workspaces.switch('edit'); assert t.simple
-    toggle(35); assert not t.simple and t.height()==80 and w.doc.state.selection==(2,8)
+    toggle(35); assert not t.simple and t.height()==t.media_height() and w.doc.state.selection==(2,8)
     assert not json.loads(w.workspaces.path.read_text(encoding='utf-8'))['simple']['edit']

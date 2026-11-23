@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
-from PySide6.QtCore import Qt,QRectF,QPointF
-from PySide6.QtGui import QColor,QPen,QPainterPath
-from PySide6.QtWidgets import QMenu
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QMenu
 from model import MediaTrack,TrackInfo
 from ui_text import tr
 
@@ -13,21 +12,32 @@ class TrackRows:
         return next((t for t in self.state.tracks if t.info.id==getattr(self,'active_media_id',None)),self.state.tracks[0])
 
     def media_rows(self):
-        y=47
+        y=73
         for track in self.state.tracks if self.state else ():
-            height=52 if track.info.audio_expanded else 26
+            height=self.video_height(track)+(22 if track.info.audio_expanded else 0)
             yield track,y,height
-            y+=height+7
+            y+=height
+
+    def video_height(self,track):
+        host=self.window()
+        if host is not self and host.height()<=620:
+            if host.height()<=440: return 44 if track.info.audio_expanded else 32
+            return 45 if track.info.audio_expanded else 34
+        return 57 if track.info.audio_expanded else 46
 
     def media_row_at(self,y):
-        return next((track for track,top,height in self.media_rows() if top-3<=y<top+height),None)
+        return next((track for track,top,height in self.media_rows() if top-3<=y<top+height-3),None)
 
     def media_track_y(self,kind):
-        top=next((y for track,y,height in self.media_rows() if track.info.id==self.active_media.info.id),47)
-        return (34 if self.simple else 40) if kind=='drawing' else top+26 if kind=='audio' else top
+        if self.simple:
+            if kind=='drawing': return 19
+            row=self.simple_track_rect()
+            return int(row.bottom() if kind=='audio' else row.top())
+        top=next((y for track,y,height in self.media_rows() if track.info.id==self.active_media.info.id),73)
+        return 31 if kind=='drawing' else top+self.video_height(self.active_media) if kind=='audio' else top
 
     def media_height(self):
-        return max((y+height+7 for track,y,height in self.media_rows()),default=73)
+        return max((y+height-3 for track,y,height in self.media_rows()),default=116)
 
     def activate_media_row(self,y):
         if self.simple: return
@@ -36,11 +46,41 @@ class TrackRows:
             self.active_media_id=track.info.id
             self.mediaTrackSelected.emit(track.info.id,'activate')
 
+    def can_add_at_cursor(self,marker):
+        if not self.state or not self.state.length: return False
+        frame=self.state.position
+        if not 0<=frame<self.state.length: return False
+        if marker:
+            from bisect import bisect_left
+            points=self.state.frame_markers
+            i=bisect_left(points,frame)
+            return i==len(points) or points[i]!=frame
+        from drawing import active_key
+        return active_key(self.state.drawings,frame) is None
+
     def press_media_title(self,event):
-        if self.simple or event.button()!=Qt.MouseButton.LeftButton or event.position().x()>=self.track_left(): return False
-        track=self.media_row_at(event.position().y())
+        if event.button()!=Qt.MouseButton.LeftButton or event.position().x()>=self.track_left(): return False
+        x,y=event.position().x(),event.position().y()
+        if self.simple:
+            if self.state and len(self.state.tracks)>1 and y>=26:
+                other=next(track for track in self.state.tracks if track.info.id!=self.active_media.info.id)
+                self.active_media_id=other.info.id
+                self.mediaTrackSelected.emit(other.info.id,'replace')
+                self.update()
+            event.accept()
+            return True
+        if y<44 and x>=self.track_left()-30 and self.state and self.state.length:
+            marker=y<22
+            if self.can_add_at_cursor(marker):
+                if marker: self.markerAdded.emit(self.state.position)
+                else: self.drawingKeyAdded.emit()
+            event.accept()
+            return True
+        track=self.media_row_at(y)
         if track is None: return False
-        if event.position().x()<18 and event.modifiers()==Qt.NoModifier:
+        if x>=self.track_left()-30 and event.modifiers()==Qt.NoModifier:
+            self.mediaAudioEnabled.emit(track.info.id,not track.info.audio_enabled)
+        elif x<23 and event.modifiers()==Qt.NoModifier:
             self.mediaAudioExpanded.emit(track.info.id,not track.info.audio_expanded)
         else:
             self.active_media_id=track.info.id
@@ -58,38 +98,46 @@ class TrackRows:
 
     def begin_cross_drag(self,event):
         self.cross_origin=None; self.cross_target=None; self.cross_copy=False
-        if self.simple or len(getattr(self,'selected_media_ids',()))!=2: return
+        if self.state.second_track is None: return
+        if self.simple and (not event.modifiers()&Qt.AltModifier or not self.simple_track_rect().contains(event.position())): return
         target=self.context_target(event.position().x(),event.position().y(),False)
         if target is None: return
         a,b,kind=target
         from model import locate
         if all(locate(segments,a)[0] is None for segments in (self.active_media.segments,self.active_media.audio)): return
         self.cross_origin=(self.active_media.info.id,a,b)
+        self.cross_press_y=event.position().y()
 
     def update_cross_drag(self,event,x):
         origin=getattr(self,'cross_origin',None)
         if origin is None or self.gesture not in ('scrub','move','copy','transfer'): return False
-        target=self.media_row_at(event.position().y())
+        pos=event.position()
+        if self.simple:
+            in_title=(0<=pos.x()<self.track_left() and self.simple_track_rect().top()<=pos.y()<self.height())
+            target=next((t for t in self.state.tracks if t.info.id!=origin[0]),None) if in_title else None
+        else:
+            target=self.media_row_at(pos.y()) if self.rect().contains(pos.toPoint()) else None
         if target is None or target.info.id==origin[0]:
             self.cross_target=None
             if self.gesture=='transfer': self.update(); return True
             return False
+        if self.gesture=='scrub' and abs(pos.y()-self.cross_press_y)<QApplication.startDragDistance(): return False
         self.cross_target=target.info.id
         if self.gesture!='transfer':
             self.cross_copy=self.gesture=='copy'
             if self.move_span: self.cross_origin=(origin[0],self.move_span[0],self.move_span[1])
             else:
                 self.move_span=(origin[1],origin[2],'video')
-                self.grab_offset=self.x_for(self.anchor)-self.x_for(origin[1])
+                self.grab_offset=self.x_for(self.drag_frame)-self.x_for(origin[1])
             self.gesture='transfer'; self.finish_range_drag()
-        frame=max(0,min(self.state.length,round(self.raw_frame(x)))); at=0
+        if self.simple: x=self.x_for(origin[1])+self.grab_offset
+        frame=max(0,min(self.state.length,round(self.raw_frame(x-self.grab_offset)))); at=0
         for segment in target.segments:
             end=at+segment.length
             if at<frame<end and segment.media is not None:
                 frame=at if frame-at<=end-frame else end; break
             at=end
-        self.drag_animation.stop(); self.drop_frame=frame; self.animated_x=self.x_for(frame)
-        self.ghost_x=x-self.grab_offset; self.update(); return True
+        self.snap_drop(frame,x); return True
 
     def release_media_title(self,event):
         drag=getattr(self,'media_title_drag',None)
@@ -100,28 +148,6 @@ class TrackRows:
             self.mediaTrackReordered.emit(drag[0],1 if event.position().y()>drag[1] else -1)
         event.accept()
         return True
-
-    def paint_media_titles(self,painter):
-        selected=getattr(self,'selected_media_ids',(self.active_media.info.id,))
-        for index,(track,y,height) in enumerate(self.media_rows()):
-            active=track.info.id in selected
-            area=QRectF(1,y-3,self.track_left()-4,height)
-            painter.setPen(QPen(QColor('#68e0cf' if active else '#35434e'),1))
-            painter.setBrush(QColor('#243a43' if active else '#17212a'))
-            painter.drawRoundedRect(area,3,3)
-            painter.setPen(QColor('#d5eaf1' if active else '#91a1b5'))
-            path=QPainterPath()
-            points=((6,y+7),(10,y+11),(14,y+7)) if track.info.audio_expanded else ((8,y+5),(12,y+9),(8,y+13))
-            path.moveTo(QPointF(*points[0]))
-            for point in points[1:]: path.lineTo(QPointF(*point))
-            painter.setPen(QPen(QColor('#d5eaf1' if active else '#91a1b5'),1.5,Qt.PenStyle.SolidLine,Qt.PenCapStyle.RoundCap,Qt.PenJoinStyle.RoundJoin))
-            painter.drawPath(path)
-            painter.drawText(QRectF(18,y,self.track_left()-24,19),Qt.AlignmentFlag.AlignCenter,tr(track.info.name))
-            if track.info.audio_expanded:
-                if not track.info.audio_enabled: painter.setPen(QColor('#85888d'))
-                painter.drawText(QRectF(18,y+26,self.track_left()-24,19),Qt.AlignmentFlag.AlignCenter,tr('AUDIO'))
-            painter.setPen(QColor('#27313e'))
-            if index: painter.drawLine(0,y-7,self.width(),y-7)
 
     def media_header_menu(self,pos):
         if self.simple or pos.x()>=self.track_left(): return None

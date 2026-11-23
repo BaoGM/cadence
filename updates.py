@@ -68,7 +68,7 @@ class Release:
     def url(self):
         return self.base + self.filename
 
-def select_release(releases, current, installed, previews=False):
+def select_release(releases, current, installed, previews=False, *, studio=False):
     if not isinstance(releases, list):
         raise ValueError('Invalid release list')
     candidates = []
@@ -77,8 +77,10 @@ def select_release(releases, current, installed, previews=False):
             continue
         tag = item.get('tag_name', '')
         try:
-            version = tag.removeprefix('v').removesuffix('-windows')
-            if tag not in ('v'+version,'v'+version+'-windows') or version_tuple(version) <= version_tuple(current):
+            suffix = '-windows-studio2' if studio else '-windows'
+            version = tag.removeprefix('v').removesuffix(suffix)
+            valid_tags = ('v'+version+suffix,) if studio else ('v'+version, 'v'+version+suffix)
+            if tag not in valid_tags or version_tuple(version) <= version_tuple(current):
                 continue
         except (ValueError, AttributeError):
             continue
@@ -97,7 +99,7 @@ def select_release(releases, current, installed, previews=False):
     return max(candidates, key=lambda r: version_tuple(r.version), default=None)
 
 def check(current, installed, previews=False):
-    return select_release(read_json(RELEASES_URL), current, installed, previews)
+    return select_release(read_json(RELEASES_URL), current, installed, previews, studio=True)
 
 def package_descriptor(release):
     from update_store import verify_signature,signed_message
@@ -155,3 +157,4 @@ def verify_package(path, digest):
 
 def installed_copy(executable):
     return (Path(executable).resolve().parent / 'uninstall' / 'unins000.exe').is_file()
+

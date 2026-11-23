@@ -30,6 +30,13 @@ class HoverTransport(QObject):
         QApplication.instance().installEventFilter(self)
         self.schedule()
 
+    def close(self):
+        QApplication.instance().removeEventFilter(self)
+        self.dock.visibilityChanged.disconnect(self.schedule)
+        self.deferred.stop()
+        self.pointer_check.stop()
+        self.overlay.hide()
+
     def schedule(self, *args):
         if not self.deferred.isActive(): self.deferred.start(0)
 

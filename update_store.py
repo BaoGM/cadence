@@ -37,7 +37,7 @@ def shared_install(base):
         folder=os.environ.get(name)
         if folder and base.is_relative_to(Path(folder)): return True
     try:
-        key=r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Cadence.Hybrid_is1'
+        key=r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Cadence.Hybrid.Studio2_is1'
         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,key) as handle:
             folder=winreg.QueryValueEx(handle,'InstallLocation')[0]
         return bool(folder) and base.parent==Path(folder).resolve()

@@ -27,7 +27,7 @@ GROUPS={
         ['Afficher la timeline','Afficher le bandeau supérieur',
          'Afficher les commandes de lecture','Afficher le time code','Afficher la liste de lecture','Afficher la barre d’outils','Afficher les outils de dessin','Afficher les réglages de comparaison'],
         # Preserve the requested usage order: zoom/reset, fullscreen, mirrors, units.
-        ['Réinitialiser le canvas','Zoom vidéo +','Zoom vidéo −','Plein écran vidéo','Dupliquer l’image vidéo','Flip - miroir vertical','Flop - miroir horizontal','Timecode / frames'],
+        ['Réinitialiser le canvas','Zoom vidéo +','Zoom vidéo −','Plein écran vidéo','Dupliquer l’image vidéo','Flip - miroir vertical','Flop - miroir horizontal','Timecode / frames','Basculer entre les vues de la timeline'],
         ['Mode Lecture / Édition','Options des modes Lecture / Édition…'],
         ['Modifier la disposition des panneaux'],
         ['Réinitialiser la disposition des panneaux']],
@@ -113,7 +113,11 @@ class BackgroundPanelMenu(QObject):
         plain=(QWidget,QFrame,QLabel,QDockWidget,QToolBar,QStatusBar)
         if type(obj) not in plain and obj not in (w,w.viewer): return False
         # Use the original hit widget even when Qt propagates an ignored context event.
-        target=(QApplication.widgetAt(event.globalPos()) if event.reason()==event.Reason.Mouse else QApplication.focusWidget()) or obj
+        if event.reason()==event.Reason.Mouse:
+            surface=obj.window()
+            target=surface.childAt(surface.mapFromGlobal(event.globalPos())) or obj
+        else:
+            target=QApplication.focusWidget() or obj
         if not self.belongs(target): return False
         if target.contextMenuPolicy()!=Qt.ContextMenuPolicy.DefaultContextMenu: return False
         if type(target) not in plain and target not in (w,w.viewer): return False

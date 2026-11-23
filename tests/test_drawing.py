@@ -5,7 +5,7 @@ from dataclasses import replace,asdict
 from fractions import Fraction
 import numpy as np
 import pytest
-sys.path.insert(0,str(Path(__file__).parent))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from drawing import Mark,DrawingKey,put_key,active_key,render_marks,render_layer,load_keys
 from model import Document,State,Segment
 from PySide6.QtCore import Qt,QPointF,QEvent
@@ -126,12 +126,15 @@ def test_export_exact_draw_range_and_eraser(application,tmp_path):
     with av.open(str(target)) as c: frames=[f.to_ndarray(format='rgb24') for f in c.decode(video=0)]
     assert frames[3][45,120,0]>150 and frames[3][45,40,0]<20
 
-def test_text_tool_and_color_selector(window,application,monkeypatch):
-    from PySide6.QtWidgets import QInputDialog
+def test_text_tool_and_color_selector(window,application):
+    from PySide6.QtTest import QTest
     d=window.drawing; v=window.viewer; d.choose_tool('text'); application.processEvents()
-    monkeypatch.setattr(QInputDialog,'getMultiLineText',lambda *args:('Arial\nDeux lignes',True))
     assert d.wheel.set_color('#12a4ef') and d.hex.text()=='#12a4ef'
     d.begin(QPointF(v.width()/2,v.height()/2),1); d.finish()
+    editor=d.text_editor
+    assert application.focusWidget() is editor and window.editing_text()
+    QTest.keyClicks(editor,'Arial'); QTest.keyClick(editor,Qt.Key_Return,Qt.ShiftModifier)
+    QTest.keyClicks(editor,'Deux lignes'); QTest.keyClick(editor,Qt.Key_Return)
     key=window.doc.state.drawings[0]
     assert key.marks[0].tool=='text' and key.marks[0].text=='Arial\nDeux lignes'
     assert key.marks[0].color=='#12a4ef' and (key.start,key.end)==(0,1)
@@ -183,9 +186,7 @@ def screen_point(d,x,y):
     return transform.map(QPointF(rect.x()+rect.width()*x,rect.y()+rect.height()*y))
 
 
-def test_lasso_and_text_move_with_undo(window,application,monkeypatch):
-    from PySide6.QtWidgets import QInputDialog
-    monkeypatch.setattr(QInputDialog,'getMultiLineText',lambda *args:('',False))
+def test_lasso_and_text_move_with_undo(window,application):
     w=window; d=w.drawing; v=w.viewer
     first=Mark(points=((.2,.2,1),(.35,.3,1)),size=.01); second=Mark(points=((.7,.7,1),),size=.04)
     text=Mark(tool='text',points=((.5,.1,1),),size=.05,text='Arial')
@@ -277,15 +278,14 @@ def test_marker_shortcut_and_wrapping(window,application):
     w.doc.undo(); assert w.doc.state.frame_markers==(5,)
     w.doc.redo(); assert w.doc.state.frame_markers==(5,10)
 
-def test_text_box_fit_style_resize_and_save(window,application,monkeypatch,tmp_path):
-    from PySide6.QtWidgets import QInputDialog
+def test_text_box_fit_style_resize_and_save(window,application,tmp_path):
+    from PySide6.QtTest import QTest
     from draw_text import fitted_layout
     d=window.drawing; d.choose_tool('text'); application.processEvents()
-    calls=[]
-    monkeypatch.setattr(QInputDialog,'getMultiLineText',lambda *a:(calls.append(1) or 'Texte automatique',True))
     d.begin(screen_point(d,.1,.1),1); d.move(screen_point(d,.6,.4),1)
-    assert not calls and not window.doc.state.drawings
-    d.finish(); mark=window.doc.state.drawings[0].marks[0]
+    assert d.text_editor is None and not window.doc.state.drawings
+    d.finish(); QTest.keyClicks(d.text_editor,'Texte automatique'); QTest.keyClick(d.text_editor,Qt.Key_Return)
+    mark=window.doc.state.drawings[0].marks[0]
     assert mark.box==pytest.approx((.5,.3))
     for button in d.style_buttons.values(): button.setChecked(True)
     mark=window.doc.state.drawings[0].marks[0]

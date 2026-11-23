@@ -1,8 +1,8 @@
 # Uninstalling
 
-For the installed edition, use Windows Settings > Apps > Cadence > Uninstall. For a portable copy, close Cadence and remove its extracted program folder. Neither operation should delete your media, exports or projects.
+For the installed edition, use Windows Settings > Apps > Cadence 2.0 > Uninstall. For a portable copy, close Cadence and remove its extracted program folder. Neither operation should delete your media, exports or projects.
 
-Preferences, caches and recovery data remain under `%LOCALAPPDATA%/CadenceStudio`. Delete that folder only if you also want to discard these settings and the recovery session. Recordings saved to a temporary folder or another destination are separate files.
+Preferences, caches and recovery data remain under `%LOCALAPPDATA%/CadenceStudio-2`. Delete that folder only if you also want to discard these settings and the recovery session. Recordings saved to a temporary folder or another destination are separate files.
 
 ## Blender and Maya connectors
 

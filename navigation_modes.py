@@ -17,11 +17,6 @@ def install(window):
 
 def set_key_step(window,enabled):
     window.key_step=bool(enabled)
-    for button,title in (
-        (window.previous_key_btn,'Image précédente' if enabled else 'Clé précédente'),
-        (window.next_key_btn,'Image suivante' if enabled else 'Clé suivante'),
-    ):
-        button.setToolTip(tr(title)); button.setAccessibleName(tr(title))
 
 
 def toggle_step(window):

@@ -60,10 +60,10 @@ def build(version, payload, output, compiler=None, test_build=False):
     associations = work / 'associations.iss'
     lines = []
     for extension in EXTENSIONS:
-        progid = 'Cadence.Installed.Project' if extension == '.cadence' else 'Cadence.Installed.Media'
+        progid = 'Cadence.Studio2.Installed.Project' if extension == '.cadence' else 'Cadence.Studio2.Installed.Media'
         lines.extend([
             f'Root: HKA; Subkey: "{{#RegistryBase}}\\Classes\\{extension}\\OpenWithProgids"; ValueName: "{progid}"; ValueType: string; ValueData: ""; Flags: uninsdeletevalue; Tasks: filetypes',
-            f'Root: HKA; Subkey: "{{#RegistryBase}}\\Cadence\\InstalledCapabilities\\FileAssociations"; ValueName: "{extension}"; ValueType: string; ValueData: "{progid}"; Tasks: filetypes',
+            f'Root: HKA; Subkey: "{{#RegistryBase}}\\CadenceStudio2\\InstalledCapabilities\\FileAssociations"; ValueName: "{extension}"; ValueType: string; ValueData: "{progid}"; Tasks: filetypes',
         ])
     associations.write_text('\n'.join(lines), encoding='utf-8-sig')
     compiler = compiler_path(compiler)
@@ -102,7 +102,7 @@ def main():
     parser.add_argument('--compiler', type=Path)
     parser.add_argument('--test-build', action='store_true')
     args = parser.parse_args()
-    output = args.output or (PROJECT / 'work/installer-tests/packages' if args.test_build else PROJECT / 'outputs')
+    output = args.output or (PROJECT / 'work/installer-tests-studio2/packages' if args.test_build else PROJECT / 'outputs')
     build(args.version, args.payload or PROJECT / f'outputs/v{args.version}/Cadence', output, args.compiler, args.test_build)
 
 

@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from fractions import Fraction
-from library_style import icon, style_button, media_details, SourceRows
+from library_style import (icon, style_button, media_details, SourceRows, panel_strip, panel_heading,
+                           TITLE_ROLE, DETAIL_ROLE, POSTER_ROLE, EmptyHint)
 from PySide6.QtGui import QImage,QPixmap,QIcon
 from PySide6.QtCore import Qt,Signal,QEvent,QSignalBlocker
 from PySide6.QtWidgets import QWidget,QVBoxLayout,QListWidget,QListWidgetItem,QAbstractItemView,QPushButton,QMenu,QComboBox,QHBoxLayout,QLabel
+from model import locate
 from reference_sequence import ReferenceSequence
 from ui_text import tr
 
@@ -29,15 +31,16 @@ class ReferenceList(QListWidget):
 
 class ReferenceQueueMixin:
     def build_reference_list(self):
-        page=QWidget(); layout=QVBoxLayout(page); layout.setContentsMargins(0,6,0,0)
+        page=QWidget(); page.setObjectName('studioPage'); layout=QVBoxLayout(page); layout.setContentsMargins(0,0,0,0); layout.setSpacing(0)
         self.ref_thumbnails={}
-        header=QHBoxLayout(); header.addWidget(QLabel(tr('Source B')))
+        header=panel_strip(layout); header.addWidget(QLabel(tr('Source B')))
         self.ref_panel_source=QComboBox()
-        header.addWidget(self.ref_panel_source,1); layout.addLayout(header)
+        header.addStretch(); header.addWidget(self.ref_panel_source)
         self.ref_panel_source.activated.connect(self.pick_panel_source)
-        self.ref_caption=QLabel(tr('Ordre de comparaison')); layout.addWidget(self.ref_caption)
+        self.ref_caption,self.ref_count=panel_heading(panel_strip(layout,'heading'),tr('Ordre de comparaison'))
         self.reference_list=ReferenceList(); self.reference_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.reference_list.setItemDelegate(SourceRows(self.reference_list,ordered=True))
+        self.reference_list.empty_hint=EmptyHint(self.reference_list,tr('Ajoutez une référence pour comparer les images.'))
         self.reference_list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.reference_list.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.reference_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -45,10 +48,16 @@ class ReferenceQueueMixin:
         self.reference_list.reordered.connect(self.reference_reordered)
         self.reference_list.deleteRequested.connect(self.remove_reference_items)
         self.reference_list.itemDoubleClicked.connect(self.seek_reference)
-        layout.addWidget(self.reference_list)
-        footer=QHBoxLayout(); layout.addLayout(footer)
-        add=style_button(QPushButton(tr('Ajouter des références…')),'plus'); add.clicked.connect(self.open_reference); footer.addWidget(add)
+        layout.addWidget(self.reference_list,1)
+        self.track_ref_readout=QListWidget(); self.track_ref_readout.setItemDelegate(SourceRows(self.track_ref_readout,ordered=True))
+        self.track_ref_readout.hide(); self.track_ref_signature=None; layout.addWidget(self.track_ref_readout,1)
+        footer=panel_strip(layout,'footer')
+        self.ref_compare_button=style_button(QPushButton(tr('Comparer')),'ab'); self.ref_compare_button.setCheckable(True)
+        self.ref_compare_button.setToolTip(tr('Activer la comparaison')); footer.addWidget(self.ref_compare_button)
+        self.ref_compare_button.clicked.connect(self.compare_enabled.setChecked)
+        self.compare_enabled.toggled.connect(self.ref_compare_button.setChecked)
         footer.addStretch()
+        add=style_button(QPushButton(tr('Ajouter des références…')),'plus',True); add.clicked.connect(self.open_reference); footer.addWidget(add)
         self.ref_buttons=[]
         for label,direction,symbol in [('Monter',-1,'up'),('Descendre',1,'down')]:
             button=style_button(QPushButton(tr(label)),symbol,True); self.ref_buttons.append(button)
@@ -73,8 +82,29 @@ class ReferenceQueueMixin:
             for track in self.doc.state.tracks: self.ref_panel_source.addItem(tr(track.info.name),track.info.id)
             self.ref_panel_source.setCurrentIndex(max(0,self.ref_panel_source.findData(identity)))
         self.reference_list.setVisible(not bool(identity))
-        self.ref_caption.setText(tr('Ordre de comparaison') if not identity else self.ref_panel_source.currentText())
+        self.track_ref_readout.setVisible(bool(identity))
+        self.refresh_track_reference(self.doc.state.position)
+        self.ref_count.setVisible(not identity)
         for button in self.ref_buttons: button.setVisible(not bool(identity))
+
+    def refresh_track_reference(self,frame):
+        identity=getattr(self,'reference_track_id',None)
+        if not identity: return
+        track=next((track for track in self.doc.state.tracks if track.info.id==identity),None)
+        key=None
+        if track:
+            frame+=self.compare_offset.value()
+            if 0<=frame<track.length: key=locate(track.segments,frame)[0]
+        signature=(identity,key,self.doc.media.get(key,{}).get('name'),track.info.name if track else '')
+        if signature==self.track_ref_signature: return
+        self.track_ref_signature=signature; self.track_ref_readout.clear()
+        media=self.doc.media.get(key)
+        if media:
+            item=QListWidgetItem(icon('film'),media['name']); item.setToolTip(media['path'])
+            item.setData(DETAIL_ROLE,self.ref_panel_source.currentText())
+        else:
+            item=QListWidgetItem(tr('Aucun média à cette image.'))
+        self.track_ref_readout.addItem(item)
 
     def pick_panel_source(self,index):
         identity=self.ref_panel_source.itemData(index)
@@ -88,7 +118,8 @@ class ReferenceQueueMixin:
         small=QPixmap.fromImage(image.scaled(56,36,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation))
         self.ref_thumbnails[key]=QIcon(small)
         for i,media in enumerate(self.reference_entries()):
-            if media['id']==key and self.reference_list.item(i): self.reference_list.item(i).setIcon(self.ref_thumbnails[key])
+            if media['id']==key and self.reference_list.item(i):
+                self.reference_list.item(i).setIcon(self.ref_thumbnails[key]); self.reference_list.item(i).setData(POSTER_ROLE,True)
 
     def reference_entries(self):
         pool={**self.doc.media,**self.reference_sources}
@@ -106,9 +137,11 @@ class ReferenceQueueMixin:
                 name=media['name']+(tr(' · indisponible') if media.get('available') is False else '')
                 details=media_details(media)
                 item=QListWidgetItem(self.ref_thumbnails.get(media['id'],icon('film')),f'{index+1}. {name}'+('\n'+details if details else '')); item.setData(Qt.ItemDataRole.UserRole,index)
+                item.setData(TITLE_ROLE,name); item.setData(DETAIL_ROLE,f'{index+1} · {details}' if details else str(index+1))
+                item.setData(POSTER_ROLE,media['id'] in self.ref_thumbnails)
                 item.setToolTip(media['path']); item.setFlags(item.flags()&~Qt.ItemFlag.ItemIsDropEnabled)
                 self.reference_list.addItem(item)
-        self.ref_button_state()
+        self.ref_count.setText(str(self.reference_list.count())); self.ref_button_state()
         self.ref_thumbnails={k:v for k,v in self.ref_thumbnails.items() if k in self.reference_order}
 
     def set_reference_sequence(self,entries,append=False):

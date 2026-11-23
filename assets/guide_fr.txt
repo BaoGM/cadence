@@ -1,4 +1,4 @@
-Cadence 1.18.5 - Guide rapide
+Cadence 2.0.3 - Guide rapide
 
 Les raccourcis indiqués sont ceux par défaut. Leur liste complète figure à la fin du guide ; ils se personnalisent dans Fichier > Options > Raccourcis.
 
@@ -20,9 +20,9 @@ Ctrl + molette augmente ou diminue le volume général par pas de 5 %, sans chan
 
 Espace : lecture / pause. Gauche et Droite : une image. Début et Fin : extrémités de la timeline. Virgule et Point : clé ou marqueur précédent / suivant, avec retour à l'autre extrémité.
 
-K bascule les commandes de clé et leurs boutons entre un pas de clé et un pas d'image. Gauche et Droite restent toujours image par image. La lecture en boucle est activée par défaut. Le bouton de boucle change le mode sans interrompre la lecture ; ce choix est conservé au prochain démarrage.
+K bascule les raccourcis virgule et point entre un pas de clé et un pas d’image. Les boutons Clé précédente et Clé suivante parcourent toujours les clés de dessin et les marqueurs. Gauche et Droite restent toujours image par image. La lecture en boucle est activée par défaut. Le bouton de boucle change le mode sans interrompre la lecture ; ce choix est conservé au prochain démarrage.
 
-Glissez sur la timeline pour déplacer la lecture. Avec l'outil Curseur (Q), glissez aussi sur la vidéo ; Maj affine le déplacement. Si la lecture était active, elle reprend au relâchement ; sinon elle reste en pause.
+Glissez sur la timeline ou sur l’espace libre de son bandeau pour déplacer la lecture. La règle affiche le nombre d’images sélectionnées et leur durée en code temporel. Vous pouvez aussi glisser horizontalement dans l’espace libre des commandes de lecture ou, avec l’outil Curseur (Q), sur la vidéo. Maintenez Maj pour un déplacement plus précis. Si la lecture était active, elle reprend au relâchement.
 
 Maj + glisser sélectionne une plage tout en affichant l'image courante. On peut appuyer sur Maj pendant un glissement déjà commencé. Relâchez la souris avant Maj pour garder la sélection ; l'ordre inverse repasse en déplacement de lecture.
 
@@ -35,17 +35,17 @@ Une piste média réunit une bande vidéo et une bande audio. Le bouton « + Pis
 
 Les pistes sont nommées Piste 1 et Piste 2. Cliquez sur un titre pour sélectionner une piste. Ctrl+clic ajoute ou retire une piste de la sélection, sur son titre comme dans sa timeline. Les modifications portent sur les pistes sélectionnées. Glissez un titre au-dessus ou au-dessous de l’autre pour changer leur ordre. Le clic droit sur le titre permet aussi de déplacer ou supprimer toute la piste. Ctrl+Z annule ces actions. Les bandes audio sont repliées au départ : cliquez sur le triangle près du titre pour les déployer.
 
-Cliquez sur le chevron près du titre, ou utilisez le clic droit, pour déployer ou replier la bande audio. Le clic droit permet aussi de désactiver ou réactiver tout son audio, y compris à l’export. Lorsque les deux pistes sont sélectionnées, glissez un média vers l’autre piste pour y déplacer sa vidéo et son audio ensemble. La portion d’origine est retirée et les clips suivants sont rapprochés, sans laisser de clip vide. Alt+Maj+glisser le copie en conservant la source. Les clés de dessin apparaissent au-dessus de la barre de lecture, sans recouvrir les chiffres, même en timeline simplifiée.
+Cliquez sur le chevron près du titre, ou utilisez le clic droit, pour déployer ou replier la bande audio. Le clic droit permet aussi de désactiver ou réactiver tout son audio, y compris à l’export. En vue détaillée, glissez un média vers l’autre piste pour y déplacer sa vidéo et son audio ensemble. Les clips suivants se rapprochent sur la piste d’origine. Alt+Maj+glisser copie le média. En vue simplifiée, maintenez Alt et faites glisser le média sur le titre de piste à gauche. Le titre indique la piste de destination pendant le déplacement. Ajoutez Maj pour copier. Les marqueurs sont intégrés à la bande média. Les clés de dessin et leurs poignées occupent le bas de la règle de temps, sous les chiffres.
 
 Les dessins, leurs clés et les marqueurs restent communs, au-dessus des deux pistes. Modifier une seule piste conserve les dessins à leur position ; avec les deux pistes sélectionnées, les dessins liés suivent les modifications.
 
-Ctrl+C, Ctrl+X et Ctrl+V copient, coupent et collent l'image courante ou la plage sélectionnée. Suppr supprime la plage. Le son est copié seulement si « Copier/coller le son » est coché dans le bandeau supérieur. Ctrl+Z annule ; Ctrl+Y rétablit.
+Ctrl+C, Ctrl+X et Ctrl+V copient, coupent et collent l'image courante ou la plage sélectionnée. Suppr supprime la plage. Le son est copié seulement si « Copier/coller le son » est coché dans le bandeau supérieur. Ctrl+Z annule. Ctrl+Y ou Ctrl+Maj+Z rétablit.
 
-Alt + glisser déplace un bloc ou une plage. Alt+Maj + glisser duplique avec le son. Le dépôt se fait avant ou après un média, ou dans un vide. Le vide est rempli ; seule la partie qui le dépasse décale la suite. « Laisser un vide » conserve l'emplacement quitté. Les options de liaison règlent si le son et les dessins suivent la vidéo.
+Alt + glisser déplace un bloc ou une plage. Pendant le geste, une carte suit le pointeur et indique où le bloc sera déposé. Échap annule le glissement. Alt+Maj + glisser duplique avec le son. Le dépôt se fait avant ou après un média, ou dans un vide. Le vide est rempli ; seule la partie qui le dépasse décale la suite. « Laisser un vide » conserve l'emplacement quitté. Les options de liaison règlent si le son et les dessins suivent la vidéo.
 
 Le clic droit propose Scinder, Dupliquer, Désactiver / Activer et les suppressions. Supprimer le média retire vidéo et son et referme l'espace. Supprimer uniquement la vidéo ou l'audio conserve la position des autres éléments.
 
-Molette : zoom. Ctrl + clic molette + glisser, ou barre de défilement : déplacement horizontal. Ctrl+0 : toute la timeline. T ou le clic droit choisit code temporel / images. Le clic droit permet aussi de passer de la timeline allégée à la détaillée.
+Molette : zoom. Ctrl + clic molette + glisser, ou barre de défilement : déplacement horizontal. Ctrl+0 : toute la timeline. Alt+T ou le clic droit choisit code temporel / images. Alt+Maj+T ou le menu contextuel bascule entre les timelines simplifiée et détaillée.
 
 Dans la liste de lecture, Ctrl+clic ou Maj+clic sélectionne plusieurs entrées ; clic droit > Supprimer les retire du montage sans effacer les fichiers d'origine.
 
@@ -58,13 +58,15 @@ Couleur, taille et opacité règlent le tracé. La pression d'une tablette agit 
 
 Pendant le tracé d'une forme : Alt déplace, Maj contraint les proportions ou l'angle de la flèche, Ctrl transforme depuis le centre et Alt+Ctrl fait tourner. Ces modificateurs se combinent. Commencez le tracé avant d'enfoncer Maj ou Ctrl pour les utiliser comme contraintes.
 
-Avec Texte, tracez un cadre : le texte s'adapte à sa taille. Choisissez police et style dans le panneau. Double-cliquez le texte pour le modifier ; Alt permet de le déplacer.
+Avec Texte, tracez un cadre et écrivez directement sur l’image. Le texte s’ajuste au cadre. Entrée ou un clic en dehors valide la saisie. Maj + Entrée ajoute une ligne et Échap annule. Double-cliquez un texte pour le modifier. Alt permet de le déplacer. Choisissez la police et le style dans le panneau.
 
 Le lasso sélectionne et déplace les objets. Changer couleur ou opacité modifie la sélection sur toute la durée de sa clé. Suppr efface ces objets en priorité ; leur clic droit propose copier, couper, coller et supprimer.
 
-Les clés apparaissent sous les graduations de la timeline. Sur cette bande, Maj + glisser sélectionne plusieurs clés et Alt + glisser les déplace. Une clé d'une image possède une poignée unique : tirez-la à gauche ou à droite pour l'étendre. Les clés plus longues gardent deux poignées. C copie, X coupe, V colle au curseur et D supprime les clés sans perdre la sélection. Maj+K duplique une clé au curseur. Ces commandes existent aussi au clic droit sur la règle et dans Dessin.
+En vue détaillée, une ligne dédiée accueille les clés au-dessus de la règle. En vue simplifiée, utilisez le bas de la règle de temps pour modifier les clés. Glissez le corps d’une clé pour la déplacer. Tirez sur une poignée pour modifier son exposition. Maj + glisser sélectionne plusieurs clés et Alt + glisser déplace la plage sélectionnée. C copie, X coupe, V colle au curseur et D supprime les clés sans perdre la sélection. Maj+K duplique une clé au curseur. Ces commandes existent aussi au clic droit sur la règle et dans Dessin.
 
-S ajoute un marqueur turquoise indépendant des dessins ; S sur ce marqueur le supprime. Les clés de dessin sont jaunes. « Afficher le calque de dessins » règle la visibilité ; « Inclure les dessins à l'export » règle leur présence à l'export.
+Pour ajuster une clé au clavier, atteignez la timeline avec Tab puis appuyez sur Entrée. Le contour indique le corps de la clé au curseur, de la suivante ou de la dernière si le curseur se trouve après toutes les clés. Depuis le corps, Maj+Tab choisit la poignée de début et Tab celle de fin. Vous pouvez aussi cliquer directement sur le corps ou une poignée. Gauche et Droite déplacent la partie active d’une image. Ctrl+Z annule chaque modification. Entrée ou Échap rend les flèches à la lecture.
+
+S ajoute un marqueur à l’image courante. Appuyez de nouveau sur S pour le supprimer. Pour lui donner un nom, faites un clic droit sur son drapeau et choisissez « Renommer le marqueur… ». Laissez le champ vide pour afficher seulement le drapeau. Glissez le drapeau pour déplacer le marqueur. Échap annule le geste et Ctrl+Z annule le déplacement. Les noms sont enregistrés dans le projet. « Afficher le calque de dessins » règle la visibilité ; « Inclure les dessins à l'export » règle leur présence à l'export.
 
 La pelure d'oignon prolonge les dessins sur le nombre d'images vidéo choisi avant et après leur clé, avec leur couleur et une opacité décroissante dès l'image voisine. Une portée de 0 désactive le côté concerné. Elle fonctionne à l'arrêt, en lecture et à l'export.
 
@@ -80,9 +82,11 @@ Comparer des vidéos
 
 A est le montage de travail ; B est une ou plusieurs vidéos de référence. Le clic droit sur un titre de piste > Utiliser comme référence B choisit cette piste pour B ; l’autre piste devient A dans l’aperçu de comparaison. L’export conserve le montage complet des deux pistes. Comparaison > Ajouter des références B les charge à la suite. L'onglet Références de la liste de lecture permet de les réordonner par glissement ou de les retirer au clic droit.
 
-Les modes sont Côte à côte, Dessus / dessous, Superposition, Différence, Révélateur et Premier plan. Maj+X ou le bouton de comparaison les fait défiler, puis revient à A seule. Alt+X intervertit A et B.
+Les modes sont Côte à côte, Dessus / dessous, Superposition, Différence, Révélateur et Premier plan. Maj+X ou le bouton de comparaison les fait défiler en boucle. Le bouton A/B et Maj+C activent ou désactivent la comparaison. Alt+X intervertit A et B.
 
 Opacité règle la superposition, Gain amplifie les différences et Décalage référence décale B en images de la timeline. En mode Révélateur, glissez la séparation. Les dessins restent sur A ; le son et l'export proviennent toujours du montage A.
+
+Pour régler le révélateur au clavier, cliquez sur la séparation ou atteignez la vidéo avec Tab puis appuyez sur Entrée. Gauche et Droite déplacent la séparation de 2 %. Entrée ou Tab conserve le réglage et quitte la poignée. Échap rétablit la position qu’elle avait lorsque vous l’avez activée.
 
 ----------------------------------------
 Cadence et qualité
@@ -106,7 +110,7 @@ Le menu Affichage et le clic droit sur le fond affichent ou cachent les panneaux
 
 Lorsque les commandes de lecture sont masquées, survolez le bas de la zone vidéo, juste au-dessus de la timeline, pour retrouver uniquement la case Mode édition et son libellé dans un petit cadre transparent à gauche. Le cadre disparaît lorsque le pointeur le quitte et ne change pas les panneaux mémorisés pour le mode courant.
 
-Les modes Lecture et Édition sont entièrement personnalisables dans Affichage > Options des modes Lecture / Édition : choisissez les panneaux et la timeline allégée séparément pour chacun. Le bouton Mode édition change de mode. Chaque mode conserve sa disposition. Fichier > Options > Préférences > Restaurer l'interface remet les deux modes à leur état initial.
+Les modes Lecture et Édition sont entièrement personnalisables dans Affichage > Options des modes Lecture / Édition : choisissez les panneaux et la timeline allégée séparément pour chacun. Les boutons Lecture et Édition en haut de la fenêtre changent de mode. F10 ouvre le menu général. F1 ou la touche ? ouvre le guide rapide. Les raccourcis personnels sont prioritaires. Chaque mode conserve sa disposition. Fichier > Options > Préférences > Restaurer l'interface remet les deux modes à leur état initial.
 
 ----------------------------------------
 Synchroniser Blender ou Maya
@@ -165,7 +169,7 @@ Dans Maya, les images sont compensées pour la transformation de vue active lors
 ----------------------------------------
 Mises à jour
 
-Cadence vérifie les nouvelles versions au démarrage, au plus une fois par jour. Fichier > Options > Préférences permet de désactiver cette vérification et d'inclure les préversions. Aide > Rechercher des mises à jour lance une vérification manuelle.
+Cette édition utilise son propre canal de mise à jour Windows 2.0. Cadence vérifie les nouvelles versions au démarrage, au plus une fois par jour. Fichier > Options > Préférences permet de désactiver cette vérification et d'inclure les préversions. Aide > Rechercher des mises à jour lance une vérification manuelle.
 
 Les mises à jour des copies par utilisateur et portables sont téléchargées en arrière-plan. Cadence vérifie la signature du manifeste et l’empreinte du paquet. La nouvelle version prend effet à la prochaine ouverture, ou via « Mise à jour prête · Redémarrer maintenant ». En cas d’échec au premier démarrage, la version précédente reprend la main. Une installation partagée reste gérée par l’administrateur.
 
@@ -193,3 +197,5 @@ Déplacer un clip vers l’autre piste retire sa portion vidéo et audio de la p
 Cliquer sur l’aperçu indépendant ne ramène pas la fenêtre principale au premier plan. La lecture unique affiche le même symbole de boucle, grisé et barré.
 
 Le volet affiche par défaut ses quatre pictogrammes et le nom de l’onglet actif. Le clic droit sur les onglets permet d’afficher tous les libellés. Dans Bibliothèque, un clic sur un dossier en affiche le contenu en arrière-plan. Dans Références, choisissez la source B et changez l’ordre avec les flèches ou par glisser-déposer.
+
+Dans Médias, le clic droit > Ajouter à la piste ajoute les sources sélectionnées à la fin de la piste choisie. Pour choisir leur position, faites-les glisser sur la piste. Le trait indique le point d’insertion, au bord d’un clip ou à l’image visée dans une zone vide.

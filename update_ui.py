@@ -103,7 +103,7 @@ class UpdateManager(QObject):
         self.window.statusBar().addPermanentWidget(self.ready_button)
 
     def restart(self):
-        if self.window.job:
+        if self.window.job: 
             QMessageBox.information(self.window,tr('Mises à jour'),tr('Attendez la fin de la tâche en cours avant d’installer la mise à jour.'))
             return
         if not self.window.confirm_discard(): return

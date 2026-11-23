@@ -7,7 +7,7 @@ import numpy as np
 from PySide6.QtWidgets import QStyle,QStatusBar
 from test_drawing import application,window,pixels
 from drawing import DrawingKey,Mark
-from drawing_timeline import DRAWING_GOLD
+from drawing_timeline import EXPOSURE_FILL
 from model import Segment,State
 from capture import CaptureDialog
 
@@ -38,8 +38,8 @@ def test_simple_timeline_marks_preserve_ranges_and_empty_keys(window,application
     t=w.timeline; rects=list(t.drawing_track.simple_markers()); assert len(rects)==2
     image=t.grab().toImage()
     y=round(rects[0].center().y())
-    assert image.pixelColor(round(t.x_for(7)),y)==DRAWING_GOLD
-    assert image.pixelColor(round(t.x_for(16)),y)!=DRAWING_GOLD
+    assert image.pixelColor(round(t.x_for(7)),y)==EXPOSURE_FILL
+    assert image.pixelColor(round(t.x_for(16)),y)!=EXPOSURE_FILL
     t.zoom=3; t.view_start=7; t.clamp_view(); rects=list(t.drawing_track.simple_markers())
     assert len(rects)==1 and rects[0].left()==t.track_left() and abs(rects[0].right()-t.x_for(10))<.01
     assert w.doc.state.drawings==keys

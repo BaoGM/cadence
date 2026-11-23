@@ -27,7 +27,7 @@ def test_key_drag_preview_without_media_selection(application, simple, operation
     refresh(); timeline.show(); application.processEvents()
     try:
         y = timeline.track_y('drawing') + 2
-        start = 10 if operation == 'left' else 20 if operation == 'right' else 10.5 if operation == 'extend' else 15
+        start = 10 if operation == 'left' else 20 if operation == 'right' else 10 if operation == 'extend' else 15
         delta = -4 if operation == 'left' else 5
         modifiers = Qt.KeyboardModifier.AltModifier if operation == 'move' else Qt.KeyboardModifier.NoModifier
         point = QPointF(timeline.x_for(start), y)

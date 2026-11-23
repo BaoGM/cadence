@@ -13,6 +13,9 @@ class SyncDialog(QDialog):
         self.setWindowTitle(tr('Synchronisation 3D'))
         self.resize(540, 300)
         layout = QVBoxLayout(self)
+        from studio_dialogs import style_inspector, inspector_section
+        style_inspector(self)
+        inspector_section(layout, 'sync', 'Connexion')
         layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         layout.setSpacing(12)
         self.enabled = QCheckBox(tr('Activer la synchronisation'))

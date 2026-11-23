@@ -81,33 +81,33 @@ def test_track_body_selection_doubleclick_drag_and_audio_menu(application,clips,
     first,second=(t.info.id for t in doc.state.tracks)
     try:
         x=round(timeline.x_for(10))
-        QTest.mouseClick(timeline,Qt.LeftButton,Qt.ControlModifier,QPoint(x,55))
+        upper,lower=(y+8 for _,y,_ in timeline.media_rows())
+        QTest.mouseClick(timeline,Qt.LeftButton,Qt.ControlModifier,QPoint(x,upper))
         assert set(doc.selected_track_ids)=={first,second}
-        QTest.mouseClick(timeline,Qt.LeftButton,Qt.ControlModifier,QPoint(x,88))
+        QTest.mouseClick(timeline,Qt.LeftButton,Qt.ControlModifier,QPoint(x,lower))
         assert doc.selected_track_ids==(first,)
-        QTest.mouseClick(timeline,Qt.LeftButton,Qt.ControlModifier,QPoint(x,88))
-        QTest.mouseDClick(timeline,Qt.LeftButton,Qt.NoModifier,QPoint(x,88))
+        QTest.mouseClick(timeline,Qt.LeftButton,Qt.ControlModifier,QPoint(x,lower))
+        QTest.mouseDClick(timeline,Qt.LeftButton,Qt.NoModifier,QPoint(x,lower))
         assert doc.state.selection==(0,48) and doc.selected_track_ids==(second,)
         assert not doc.state.second_track.info.audio_expanded
-        QTest.mouseDClick(timeline,Qt.LeftButton,Qt.ShiftModifier,QPoint(40,88))
+        QTest.mouseDClick(timeline,Qt.LeftButton,Qt.ShiftModifier,QPoint(40,lower))
         assert not doc.state.second_track.info.audio_expanded
         doc.select_track(first); doc.select_track(second,extend=True); window.refresh()
         original=doc.state
-        QTest.mousePress(timeline,Qt.LeftButton,Qt.NoModifier,QPoint(x,55))
-        event=QMouseEvent(QEvent.MouseMove,QPointF(x,88),QPointF(timeline.mapToGlobal(QPoint(x,88))),Qt.NoButton,Qt.LeftButton,Qt.NoModifier)
+        QTest.mousePress(timeline,Qt.LeftButton,Qt.NoModifier,QPoint(x,upper))
+        event=QMouseEvent(QEvent.MouseMove,QPointF(x,lower),QPointF(timeline.mapToGlobal(QPoint(x,lower))),Qt.NoButton,Qt.LeftButton,Qt.NoModifier)
         QApplication.sendEvent(timeline,event)
-        QTest.mouseRelease(timeline,Qt.LeftButton,Qt.NoModifier,QPoint(x,88))
+        QTest.mouseRelease(timeline,Qt.LeftButton,Qt.NoModifier,QPoint(x,lower))
         assert all(s.media is None for s in doc.state.tracks[0].segments)
         assert doc.state.second_track.length==96
         assert doc.undo() and doc.state.tracks==original.tracks
         window.refresh()
-        menu=timeline.context_menu(QPoint(x,55))
+        menu=timeline.context_menu(QPoint(x,upper))
         next(a for a in menu.actions() if a.data()=='track_audio').trigger()
         assert not doc.state.track_info.audio_enabled
         menu.deleteLater()
         timeline.simple=True; timeline.set_document(doc.state,doc.media,doc.fps)
-        assert timeline.track_y('drawing')>25
-        assert timeline.track_y('drawing')+4<timeline.simple_track_rect().top()
+        assert 16<timeline.track_y('drawing')<timeline.simple_track_rect().top()-4
         assert timeline.height()>=timeline.simple_track_rect().bottom()+4
     finally:
         doc.saved_signature=doc.signature(); window.close(); application.processEvents()

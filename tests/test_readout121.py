@@ -82,15 +82,16 @@ def test_brush_and_canvas_navigation_do_not_show_scrub_readout(window,applicatio
     mouse(v,QEvent.Type.MouseButtonRelease,point)
 
 
-def test_compact_badge_does_not_paint_over_tracks(window):
+@pytest.mark.parametrize('simple',[False,True])
+def test_compact_badge_does_not_paint_over_tracks(window,simple):
+    window.workspaces.set_timeline_simple(simple)
     t=window.timeline; t.hover_x=t.x_for(4.5)
     image=QImage(t.size(),QImage.Format.Format_ARGB32_Premultiplied); image.fill(Qt.GlobalColor.transparent)
     painter=QPainter(image)
     try: t.paint_frame_indicator(painter)
     finally: painter.end()
     rgba=pixels(image); ys,xs=np.nonzero(rgba[:,:,3])
-    assert len(xs)>0 and ys.max()<30
-    assert not np.any(rgba[30:,:,3])
+    assert len(xs)>0 and ys.min()>=t.ruler_y() and ys.max()<t.ruler_y()+26
 
 
 @pytest.mark.parametrize('simple',[True,False])
@@ -106,6 +107,6 @@ def test_hover_highlight_is_one_frame_wide_and_translucent(window,application,si
         return pixels(image).copy()
     rgba=render(); ys,xs=np.nonzero(rgba[:,:,3])
     assert abs(xs.min()-t.x_for(12))<=1 and abs(xs.max()+1-t.x_for(13))<=1
-    assert rgba[:,:,3].max()==(48 if simple else 16) and ys.min()>=24
+    assert rgba[:,:,3].max()==76 and ys.min()>=24
     assert w.doc.state.position==position
     application.sendEvent(t,QEvent(QEvent.Type.Leave)); assert not np.any(render()[:,:,3])

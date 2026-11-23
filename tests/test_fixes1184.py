@@ -180,5 +180,7 @@ def test_library_lists_do_not_overlap_in_small_window(window,application,mode):
     assert panel.tree.mapToGlobal(panel.tree.rect().bottomLeft()).y()<panel.files.mapToGlobal(panel.files.rect().topLeft()).y()
     assert panel.files.parentWidget().rect().contains(files)
     assert min(tree.height(),files.height())>=panel.fontMetrics().height()+8
+    for view in (panel.tree, panel.files):
+        assert view.viewport().height() >= view.itemDelegate().row_height
     content=panel.tree.parentWidget().parentWidget()
     assert content.parentWidget().width()>=content.minimumSizeHint().width()

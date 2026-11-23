@@ -19,11 +19,11 @@ Cadence is a Windows video review and annotation application for animation. Its 
 
 ## Installation
 
-Windows 10 or 11, 64-bit. The [1.18.5 Windows preview](https://github.com/BaoGM/cadence/releases/tag/v1.18.5-windows) includes an installer, a portable archive, corresponding sources, checksums and build provenance. It is unsigned and marked as a prerelease. SignPath Foundation acceptance is not claimed; see the [code signing policy](CODE_SIGNING_POLICY.md).
+Windows 10 or 11, 64-bit. The unsigned [Cadence 2.0.3 preview](https://github.com/BaoGM/cadence/releases/tag/v2.0.3-windows-studio2) includes an installer, a portable archive, checksums and corresponding sources.
 
-The default installation is per user. Installing for everyone in Program Files requires administrator permission. For the portable edition, extract the whole archive and run `Cadence.exe`; keep `_internal` and `Licences` beside it. Third-party source archives accompany full releases but are not needed to run the application.
+The default installation is per user. Cadence 2.0 installs alongside Windows 1.x and stores its preferences, library and cache in `%LOCALAPPDATA%/CadenceStudio-2`. For a portable copy, extract the complete archive and run `Cadence.exe`.
 
-Linux 1.18.0 remains available from its existing release and `feature/linux-port` branch. This branch contains the current Windows release.
+[Cadence 1.18.5 for Windows](https://github.com/BaoGM/cadence/releases/tag/v1.18.5-windows) and [Cadence 1.18.0 for Linux](https://github.com/BaoGM/cadence/releases/tag/v1.18.0) remain available. The Windows 2.0 update channel uses tags ending in `-windows-studio2`.
 
 ## Use
 

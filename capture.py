@@ -112,12 +112,16 @@ class CaptureDialog(QDialog):
         self.timer=QTimer(self); self.timer.setInterval(200); self.timer.timeout.connect(self.tick)
         root=QVBoxLayout(self)
         self.screens=QComboBox()
+        from studio_dialogs import style_inspector, inspector_section
+        from studio_icons import icon
+        style_inspector(self)
+        inspector_section(root,'capture','Enregistrement')
         for s in QApplication.screens(): self.screens.addItem(tr(f'{s.name()} · {s.geometry().width()} × {s.geometry().height()}'),s)
         root.addWidget(self.screens); self.screens.currentIndexChanged.connect(self.reset_region)
         self.zone=QPushButton(tr('Tracer une zone…')); self.zone.clicked.connect(self.pick); root.addWidget(self.zone)
         self.full=QPushButton(tr('Utiliser tout l’écran')); self.full.clicked.connect(self.reset_region); root.addWidget(self.full)
-        for button in (self.full,self.zone):
-            button.setCheckable(True); button.setStyleSheet('QPushButton:checked {background:#355558;border:1px solid #68e0cf;}')
+        for button,symbol in ((self.full,'fit'),(self.zone,'crop')):
+            button.setCheckable(True); button.setIcon(icon(symbol))
         row=QHBoxLayout(); row.addWidget(QLabel(tr('Images/sec'))); self.fps=QComboBox()
         for n in (12,24,25,30,60): self.fps.addItem(tr(str(n)),n)
         self.fps.setCurrentText('30'); row.addWidget(self.fps); row.addStretch()
@@ -209,7 +213,10 @@ class CaptureDialog(QDialog):
             picker.close(); self.restore(); self.update_region_ui()
     def restore(self):
         self.parentWidget().setWindowState(self.saved_state); self.parentWidget().show()
-        if not self.quick: self.show(); self.raise_(); self.activateWindow()
+        if self.quick:
+            self.hide()
+        else:
+            self.show(); self.raise_(); self.activateWindow()
     def begin(self):
         if self.proc or self.countdown or self.mux_thread: return
         screen=self.screens.currentData()

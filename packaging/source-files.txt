@@ -40,6 +40,8 @@ assets/fonts/sources.json
 assets/guide_en.txt
 assets/guide_fr.txt
 assets/qtbase_fr.qm
+assets/studio-check.svg
+assets/studio-down.svg
 assets/ui_en.txt
 assets/ui_patterns.json
 assets/update-key.txt
@@ -50,6 +52,7 @@ cache_ram.py
 cache_tools.py
 cadence_change.py
 cadence_dialog.py
+canvas_text.py
 capture.py
 capture_audio.py
 capture_feedback.py
@@ -83,6 +86,7 @@ engine.py
 export_dialog.py
 file_dialogs.py
 guide.py
+handle_focus.py
 hardware_decode.py
 hover_transport.py
 integrations/cadence_autostart.py
@@ -93,6 +97,7 @@ integrations/cadence_drawings_maya.py
 integrations/cadence_runtime.py
 library_style.py
 media.py
+media_source_drop.py
 media_track_ui.py
 menu_layout.py
 model.py
@@ -146,6 +151,13 @@ smoke1180.py
 smoke1181.py
 smoke1182.py
 smoke1184.py
+studio_chrome.py
+studio_dialogs.py
+studio_hover.py
+studio_icons.py
+studio_options.py
+studio_transport.py
+studio_workspace.py
 sync3d.py
 sync3d_dialog.py
 sync3d_instances.py
@@ -155,6 +167,7 @@ tests/test_audio1218.py
 tests/test_audio_export1112.py
 tests/test_cadence.py
 tests/test_cadence180.py
+tests/test_canvas_text202.py
 tests/test_capture.py
 tests/test_capture0151.py
 tests/test_capture126.py
@@ -187,6 +200,7 @@ tests/test_fixes1185.py
 tests/test_gaps180.py
 tests/test_gpu160.py
 tests/test_gpu190.py
+tests/test_handle_focus202.py
 tests/test_hardware190.py
 tests/test_import1105.py
 tests/test_import1213.py
@@ -194,6 +208,8 @@ tests/test_instances1180.py
 tests/test_interface0150.py
 tests/test_interface1218.py
 tests/test_keys128.py
+tests/test_marker_names201.py
+tests/test_media_source_drop203.py
 tests/test_menus0143.py
 tests/test_native130.py
 tests/test_native140.py
@@ -221,8 +237,10 @@ tests/test_render1170.py
 tests/test_sensitivity1211.py
 tests/test_session120.py
 tests/test_session170.py
+tests/test_shortcut_aliases202.py
 tests/test_spatial_gpu182.py
 tests/test_stress141.py
+tests/test_studio200.py
 tests/test_sync1120.py
 tests/test_sync1121.py
 tests/test_sync1163.py
@@ -231,6 +249,9 @@ tests/test_timecode_overlay.py
 tests/test_timeline102.py
 tests/test_timeline1101.py
 tests/test_timeline1152.py
+tests/test_timeline200.py
+tests/test_timeline202.py
+tests/test_timeline203.py
 tests/test_toolbar_layout.py
 tests/test_tools0160.py
 tests/test_tools0170.py
@@ -239,10 +260,16 @@ tests/test_transfer1141.py
 tests/test_transfer1150.py
 tests/test_transfer1151.py
 tests/test_translation1110.py
+tests/test_transport_scrub203.py
 tests/test_updates1160.py
 tests/test_wipe1217.py
+tests/test_workspace_migration202.py
 timecode_overlay.py
+timeline_drop.py
+timeline_gestures.py
 timeline_index.py
+timeline_skin.py
+timeline_thumbnails.py
 timestamp_preview.py
 tool_icons.py
 track_cadence.py

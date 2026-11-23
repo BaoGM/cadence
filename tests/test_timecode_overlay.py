@@ -9,7 +9,7 @@ from test_drawing import application,window
 
 
 def test_overlay_position_visibility_and_fullscreen(window,application):
-    w=window; v=w.viewer; o=w.timecode_overlay
+    w=window; w.set_panel('timecode',True); v=w.viewer; o=w.timecode_overlay
     v.set_frame(np.full((540,960,3),90,np.uint8)); w.refresh(); application.processEvents()
     assert not any(p.objectName()=='timecode_widget' for p in w.findChildren(QDockWidget))
     assert abs(o.rect().center().x()-o.bounds().center().x())<1
@@ -30,7 +30,7 @@ def test_overlay_position_visibility_and_fullscreen(window,application):
 
 
 def test_drag_overlay_does_not_scrub_or_draw(window,application):
-    w=window; v=w.viewer; o=w.timecode_overlay
+    w=window; w.set_panel('timecode',True); v=w.viewer; o=w.timecode_overlay
     v.set_frame(np.full((540,960,3),90,np.uint8)); w.drawing.choose_tool('brush'); application.processEvents()
     original=w.doc.state; start=o.rect().center(); end=start+QPointF(40,-50)
     QTest.mousePress(v,Qt.MouseButton.LeftButton,pos=start.toPoint())
@@ -57,7 +57,7 @@ def test_old_docked_timecode_layout_does_not_leave_an_empty_strip(window,applica
 
 
 def test_overlay_stays_in_viewport_when_images_move_or_change_shape(window,application):
-    w=window; v=w.viewer; o=w.timecode_overlay; w.request_frame=lambda:None
+    w=window; w.set_panel('timecode',True); v=w.viewer; o=w.timecode_overlay; w.request_frame=lambda:None
     v.set_frame(np.full((540,960,3),90,np.uint8)); application.processEvents()
     o.set_position([.5,1]); initial=o.rect()
     assert o.bounds()==QRectF(v.rect()).adjusted(8,8,-8,-8)
@@ -68,7 +68,7 @@ def test_overlay_stays_in_viewport_when_images_move_or_change_shape(window,appli
     v.reference_rgb=np.full((540,960,3),140,np.uint8)
     for mode in ('horizontal','vertical','overlay','difference','wipe','front'):
         v.compare_mode=mode; v.apply_effect(); assert o.rect()==initial
-    v.comparing=False; v.set_frame(np.full((80,1920,3),90,np.uint8))
+    v.comparing=False; v.geometry_aspect=1920/80; v.set_frame(np.full((80,1920,3),90,np.uint8))
     fitted=v.image.size().scaled(v.size(),Qt.AspectRatioMode.KeepAspectRatio)
     assert o.rect().top()>v.height()/2+fitted.height()/2
     w.resize(1600,950); application.processEvents()
@@ -78,7 +78,7 @@ def test_overlay_stays_in_viewport_when_images_move_or_change_shape(window,appli
 def test_timecode_context_lock_and_persistence(window,application):
     from playback_preferences import save,load,path
     from ui_text import tr
-    w=window; v=w.viewer; o=w.timecode_overlay; w.request_frame=lambda:None
+    w=window; w.set_panel('timecode',True); v=w.viewer; o=w.timecode_overlay; w.request_frame=lambda:None
     v.set_frame(np.full((540,960,3),90,np.uint8)); w.drawing.choose_tool('cursor'); application.processEvents()
     seen=[]
     def toggle(expected):

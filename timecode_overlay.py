@@ -9,6 +9,7 @@ class TimecodeOverlay(QObject):
     visibilityChanged=Signal(bool)
     positionChanged=Signal()
     lockChanged=Signal(bool)
+    frameChanged=Signal(str,str)
 
     def __init__(self,viewer):
         super().__init__(viewer); self.viewer=viewer; self.visible=True; self.locked=False
@@ -42,6 +43,7 @@ class TimecodeOverlay(QObject):
         ms=round(frame/float(fps)*1000)
         self.time=f'{ms//3600000:02}:{ms//60000%60:02}:{ms//1000%60:02}.{ms%1000:03}'
         self.frame=tr(f'IMAGE {frame} / {max(0,total-1)}'+(' · FIN' if total and frame==total else ''))
+        self.frameChanged.emit(self.time,self.frame)
         self.viewer.update()
 
     def bounds(self):

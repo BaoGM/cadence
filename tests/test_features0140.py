@@ -45,12 +45,13 @@ def test_handles_commit_cancel_and_shortcuts(window,application):
 def test_reading_mode_restores_panels(window,application):
     w=window; w.header.show(); w.library.show(); application.processEvents()
     w.workspaces.switch('read'); application.processEvents()
-    assert w.timeline.simple and w.timeline.height()==64
-    assert w.timeline.x_for(0)==w.timeline.width()-w.timeline.x_for(w.doc.state.length)
+    assert w.timeline.simple and w.timeline.height()==52
+    assert w.timeline.x_for(0)==w.timeline.track_left()
+    assert w.timeline.x_for(w.doc.state.length)==w.timeline.track_right()
     assert w.timeline.frame_for(w.timeline.x_for(0))==0
     assert w.timeline.frame_for(w.timeline.x_for(w.doc.state.length))==w.doc.state.length-1
-    assert w.header.isHidden() and w.library.isHidden() and w.header.isHidden()
-    assert not w.timecode_overlay.isHidden() and not w.transport_widget.isHidden()
+    assert w.header.isHidden() and not w.library.isHidden() and w.edit_toolbar.isHidden()
+    assert w.timecode_overlay.isHidden() and not w.transport_widget.isHidden()
     w.workspaces.switch('edit'); application.processEvents()
     assert not w.timeline.simple and not w.header.isHidden() and not w.library.isHidden()
 

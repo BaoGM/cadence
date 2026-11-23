@@ -2,10 +2,11 @@
 from datetime import datetime
 from fractions import Fraction
 from threading import Thread
-from library_style import icon, style_button
+from library_style import (icon, style_button, panel_strip, panel_heading, LibrarySplitter, LibraryTree,
+                           TreeRows, SourceRows, SYMBOL_ROLE, EmptyHint)
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal, QTimer, QFile, QSignalBlocker
+from PySide6.QtCore import Qt, Signal, QTimer, QFile, QSignalBlocker, QEvent
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtCore import QUrl
 from shiboken6 import isValid
@@ -84,18 +85,18 @@ class PlaylistPanel(QWidget):
             QTimer.singleShot(0, lambda text=str(error): window.error(text))
         outer = QVBoxLayout(self); outer.setContentsMargins(0, 0, 0, 0)
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        content = QWidget(); scroll.setWidget(content); outer.addWidget(scroll)
-        layout = QVBoxLayout(content); layout.setContentsMargins(2, 2, 2, 2)
+        content = QWidget(); content.setObjectName('studioPage'); scroll.setWidget(content); outer.addWidget(scroll)
+        layout = QVBoxLayout(content); layout.setContentsMargins(0, 0, 0, 0); layout.setSpacing(0)
         layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
-        row = QHBoxLayout()
+        row = panel_strip(layout)
         new = QPushButton(tr('Nouveau…')); new.clicked.connect(self.create_menu); row.addWidget(new)
         self.open_button = QPushButton(tr('Ouvrir')); self.open_button.clicked.connect(self.open_current); row.addWidget(self.open_button)
-        self.refresh_button = QPushButton(tr('Actualiser')); self.refresh_button.clicked.connect(lambda: self.browse(refresh=True)); row.addWidget(self.refresh_button)
-        layout.addLayout(row)
+        row.addStretch(); self.refresh_button = QPushButton(tr('Actualiser')); self.refresh_button.clicked.connect(lambda: self.browse(refresh=True)); row.addWidget(self.refresh_button)
         style_button(new,'plus'); style_button(self.open_button,'open'); style_button(self.refresh_button,'refresh',True)
-        splitter = QSplitter(Qt.Orientation.Vertical)
-        self.tree = QTreeWidget(); self.tree.setHeaderHidden(True)
-        self.tree.setMinimumHeight(self.tree.fontMetrics().height()+8)
+        splitter = LibrarySplitter(Qt.Orientation.Vertical); splitter.setHandleWidth(6); splitter.setChildrenCollapsible(False)
+        self.tree = LibraryTree(); self.tree.setHeaderHidden(True)
+        self.tree.setItemDelegate(TreeRows(self.tree)); self.tree.setIndentation(13); self.tree.setMouseTracking(True)
+        self.tree.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tree.currentItemChanged.connect(self.selected)
         self.tree.setExpandsOnDoubleClick(False)
         self.tree.itemDoubleClicked.connect(self.double_clicked)
@@ -104,28 +105,50 @@ class PlaylistPanel(QWidget):
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self.tree_menu)
         splitter.addWidget(self.tree)
-        self.files = PlaylistFiles(); self.files.setMinimumHeight(self.files.fontMetrics().height()+8)
+        self.files = PlaylistFiles()
+        self.files.setItemDelegate(SourceRows(self.files)); self.empty_files=EmptyHint(self.files,'')
         self.files.model().rowsMoved.connect(self.reordered)
         self.files.filesDropped.connect(self.add_paths)
         self.files.playRequested.connect(self.play_file)
         self.files.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.files.customContextMenuRequested.connect(self.files_menu)
         files_panel=QWidget(); file_layout=QVBoxLayout(files_panel)
-        file_layout.setContentsMargins(0,0,0,0)
-        self.folder_label=QLabel(); file_layout.addWidget(self.folder_label); file_layout.addWidget(self.files)
+        file_layout.setContentsMargins(0,0,0,0); file_layout.setSpacing(0)
+        self.folder_label,self.folder_count=panel_heading(panel_strip(file_layout,'heading'),'')
+        file_layout.addWidget(self.files,1)
         splitter.addWidget(files_panel); layout.addWidget(splitter, 1)
+        splitter.setStretchFactor(0,0); splitter.setStretchFactor(1,1); splitter.setSizes([164,225])
         self.file_error = QLabel()
         self.file_error.setTextFormat(Qt.TextFormat.PlainText)
         self.file_error.setWordWrap(True)
         self.file_error.hide()
         layout.addWidget(self.file_error)
-        row = QHBoxLayout()
+        row = panel_strip(layout,'footer'); self.file_footer=row.parentWidget()
         self.add_button = QPushButton(tr('Ajouter des vidéos…')); self.add_button.clicked.connect(self.add_files); row.addWidget(self.add_button)
         self.remove_button = QPushButton(tr('Retirer de la liste')); self.remove_button.clicked.connect(self.remove_files); row.addWidget(self.remove_button)
-        layout.addLayout(row)
+        row.insertStretch(1)
         style_button(self.add_button,'plus'); style_button(self.remove_button,'minus',True)
-        scroll.setMinimumWidth(230)
+        scroll.setMinimumWidth(204); scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.open_button_maximum=self.open_button.maximumWidth()
+        self.header_viewport=scroll.viewport()
+        self.header_viewport.installEventFilter(self)
         self.rebuild()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        for view in (self.tree, self.files):
+            margins = view.contentsMargins()
+            row_height = max(view.itemDelegate().row_height, view.fontMetrics().height() + 8)
+            view.setMinimumHeight(row_height + margins.top() + margins.bottom())
+
+    def eventFilter(self,obj,event):
+        if obj is self.header_viewport and event.type()==QEvent.Type.Resize:
+            narrow=obj.width()<235
+            self.open_button.setText('' if narrow else tr('Ouvrir'))
+            if narrow: self.open_button.setFixedWidth(30)
+            else:
+                self.open_button.setMinimumWidth(0); self.open_button.setMaximumWidth(self.open_button_maximum)
+        return super().eventFilter(obj,event)
 
     def run(self, operation):
         try: return operation()
@@ -134,24 +157,29 @@ class PlaylistPanel(QWidget):
     def add_node(self, parent, title, data):
         item = QTreeWidgetItem(parent, [title]); item.setData(0, Qt.ItemDataRole.UserRole, data)
         if data:
-            item.setIcon(0,icon('time' if data[0]=='temporary' else 'folder' if data[1] else 'list'))
+            symbol='time' if data[0]=='temporary' else 'folder' if data[1] else 'list'
+            item.setIcon(0,icon(symbol)); item.setData(0,SYMBOL_ROLE,symbol)
         return item
 
     def folder_icon(self,item,opened):
         data=item.data(0,Qt.ItemDataRole.UserRole)
         if data and data[0]!='temporary' and data[1]:
-            item.setIcon(0,icon('opened' if opened else 'folder'))
+            symbol='opened' if opened else 'folder'
+            item.setIcon(0,icon(symbol)); item.setData(0,SYMBOL_ROLE,symbol)
 
     def rebuild(self, select=None):
         self.rebuilding = True
         current = select or self.current
+        expanded={self.tree.topLevelItem(i).text(0):self.tree.topLevelItem(i).isExpanded()
+                  for i in range(self.tree.topLevelItemCount())}
         with QSignalBlocker(self.tree):
             self.tree.clear()
-            saved = self.add_node(self.tree, tr('Listes enregistrées'), None)
             followed = self.add_node(self.tree, tr('Dossiers suivis'), None)
+            saved = self.add_node(self.tree, tr('Listes enregistrées'), None)
             temporary = self.add_node(self.tree, tr('Temporaire'), None)
             self.temporary_group = temporary
-            for group,symbol in ((saved,'list'),(followed,'library'),(temporary,'time')): group.setIcon(0,icon(symbol))
+            for group,symbol in ((saved,'list'),(followed,'library'),(temporary,'time')):
+                group.setIcon(0,icon(symbol)); group.setData(0,SYMBOL_ROLE,symbol)
             selection = None
             for entry in self.store.entries if self.store else []:
                 folder = entry.get('root')
@@ -164,8 +192,9 @@ class PlaylistPanel(QWidget):
             for record in self.temporary:
                 item = self.add_node(temporary, record['name'], ('temporary', record['id']))
                 if current == ('temporary', record['id']): selection = item
-            for item in (saved, followed, temporary): item.setExpanded(True)
-            if selection: self.tree.setCurrentItem(selection)
+            for group in (followed,saved,temporary): group.setExpanded(expanded.get(group.text(0),group is followed))
+            if selection:
+                selection.parent().setExpanded(True); self.tree.setCurrentItem(selection)
         self.rebuilding = False
         self.selected(self.tree.currentItem(), None)
 
@@ -196,6 +225,7 @@ class PlaylistPanel(QWidget):
         self.file_error.hide()
         self.rebuilding = True; self.files.clear()
         data = self.current; editable = bool(data and data[0] != 'temporary')
+        self.file_footer.setVisible(editable)
         self.refresh_button.setEnabled(editable)
         self.add_button.setEnabled(editable); self.remove_button.setEnabled(editable)
         self.files.setDragEnabled(editable); self.files.setAcceptDrops(editable)
@@ -208,9 +238,13 @@ class PlaylistPanel(QWidget):
             item = QListWidgetItem(icon('film'), Path(path).name); item.setData(Qt.ItemDataRole.UserRole, path)
             item.setToolTip(path); self.files.addItem(item)
             if not Path(path).is_file(): item.setText(item.text() + ' — ' + tr('Introuvable'))
+        self.empty_files.setText(tr('Aucun fichier dans ce dossier.') if editable and data[1] else
+                                 tr('Aucun fichier dans cette liste.') if data else tr('Sélectionnez un dossier ou une liste.'))
+        self.empty_files.refresh()
         current=self.tree.currentItem()
-        self.folder_label.setText(f'{current.text(0)}  ·  {len(paths)}' if current and data else '')
-        self.folder_label.setVisible(bool(current and data))
+        self.folder_label.setText(current.text(0) if current and data else '')
+        self.folder_label.setToolTip(self.folder_label.text()); self.folder_count.setText(f"{len(paths)} {tr('fichier') if len(paths)==1 else tr('fichiers')}")
+        self.folder_label.parentWidget().setVisible(bool(current and data))
         self.open_button.setEnabled(bool(paths) or bool(data and data[0] == 'temporary'))
         self.rebuilding = False
 

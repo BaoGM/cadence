@@ -151,5 +151,5 @@ assert check_native_import(Path(sys.argv[1]))['background_audio']
 window.close(); app.processEvents()
 '''
     env=dict(os.environ,QT_QPA_PLATFORM='offscreen',CADENCE_CACHE=str(tmp_path/'cache'))
-    result=subprocess.run([sys.executable,'-c',script,str(tmp_path)],cwd=Path(__file__).parent,env=env,capture_output=True,timeout=30,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    result=subprocess.run([sys.executable,'-c',script,str(tmp_path)],cwd=Path(__file__).resolve().parents[1],env=env,capture_output=True,timeout=30,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     assert result.returncode==0,(result.returncode,result.stdout,result.stderr)

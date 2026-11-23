@@ -14,13 +14,18 @@ def decoded(value):
 class WorkspaceModes(QObject):
     def __init__(self,w):
         super().__init__(w); self.w=w; self.mode='read'; self.path=preference_path().with_name('workspaces.json')
-        self.pending_compact_mode=None; w.installEventFilter(self)
+        self.pending_compact_mode=None; self.fit_on_reveal=set(); w.installEventFilter(self)
         self.panels={**w.panel_widgets(),'library':w.library,'tools':w.edit_toolbar}
-        self.default_profiles={'read':{k:k in ('transport','timecode','timeline') for k in self.panels},'edit':{k:True for k in self.panels}}
+        self.default_profiles={mode:{k:k in visible for k in self.panels} for mode,visible in (
+            ('read',('transport','timeline','library')),('edit',('transport','timeline','library','tools')))}
         self.profiles={mode:dict(values) for mode,values in self.default_profiles.items()}
         self.simple={'read':True,'edit':False}; self.layouts={}; self.layout_versions={}; self.editable={'read':False,'edit':False}
         try:
             data=json.loads(self.path.read_text(encoding='utf-8'))
+            sides=data.get('side_history',{})
+            if isinstance(sides,dict):
+                w.studio.side_history={k:[n for n in v if n in ('library','drawing','comparison')]
+                    for k,v in sides.items() if k in ('read/left','read/right','edit/left','edit/right') and isinstance(v,list)}
             for m in self.profiles:
                 for k in self.panels:
                     if type(data.get('profiles',{}).get(m,{}).get(k)) is bool: self.profiles[m][k]=data['profiles'][m][k]
@@ -32,15 +37,17 @@ class WorkspaceModes(QObject):
             if not geometry.isEmpty(): w.restoreGeometry(geometry)
         except (OSError,ValueError,TypeError,UnicodeError,AttributeError): initial='read'
         self.toggle=QCheckBox(tr('Mode édition')); self.toggle.setToolTip(tr('Décocher pour passer en mode lecture'))
-        w.transport_left.addWidget(self.toggle); self.toggle.toggled.connect(lambda checked:self.switch('edit' if checked else 'read'))
+        w.transport_left.addWidget(self.toggle); self.toggle.hide()
+        self.toggle.toggled.connect(lambda checked:self.switch('edit' if checked else 'read'))
         w.timeline.simpleRequested.connect(self.set_timeline_simple)
+        w.comparison_panel.visibilityChanged.connect(self.comparison_shown)
         self.apply(initial if initial in self.profiles else 'read')
     def capture(self):
         self.profiles[self.mode]={k:not p.isHidden() for k,p in self.panels.items()}
         self.layouts[self.mode]=encoded(self.w.saveState()); self.editable[self.mode]=self.w.layout_editable
         self.layout_versions[self.mode]=2
     def save(self):
-        write_file(self.path,dict(profiles=self.profiles,simple=self.simple,mode=self.mode,layouts=self.layouts,layout_versions=self.layout_versions,editable=self.editable,geometry=encoded(self.w.saveGeometry())))
+        write_file(self.path,dict(profiles=self.profiles,simple=self.simple,mode=self.mode,layouts=self.layouts,layout_versions=self.layout_versions,editable=self.editable,geometry=encoded(self.w.saveGeometry()),side_history=self.w.studio.side_history))
     def switch(self,mode):
         if mode==self.mode: return
         if self.w.video_fullscreen: self.w.toggle_fullscreen()
@@ -48,6 +55,7 @@ class WorkspaceModes(QObject):
     def set_timeline_simple(self,simple):
         w=self.w; self.simple[self.mode]=bool(simple); w.timeline.simple=bool(simple)
         w.timeline.set_document(w.doc.state,w.doc.media,w.doc.fps); w.sync_timeline_scroll()
+        w.studio.sync_mode(self.mode,bool(simple))
         self.capture(); self.save()
     def apply(self,mode):
         self.mode=mode; w=self.w; w.setUpdatesEnabled(False)
@@ -55,19 +63,18 @@ class WorkspaceModes(QObject):
             if mode=='read': w.drawing.cancel(); w.drawing.choose_tool('cursor'); w.clip_tools.cancel()
             state=decoded(self.layouts.get(mode))
             w.restoreState(state if not state.isEmpty() else w.initial_dock_state)
-            if not state.isEmpty() and self.layout_versions.get(mode,0)<1:
-                self.migrate_tool_panel()
-                self.layouts[mode]=encoded(w.saveState()); self.layout_versions[mode]=1
             with QSignalBlocker(w.layout_action): w.layout_action.setChecked(self.editable[mode])
             w.set_layout_editable(self.editable[mode])
             for k,p in self.panels.items(): p.setVisible(self.profiles[mode][k])
             if state.isEmpty() or self.layout_versions.get(mode,0)<2:
+                if not self.profiles[mode]['comparison']: self.fit_on_reveal.add(mode)
                 self.fit_comparison_stack()
                 self.layouts[mode]=encoded(w.saveState()); self.layout_versions[mode]=2
                 self.pending_compact_mode=mode
                 if w.isVisible(): self.schedule_compact_layout(mode)
             with QSignalBlocker(self.toggle): self.toggle.setChecked(mode=='edit')
             w.timeline.simple=self.simple[mode]; w.timeline.set_document(w.doc.state,w.doc.media,w.doc.fps); w.sync_timeline_scroll()
+            w.studio.sync_mode(mode,self.simple[mode])
             w.viewer.setFocus(Qt.FocusReason.OtherFocusReason)
         finally: w.setUpdatesEnabled(True); w.update()
     def eventFilter(self,obj,event):
@@ -76,9 +83,14 @@ class WorkspaceModes(QObject):
         return super().eventFilter(obj,event)
     def schedule_compact_layout(self,mode):
         QTimer.singleShot(0,lambda:self.finish_compact_layout(mode))
+    def comparison_shown(self,visible):
+        if visible and self.mode in self.fit_on_reveal:
+            self.fit_on_reveal.remove(self.mode)
+            QTimer.singleShot(0,self.fit_comparison_stack)
     def finish_compact_layout(self,mode):
         if self.mode!=mode or self.pending_compact_mode!=mode or not self.w.isVisible(): return
         self.pending_compact_mode=None
+        self.w.studio.fit_sidebar()
         self.fit_comparison_stack(); self.layouts[mode]=encoded(self.w.saveState())
     def fit_comparison_stack(self):
         w=self.w; library=w.library; comparison=w.comparison_panel
@@ -91,18 +103,6 @@ class WorkspaceModes(QObject):
         total=library.height()+comparison.height()
         w.resizeDocks([library,comparison],[max(library.minimumSizeHint().height(),total-height),height],Qt.Orientation.Vertical)
         w.layout().activate()
-    def migrate_tool_panel(self):
-        w=self.w; tools=w.edit_toolbar; area=Qt.DockWidgetArea.LeftDockWidgetArea
-        neighbors=[p for p in self.panels.values() if isinstance(p,QDockWidget) and p is not tools and not p.isFloating() and w.dockWidgetArea(p)==area]
-        for panel in neighbors: panel.show()
-        w.layout().activate()
-        neighbors.sort(key=lambda p:(p.y(),p.x()))
-        sizes=[p.height() for p in neighbors]
-        w.removeDockWidget(tools); w.addDockWidget(area,tools)
-        if neighbors:
-            w.splitDockWidget(tools,neighbors[0],Qt.Orientation.Horizontal)
-            for previous,panel in zip(neighbors,neighbors[1:]): w.splitDockWidget(previous,panel,Qt.Orientation.Vertical)
-            w.resizeDocks(neighbors,sizes,Qt.Orientation.Vertical)
     def reset(self,all_modes=False):
         self.w.timecode_overlay.set_locked(False)
         self.w.timecode_overlay.set_position([.5,1])

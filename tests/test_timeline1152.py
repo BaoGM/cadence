@@ -33,7 +33,7 @@ def move_mouse(t,x,y,modifiers=Qt.KeyboardModifier.NoModifier):
 @pytest.mark.parametrize('delta',[-9,12])
 def test_single_handle_extends_either_direction_and_undo(timeline,delta):
     t,d=timeline; original=d.state.drawings
-    start=QPoint(round(t.x_for(40.5)),42)
+    start=QPoint(round(t.x_for(40)),t.track_y('drawing')+2)
     QTest.mousePress(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.NoModifier,start)
     assert t.drawing_track.mode=='extend'
     end=start+QPoint(round(delta*t.track_width()/t.span()),0)
@@ -46,11 +46,11 @@ def test_single_handle_extends_either_direction_and_undo(timeline,delta):
 
 
 def test_single_handle_can_change_direction_before_release(timeline):
-    t,d=timeline; start=QPoint(round(t.x_for(40.5)),42)
+    t,d=timeline; start=QPoint(round(t.x_for(40)),t.track_y('drawing')+2)
     QTest.mousePress(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.NoModifier,start)
-    move_mouse(t,start.x()-100,42); assert t.drawing_track.preview[0].start==30
-    move_mouse(t,start.x()+70,42); assert t.drawing_track.preview[0].start==40
-    QTest.mouseRelease(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.NoModifier,QPoint(start.x()+70,42))
+    move_mouse(t,start.x()-round(10*t.track_width()/t.span()),t.track_y('drawing')+2); assert t.drawing_track.preview[0].start==30
+    move_mouse(t,start.x()+round(7*t.track_width()/t.span()),t.track_y('drawing')+2); assert t.drawing_track.preview[0].start==40
+    QTest.mouseRelease(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.NoModifier,QPoint(start.x()+round(7*t.track_width()/t.span()),t.track_y('drawing')+2))
     assert (d.state.drawings[0].start,d.state.drawings[0].end)==(40,48)
 
 
@@ -58,10 +58,10 @@ def test_handles_stop_at_neighbor_and_escape_cancels(timeline):
     t,d=timeline
     d.state=replace(d.state,drawings=(DrawingKey(35,38,()),*d.state.drawings,DrawingKey(45,49,())))
     t.set_document(d.state,{},24); original=d.state.drawings
-    start=QPoint(round(t.x_for(40.5)),42)
+    start=QPoint(round(t.x_for(40)),t.track_y('drawing')+2)
     QTest.mousePress(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.NoModifier,start)
-    move_mouse(t,start.x()+150,42); assert t.drawing_track.preview[1].end==45
-    move_mouse(t,start.x()-150,42); assert t.drawing_track.preview[1].start==38
+    move_mouse(t,start.x()+round(15*t.track_width()/t.span()),t.track_y('drawing')+2); assert t.drawing_track.preview[1].end==45
+    move_mouse(t,start.x()-round(15*t.track_width()/t.span()),t.track_y('drawing')+2); assert t.drawing_track.preview[1].start==38
     QTest.keyClick(t,Qt.Key.Key_Escape)
     assert d.state.drawings==original and t.drawing_track.mode is None
 
@@ -71,10 +71,10 @@ def test_long_keys_keep_two_handles_and_alt_move(timeline):
     assert t.drawing_track.resize_mode(d.state.drawings[0],t.x_for(40))=='left'
     assert t.drawing_track.resize_mode(d.state.drawings[0],t.x_for(50))=='right'
     assert t.drawing_track.resize_mode(d.state.drawings[0],t.x_for(45))=='click'
-    start=QPoint(round(t.x_for(45)),42)
+    start=QPoint(round(t.x_for(45)),t.track_y('drawing')+2)
     QTest.mousePress(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.AltModifier,start)
-    move_mouse(t,start.x()+100,42,Qt.KeyboardModifier.AltModifier)
-    QTest.mouseRelease(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.AltModifier,QPoint(start.x()+100,42))
+    move_mouse(t,start.x()+round(10*t.track_width()/t.span()),t.track_y('drawing')+2,Qt.KeyboardModifier.AltModifier)
+    QTest.mouseRelease(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.AltModifier,QPoint(start.x()+round(10*t.track_width()/t.span()),t.track_y('drawing')+2))
     assert (d.state.drawings[0].start,d.state.drawings[0].end)==(50,60)
 
 
@@ -90,7 +90,7 @@ def test_ruler_menu_merges_actions_without_duplicates(timeline):
 
 def test_shift_selection_on_key_strip_preserves_keys(timeline):
     t,d=timeline; original=d.state.drawings
-    start=QPoint(round(t.x_for(30.5)),42); end=QPoint(round(t.x_for(50.5)),42)
+    start=QPoint(round(t.x_for(30.5)),t.track_y('drawing')+2); end=QPoint(round(t.x_for(50.5)),t.track_y('drawing')+2)
     QTest.mousePress(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.ShiftModifier,start)
     move_mouse(t,end.x(),end.y(),Qt.KeyboardModifier.ShiftModifier)
     QTest.mouseRelease(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.ShiftModifier,end)
@@ -102,7 +102,7 @@ def test_dense_keys_keep_compact_height_and_render(application):
     t=Timeline(); t.resize(1200,100)
     keys=tuple(DrawingKey(f,f+1,(Mark(),)) for f in range(0,100000,5))
     state=State((Segment(None,0,100000),),drawings=keys,frame_markers=(10,50000,99999))
-    t.set_document(state,{},24); assert t.height()==80
+    t.set_document(state,{},24); assert t.height()==116
     image=QImage(t.size(),QImage.Format.Format_ARGB32_Premultiplied); t.render(image)
     for zoom in (1,10,100):
         t.zoom=zoom; t.view_start=40000 if zoom>1 else 0

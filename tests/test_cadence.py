@@ -5,7 +5,7 @@ from fractions import Fraction
 from dataclasses import replace
 import numpy as np
 import pytest
-sys.path.insert(0,str(Path(__file__).parent))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from model import Document,State,Segment,slice_segments,locate,sample_at,TimelinePCM
 from media import prepare_media,PreviewReader,export_video,exposure_lut,ffmpeg,exposure_filter
 
@@ -59,7 +59,7 @@ def test_exposure_ffmpeg_parity(tmp_path):
 def prepared(tmp_path_factory):
     root=tmp_path_factory.mktemp('media')
     os.environ['CADENCE_CACHE']=str(root/'cache')
-    m=prepare_media(Path(__file__).parents[1]/'assets'/'Demonstration.mp4')
+    m=prepare_media(Path(__file__).resolve().parents[1]/'assets'/'Demonstration.mp4')
     return m,root
 
 def test_import_and_precise_seek(prepared):
@@ -126,7 +126,7 @@ def test_ui_smoke(prepared,tmp_path):
         from media import PreviewReader
         reader=PreviewReader(); assert np.array_equal(win.viewer.rgb,reader.read(m,54)); reader.close()
         win.grab().save(str(tmp_path/'ui.png'))
-        screenshot=Path(__file__).parent/'ui-preview.png'; win.grab().save(str(screenshot))
+        screenshot=Path(__file__).resolve().parents[1]/'ui-preview.png'; win.grab().save(str(screenshot))
     finally:
         win.doc.saved_signature=win.doc.signature(); win.close(); app.processEvents()
 
@@ -268,7 +268,7 @@ def test_view_controls_and_scrub(prepared,tmp_path):
         QTest.keyClick(win,Qt.Key.Key_Escape); app.processEvents()
         assert not win.video_fullscreen and win.header.isHidden() and win.timeline_panel.isHidden()
         win.panel_actions['header'].trigger(); win.timeline_action.trigger(); app.processEvents()
-        win.grab().save(str(Path(__file__).parent/'ui-preview.png'))
+        win.grab().save(str(Path(__file__).resolve().parents[1]/'ui-preview.png'))
     finally:
         win.viewer.scrub_pixels=original_scrub; win.doc.saved_signature=win.doc.signature(); win.close(); app.processEvents()
 
@@ -338,14 +338,15 @@ def test_timeline_gestures_and_numeric_scrub(prepared):
             QApplication.sendEvent(t,QMouseEvent(QEvent.Type.MouseMove,point,QPointF(t.mapToGlobal(point.toPoint())),Qt.MouseButton.NoButton,Qt.MouseButton.LeftButton,modifier))
             QTest.mouseRelease(t,Qt.MouseButton.LeftButton,modifier,QPoint(round(t.x_for(b)),y))
             app.processEvents()
-        drag(2,20,60); assert abs(d.state.position-20)<=1 and d.state.selection is None
-        drag(3,15,60,Qt.KeyboardModifier.ShiftModifier); assert d.state.selection and d.state.selection[1]-d.state.selection[0]>=12
+        drag(2,20,t.track_y('video')+9); assert abs(d.state.position-20)<=1 and d.state.selection is None
+        drag(3,15,t.track_y('video')+9,Qt.KeyboardModifier.ShiftModifier); assert d.state.selection and d.state.selection[1]-d.state.selection[0]>=12
         win.clear_selection(); win.link_tracks.setChecked(False)
         audio_before=d.state.audio
-        drag(5,48,60,Qt.KeyboardModifier.AltModifier)
+        drag(5,48,t.track_y('video')+9,Qt.KeyboardModifier.AltModifier)
         assert expanded(d.state.segments)==list(range(48,72))+list(range(24))
         assert d.state.audio==audio_before
         win.undo(); win.clear_selection()
+        win.workspaces.set_timeline_simple(False)
         win.expand_media_audio(d.active_track_id,True)
         drag(5,48,t.track_y('audio')+9,Qt.KeyboardModifier.AltModifier)
         assert expanded(d.state.audio)==list(range(48,72))+list(range(24))
@@ -365,7 +366,7 @@ def test_timeline_gestures_and_numeric_scrub(prepared):
 def test_association_command_quotes():
     from association import registration_values
     values=registration_values('C:/Program Files/Cadence Studio/CadenceStudio.exe')
-    command=values[r'Software\Classes\CadenceStudio.Project\shell\open\command'][0]
+    command=values[r'Software\Classes\Cadence.Studio2.Project\shell\open\command'][0]
     assert command.startswith('"') and command.endswith('" "%1"')
 
 
@@ -414,14 +415,14 @@ def test_drag_visual_and_gap_preview(prepared):
         app.processEvents(); t=win.timeline
         assert t.boundary_for(t.x_for(30))==24
         assert t.boundary_for(t.x_for(43))==48
-        QTest.mousePress(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.AltModifier,QPoint(round(t.x_for(5)),60))
-        QTest.mouseMove(t,QPoint(round(t.x_for(65)),60)); QTest.qWait(150)
+        QTest.mousePress(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.AltModifier,QPoint(round(t.x_for(5)),t.track_y('video')+9))
+        QTest.mouseMove(t,QPoint(round(t.x_for(65)),t.track_y('video')+9)); QTest.qWait(150)
         assert t.drop_frame==72 and t.ghost_x is not None
         deadline=time.monotonic()+2
         while abs(t.animated_x-t.x_for(72))>=1 and time.monotonic()<deadline: QTest.qWait(20)
         assert abs(t.animated_x-t.x_for(72))<1
-        win.grab().save(str(Path(__file__).parent/'drag-preview.png'))
-        QTest.mouseRelease(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.AltModifier,QPoint(round(t.x_for(65)),60))
+        win.grab().save(str(Path(__file__).resolve().parents[1]/'drag-preview.png'))
+        QTest.mouseRelease(t,Qt.MouseButton.LeftButton,Qt.KeyboardModifier.AltModifier,QPoint(round(t.x_for(65)),t.track_y('video')+9))
         assert d.state.segments[-1]==Segment(k,0,24)
         win.leave_gap.setChecked(True); win.move_section(0,24,72,'video')
         win.seek(1); assert win.viewer.image.pixelColor(0,0).red()==0
@@ -452,7 +453,7 @@ def test_timeline_context_menu_track(prepared):
     m,_=prepared; k=m['id']; d=Document(); d.media={k:m}; d.state=State((Segment(k,0,24),Segment(k,48,72)),selection=(4,10)); win.install_doc(d)
     try:
         t=win.timeline; app.processEvents()
-        assert t.context_target(t.x_for(6),60)==(4,10,'video')
+        assert t.context_target(t.x_for(6),t.track_y('video')+9)==(4,10,'video')
         assert t.context_target(t.x_for(30),t.track_y('audio')+9) is None
         win.expand_media_audio(d.active_track_id,True)
         assert t.context_target(t.x_for(30),t.track_y('audio')+9)==(24,48,'audio')
@@ -564,7 +565,7 @@ def test_navigation_library_and_volume(prepared,tmp_path):
         win.library.show();
         deadline=time.time()+5
         while win.rendered_token!=win.token and time.time()<deadline: app.processEvents(); QTest.qWait(10)
-        win.grab().save(str(Path(__file__).parent/'ui-preview.png'))
+        win.grab().save(str(Path(__file__).resolve().parents[1]/'ui-preview.png'))
     finally: d.saved_signature=d.signature(); win.close(); app.processEvents()
 
 
@@ -637,6 +638,7 @@ def test_library_right_click_and_delete_both(prepared):
     from PySide6.QtWidgets import QApplication,QMenu
     from PySide6.QtCore import QTimer,Qt
     from app import MainWindow
+    from ui_text import tr
     app=QApplication.instance() or QApplication([]); win=MainWindow(); win.show(); win.library.show(); m,_=prepared
     d=Document(); d.append_media([m,m]); win.install_doc(d)
     try:
@@ -645,7 +647,9 @@ def test_library_right_click_and_delete_both(prepared):
             def choose():
                 menu=app.activePopupWidget()
                 try:
-                    assert isinstance(menu,QMenu); assert menu.actions()[0].text()=='Supprimer'; menu.actions()[0].trigger()
+                    assert isinstance(menu,QMenu)
+                    delete, = [action for action in menu.actions() if action.text() == tr('Supprimer')]
+                    delete.trigger()
                 finally:
                     if menu: menu.close()
             QTimer.singleShot(50,choose)
@@ -666,7 +670,11 @@ def test_volume_bars_context_and_drag(tmp_path):
     app=QApplication.instance() or QApplication([]); app.setStyleSheet(STYLE); win=MainWindow(); win.show()
     try:
         v=win.volume; app.processEvents()
-        QTest.mousePress(v,Qt.MouseButton.LeftButton,pos=QPoint(7,20)); QTest.mouseMove(v,QPoint(52,20)); QTest.mouseRelease(v,Qt.MouseButton.LeftButton,pos=QPoint(52,20))
+        slider=v.slider
+        midpoint=QPoint(slider.width()//2,slider.height()//2)
+        QTest.mousePress(slider,Qt.MouseButton.LeftButton,pos=QPoint(6,midpoint.y()))
+        QTest.mouseMove(slider,midpoint)
+        QTest.mouseRelease(slider,Qt.MouseButton.LeftButton,pos=midpoint)
         assert v.value()==50 and win.transport.volume==.5
         for expected in ('Couper le son','Réactiver le son'):
             def choose(label=expected):
@@ -745,12 +753,17 @@ def test_multi_delete_single_undo():
     d.undo(); assert d.state==before
 
 
-def test_library_multiple_selection_and_locked_clean_layout(prepared,monkeypatch):
+def test_library_multiple_selection_and_locked_clean_layout(prepared,monkeypatch,tmp_path):
     from PySide6.QtWidgets import QApplication,QDockWidget,QLabel,QMenu,QAbstractItemView
     from PySide6.QtCore import Qt,QTimer
     from app import MainWindow,STYLE
-    app=QApplication.instance() or QApplication([]); app.setStyleSheet(STYLE); win=MainWindow(); win.show(); m,_=prepared
-    d=Document(); d.append_media([m,m,m]); win.install_doc(d); win.library.show(); app.processEvents()
+    app=QApplication.instance() or QApplication([])
+    app.setStyleSheet(STYLE)
+    win=MainWindow()
+    win.show()
+    m,_=prepared
+    d=Document(); d.append_media([m,m,m]); win.install_doc(d); win.library.show()
+    win.library_tabs.setCurrentWidget(win.playlist); app.processEvents()
     try:
         assert 'hint' not in win.panel_widgets() and 'status' not in win.panel_widgets()
         assert not any('LECTURE PRÉCISE' in label.text() or 'I / O : bornes' in label.text() for label in win.findChildren(QLabel))
@@ -761,13 +774,14 @@ def test_library_multiple_selection_and_locked_clean_layout(prepared,monkeypatch
         win.timeline_panel.setFloating(True); win.layout_action.trigger(); app.processEvents(); assert not win.timeline_panel.isFloating()
         for listing in (win.playlist,win.media_list): assert listing.selectionMode()==QAbstractItemView.SelectionMode.ExtendedSelection
         win.playlist.item(0).setSelected(True); win.playlist.item(2).setSelected(True); before=d.state; count=len(d.undo_stack)
-        def choose():
-            menu=app.activePopupWidget()
-            try:
+        class SelectionMenu(QMenu):
+            def exec(self,*args):
                 assert len(win.playlist.selectedItems())==2
-                menu.actions()[0].trigger()
-            finally: menu.close()
-        QTimer.singleShot(30,choose); win.library_context(win.playlist,win.playlist.visualItemRect(win.playlist.item(2)).center())
+                assert self.actions()[0].text()=='Supprimer'
+                self.actions()[0].trigger()
+        with monkeypatch.context() as scoped:
+            scoped.setattr('app.QMenu',SelectionMenu)
+            win.library_context(win.playlist,win.playlist.visualItemRect(win.playlist.item(2)).center())
         assert d.state.length==192 and len(d.undo_stack)==count+1
         win.undo(); assert d.state==before
         # Follow external scrub, keep manual scroll until the playhead actually moves.
@@ -776,23 +790,27 @@ def test_library_multiple_selection_and_locked_clean_layout(prepared,monkeypatch
         win.timeline_scroll.setValue(0); assert t.view_start==0
         win.seek(351); assert t.view_start>0
         win.seek(10); assert t.view_start<=10<t.view_start+t.span()
-        win.library.hide(); win.grab().save(str(Path(__file__).parent/'ui-preview.png'))
+        win.library.hide(); assert win.grab().save(str(tmp_path/'ui-preview.png'))
     finally: d.saved_signature=d.signature(); win.close(); app.processEvents()
 
 
-def test_volume_no_outline_no_cross():
+def test_volume_slider_mute_and_keyboard():
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QApplication
     from widgets import VolumeBars
-    from app import STYLE
-    app=QApplication.instance() or QApplication([]); app.setStyleSheet(STYLE); v=VolumeBars(); v.show(); v.setValue(100)
+    app=QApplication.instance() or QApplication([])
+    v=VolumeBars(); v.show()
     try:
-        v.clearFocus(); app.processEvents(); unfocused=v.grab().toImage()
-        v.setFocus(); app.processEvents(); focused=v.grab().toImage()
-        assert focused==unfocused
-        v.setMuted(True); app.processEvents(); muted=v.grab().toImage()
-        # No pale cross: all painted pixels remain within the dark grey palette.
-        assert max(muted.pixelColor(x,y).red() for x in range(v.width()) for y in range(v.height()))<150
-        assert muted!=focused
+        QTest.keyClick(v.slider,Qt.Key.Key_End)
+        assert v.readout.text()=='100 %'
+        v.speaker.click()
+        assert v.muted and v.value()==100
+        QTest.keyClick(v.slider,Qt.Key.Key_M)
+        assert not v.muted and v.value()==100
+        QTest.keyClick(v.slider,Qt.Key.Key_Home)
+        QTest.keyClick(v.slider,Qt.Key.Key_Right)
+        assert v.value()==5 and v.readout.text()=='5 %'
     finally: v.close()
 
 def test_timeline_ruler_context_units():
@@ -825,8 +843,8 @@ def test_compact_timeline_when_panels_hidden(prepared):
         for key in ('header','transport'): win.set_panel(key,False)
         win.resize(1600,1000); app.processEvents()
         assert win.viewer.height()>before
-        assert win.timeline.height()==80 and win.timeline_panel.height()==timeline_height
-        assert 79<=win.timeline_panel.height()<=82
+        assert win.timeline.height()==win.timeline.media_height() and win.timeline_panel.height()==timeline_height
+        assert abs(win.timeline_panel.height()-win.timeline.height()-win.studio.timeline_bar.height()-win.studio.foot.height())<=2
         for control in (win.copy_audio,win.leave_gap,win.link_tracks):
             assert win.header.isAncestorOf(control) and not win.timeline_panel.isAncestorOf(control)
         win.timeline.zoom=4; win.timeline.clamp_view(); app.processEvents()
@@ -843,8 +861,11 @@ def test_locked_library_compact_timecode_and_fullscreen(prepared):
     app=QApplication.instance() or QApplication([]); win=MainWindow(); win.show(); app.processEvents()
     try:
         assert not win.layout_editable and win.library_action.isEnabled()
-        win.library_action.trigger(); app.processEvents(); assert win.library.isVisible()
-        win.library_action.trigger(); app.processEvents(); assert win.library.isHidden()
+        shown=win.library.isVisible()
+        win.library_action.trigger(); app.processEvents(); assert win.library.isVisible()!=shown
+        win.library_action.trigger(); app.processEvents(); assert win.library.isVisible()==shown
+        win.panel_actions['timecode'].setChecked(True)
+        win.timecode_overlay.setVisible(True)
         assert not win.timecode_overlay.isHidden() and win.timecode_overlay.rect().isEmpty()
         assert not (win.dockOptions()&QMainWindow.DockOption.AnimatedDocks)
         size=win.size(); margins=win.centralWidget().layout().contentsMargins(); heights={k:w.height() for k,w in win.panel_widgets().items() if k!='timecode'}
@@ -912,7 +933,7 @@ def test_comparison_playback_modes_sync_and_save(prepared,tmp_path,monkeypatch):
     try:
         win.compare_cycle_btn.click(); assert win.comparison_panel.isVisible() and not win.compare_swap_btn.isEnabled()
         win.seek(24); win.use_reference(m); rendered(); assert win.viewer.comparing; assert win.reference_combo.currentData()==m['id']
-        assert win.windowTitle().startswith('● Cadence -')
+        assert win.windowTitle().startswith('● Cadence 2.0 -')
         win.workspaces.switch('read'); app.processEvents(); assert win.compare_cycle_btn.isVisible()
         win.compare_enabled.setChecked(False); win.comparison_panel.hide()
         for index,(_,mode) in enumerate(MODES):
@@ -923,7 +944,8 @@ def test_comparison_playback_modes_sync_and_save(prepared,tmp_path,monkeypatch):
             if mode=='difference': assert image.pixelColor(w//2,h//2).red()==0
         win.compare_swap_btn.click(); assert win.viewer.compare_swapped and win.compare_cycle_btn.symbol=='front_b'
         win.compare_swap_btn.click(); assert not win.viewer.compare_swapped and win.compare_swap_btn.symbol=='ab'
-        win.compare_cycle_btn.click(); rendered(); assert not win.viewer.comparing and win.compare_cycle_btn.symbol=='off'
+        win.compare_cycle_btn.click(); rendered(); assert win.viewer.comparing and win.compare_cycle_btn.symbol=='horizontal'
+        win.compare_action.trigger(); rendered(); assert not win.viewer.comparing and win.compare_cycle_btn.symbol=='off'
         assert not win.compare_swap_btn.isEnabled() and win.viewer.image.width()==w
         win.compare_cycle_btn.click(); rendered(); assert win.viewer.compare_mode=='horizontal' and win.viewer.comparing
         win.workspaces.switch('edit'); win.comparison_panel.show()
@@ -983,7 +1005,8 @@ def test_vector_transport_loop_toggle():
         win.set_loop(True); assert win.loop_btn.isChecked()
         playback=[b for b in win.transport_widget.findChildren(TransportButton) if type(b) is TransportButton]
         assert len(playback)==6
-        for b in playback: assert (b.width(),b.height())==(36,34) and not b.text()
+        for b in playback:
+            assert b.height()==30 and b.width()==(39 if b is win.play_btn else 28) and not b.text()
     finally: win.close(); app.processEvents()
 
 def test_waveform_peaks_and_visual_normalization(tmp_path):
@@ -1035,9 +1058,9 @@ def test_duplicate_context_and_alt_shift_drag(prepared):
         assert expanded(d.state.audio)==expanded(d.state.segments)==list(range(24))*2+list(range(48,72))
         win.undo(); assert d.state==before
         mod=Qt.KeyboardModifier.AltModifier|Qt.KeyboardModifier.ShiftModifier
-        QTest.mousePress(t,Qt.MouseButton.LeftButton,mod,QPoint(round(t.x_for(6)),60)); QTest.mouseMove(t,QPoint(round(t.x_for(48)),60))
+        QTest.mousePress(t,Qt.MouseButton.LeftButton,mod,QPoint(round(t.x_for(6)),t.track_y('video')+9)); QTest.mouseMove(t,QPoint(round(t.x_for(48)),t.track_y('video')+9))
         assert t.gesture=='copy' and t.drop_frame==48
-        QTest.mouseRelease(t,Qt.MouseButton.LeftButton,mod,QPoint(round(t.x_for(48)),60))
+        QTest.mouseRelease(t,Qt.MouseButton.LeftButton,mod,QPoint(round(t.x_for(48)),t.track_y('video')+9))
         assert d.state.length==72 and expanded(d.state.audio)==expanded(d.state.segments)==list(range(24))+list(range(48,72))+list(range(24))
         win.undo(); assert d.state==before
     finally: d.saved_signature=d.signature(); win.close(); app.processEvents()
@@ -1072,10 +1095,11 @@ def test_default_panels_match_requested_layout():
     from app import MainWindow
     app=QApplication.instance() or QApplication([]); win=MainWindow(); win.show(); app.processEvents()
     try:
-        for key in ('timeline','transport','timecode'): assert not win.panel_widgets()[key].isHidden() and win.panel_actions[key].isChecked()
-        for key in ('header','comparison','drawing'): assert win.panel_widgets()[key].isHidden() and not win.panel_actions[key].isChecked()
+        for key in ('timeline','transport'): assert not win.panel_widgets()[key].isHidden() and win.panel_actions[key].isChecked()
+        for key in ('header','comparison','drawing','timecode'): assert win.panel_widgets()[key].isHidden() and not win.panel_actions[key].isChecked()
         assert not {'inspector','meta','status'} & win.panel_widgets().keys()
-        assert win.library.isHidden() and not win.layout_editable and not win.layout_action.isChecked()
+        assert win.library.isVisible() and win.library_action.isChecked()
+        assert not win.layout_editable and not win.layout_action.isChecked()
     finally: win.close(); app.processEvents()
 
 def test_continuous_drag_wrap_has_no_jumps_and_restores_cursor():

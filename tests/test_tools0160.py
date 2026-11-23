@@ -160,7 +160,7 @@ def test_reset_panel_layout_preserves_project_and_other_mode(window,application)
     assert not w.layout_editable and not w.comparison_panel.isFloating()
     assert w.dockWidgetArea(w.timeline_panel)==Qt.DockWidgetArea.BottomDockWidgetArea
     assert w.dockWidgetArea(w.header)==Qt.DockWidgetArea.TopDockWidgetArea
-    assert not w.library.isHidden() and not w.drawing.panel.isHidden() and not w.header.isHidden()
+    assert not w.library.isHidden() and not w.edit_toolbar.isHidden() and w.drawing.panel.isHidden() and w.header.isHidden()
     assert w.workspaces.profiles['read']==read_profile and w.doc.state==original
     view=next(a.menu() for a in w.menuBar().actions() if a.text()=='Affichage')
     assert view.actions()[-1] is w.reset_layout_action and view.actions()[-2].isSeparator()

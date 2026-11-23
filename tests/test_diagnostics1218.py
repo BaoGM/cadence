@@ -3,7 +3,7 @@ import os,subprocess,sys
 from pathlib import Path
 
 def test_python_thread_and_qt_errors_are_logged(tmp_path):
-    source=Path(__file__).parent
+    source=Path(__file__).resolve().parents[1]
     program='''
 import diagnostics,sys,threading,logging
 diagnostics.initialize()

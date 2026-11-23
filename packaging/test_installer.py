@@ -10,10 +10,10 @@ import winreg
 
 from build_installer import PROJECT, SOURCE, sha256
 
-ROOT = PROJECT / 'work/installer-tests'
+ROOT = PROJECT / 'work/installer-tests-studio2'
 PACKAGES = ROOT / 'packages'
 INSTALL = ROOT / 'Cadence'
-PRIVATE_REGISTRY = r'Software\CadenceInstallerTests'
+PRIVATE_REGISTRY = r'Software\CadenceStudio2InstallerTests'
 TEST_HIVE = winreg.HKEY_CURRENT_USER
 
 
@@ -56,8 +56,8 @@ def delete_test_registry(path=PRIVATE_REGISTRY):
 def main():
     global ROOT, INSTALL, TEST_HIVE
     parser = argparse.ArgumentParser()
-    parser.add_argument('--previous', default='1.10.8')
-    parser.add_argument('--current', default='1.11.0')
+    parser.add_argument('--previous', default='2.0.0')
+    parser.add_argument('--current', default='2.0.0')
     parser.add_argument('--all-users', action='store_true')
     args = parser.parse_args()
     if args.all_users:
@@ -76,26 +76,26 @@ def main():
     association_before = [registry_value(key, hive=hive) for hive in hives for key in production_keys]
     results = {}
     try:
-        for version in (args.previous, args.current):
+        for index,version in enumerate((args.previous, args.current)):
             run(PACKAGES / f'Cadence-{version}-Setup.exe', mode, f'/DIR={INSTALL}', '/TASKS=filetypes',
                 '/NOCLOSEAPPLICATIONS', '/LANG=french', f'/LOG={ROOT / (version + ".log")}')
             source = PROJECT / f'outputs/v{version}/Cadence'
             expected = {p.relative_to(source): sha256(p) for p in source.rglob('*') if p.is_file()}
             assert all((INSTALL / relative).is_file() and sha256(INSTALL / relative) == digest for relative, digest in expected.items())
             assert (INSTALL / 'Test Start Menu/Cadence.lnk').is_file()
-            command = registry_value(PRIVATE_REGISTRY + r'\Classes\Cadence.Installed.Media\shell\open\command')
+            command = registry_value(PRIVATE_REGISTRY + r'\Classes\Cadence.Studio2.Installed.Media\shell\open\command')
             assert command == f'"{INSTALL / "Cadence.exe"}" "%1"'
-            assert registry_value(PRIVATE_REGISTRY + r'\Cadence\InstalledCapabilities\FileAssociations', '.wav') == 'Cadence.Installed.Media'
+            assert registry_value(PRIVATE_REGISTRY + r'\CadenceStudio2\InstalledCapabilities\FileAssociations', '.wav') == 'Cadence.Studio2.Installed.Media'
             if version == args.current:
-                assert registry_value(PRIVATE_REGISTRY + r'\Classes\.wav\OpenWithProgids', 'Cadence.Installed.Media') == ''
-                uninstall_key = r'Software\Microsoft\Windows\CurrentVersion\Uninstall\Cadence.Installer.Test_is1'
-                assert registry_value(uninstall_key, 'DisplayName') == 'Cadence Installer Test'
+                assert registry_value(PRIVATE_REGISTRY + r'\Classes\.wav\OpenWithProgids', 'Cadence.Studio2.Installed.Media') == ''
+                uninstall_key = r'Software\Microsoft\Windows\CurrentVersion\Uninstall\Cadence.Installer.Studio2.Test_is1'
+                assert registry_value(uninstall_key, 'DisplayName') == 'Cadence 2.0 Installer Test'
                 assert registry_value(uninstall_key, 'DisplayVersion') == args.current
                 results['separate_name_and_version'] = True
             log = (ROOT / (version + '.log')).read_text(encoding='utf-8-sig')
             assert 'Administrative install mode: ' + ('Yes' if args.all_users else 'No') in log
             results[version] = {'files_verified': len(expected), 'shortcut': True, 'associations': True}
-            if version == args.previous:
+            if index == 0:
                 (INSTALL / 'personal.cadence').write_text('User project - preserve', encoding='utf-8')
                 obsolete = INSTALL / '_internal/obsolete-test.dll'
                 obsolete.write_bytes(b'old library')
@@ -108,6 +108,7 @@ def main():
                 assert not (INSTALL / '_internal/obsolete-test.dll').exists()
                 assert (INSTALL / '_internal/modified-test.dll').read_bytes() == b'user modification'
                 assert (INSTALL / 'personal.cadence').read_text(encoding='utf-8') == 'User project - preserve'
+                results['updated_managed_files'] = True
         run(PACKAGES / f'Cadence-{args.current}-Setup.exe', mode, '/TASKS=filetypes', '/NOCLOSEAPPLICATIONS',
             '/LANG=english', f'/LOG={ROOT / "reinstall.log"}')
         assert sha256(INSTALL / 'Cadence.exe') == sha256(PROJECT / f'outputs/v{args.current}/Cadence/Cadence.exe')
@@ -131,8 +132,8 @@ def main():
     assert not (INSTALL / 'Cadence.exe').exists()
     assert not (INSTALL / 'Test Start Menu/Cadence.lnk').exists()
     assert (INSTALL / 'personal.cadence').is_file()
-    assert registry_value(PRIVATE_REGISTRY + r'\Classes\Cadence.Installed.Media\shell\open\command') is None
-    assert registry_value(r'Software\Microsoft\Windows\CurrentVersion\Uninstall\Cadence.Installer.Test_is1', 'DisplayName') is None
+    assert registry_value(PRIVATE_REGISTRY + r'\Classes\Cadence.Studio2.Installed.Media\shell\open\command') is None
+    assert registry_value(r'Software\Microsoft\Windows\CurrentVersion\Uninstall\Cadence.Installer.Studio2.Test_is1', 'DisplayName') is None
     results['uninstall'] = True
     results['user_files_preserved'] = True
     results['administrative_mode'] = args.all_users

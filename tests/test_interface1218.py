@@ -23,12 +23,12 @@ def test_panel_menu_timeline_commands(window,application):
     action(menu,'timeline_simple').trigger();assert t.simple
     menu.deleteLater()
 
-def test_all_tracks_units_and_equal_heights(window,application):
+def test_all_tracks_units_and_lane_heights(window,application):
     w=window;t=w.timeline;w.doc.state=replace(w.doc.state,drawings=(DrawingKey(4,9,(Mark(),)),));w.refresh()
     w.expand_media_audio(w.doc.active_track_id,True)
     rectangles=[t.track_rect(track) for track in ('video','audio')]
-    assert len({r.height() for r in rectangles})==1
-    assert rectangles[1].top()-rectangles[0].bottom()==7
+    assert rectangles[0].height()>rectangles[1].height()>0
+    assert rectangles[1].top()-rectangles[0].bottom()==6
     assert t.track_y('drawing')<rectangles[0].top()
     assert t.height()-rectangles[-1].bottom()<20
     for track in ('video','audio','drawing'):

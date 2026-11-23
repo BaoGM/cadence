@@ -33,6 +33,16 @@ def test_no_drafts_or_incomplete_assets():
     oversized=release(); oversized['assets'][0]['size']=updates.MAX_PACKAGE+1
     assert updates.select_release([draft,missing,malformed,oversized],'1.16.0',True) is None
 
+def test_studio_channel_is_separate(monkeypatch):
+    studio=release('2.0.1',True)
+    studio['tag_name'] += '-windows-studio2'
+    stable=release('2.1.0')
+    entries=[studio,stable,release('1.18.5')]
+    monkeypatch.setattr(updates,'read_json',lambda url: entries)
+    assert updates.check('2.0.0',False,False) is None
+    assert updates.check('2.0.0',False,True).tag == 'v2.0.1-windows-studio2'
+    assert updates.select_release([studio],'1.18.5',True,True) is None
+
 @pytest.mark.parametrize('url', ['http://github.com/a','https://evil.invalid/a','https://github.com.evil.invalid/a','https://x@github.com/a','file:///C:/evil','https://github.com:123/a'])
 def test_reject_untrusted_urls(url):
     with pytest.raises(ValueError): updates.checked_url(url)

@@ -30,7 +30,7 @@ def test_explicit_rate_after_refusal_and_all_media_undo(link, monkeypatch):
     from media import prepare_media
     from model import Document
     w=link.window
-    media=prepare_media(Path(__file__).parents[1]/'assets/Demonstration.mp4',quality='480p')
+    media=prepare_media(Path(__file__).resolve().parents[1]/'assets/Demonstration.mp4',quality='480p')
     other=dict(media,id=media['id']+'-second')
     w.doc=Document(); w.doc.append_media([media,other]); baseline=w.doc.state
     w.preferences={'preview_quality':'480p'}
@@ -114,11 +114,11 @@ def test_quarter_screen_and_compact_transport(application,tmp_path,monkeypatch):
                 w.resize(width,height); application.processEvents(); QTest.qWait(20)
                 assert w.size().width()<=width and w.size().height()<=height
                 assert w.viewer.width()>=150 and w.viewer.height()>=70
-                assert w.transport_widget.width()==w.width()
+                assert w.transport_widget.width()==w.viewer_workspace.width()
                 assert w.timeline_panel.width()==w.width()
                 assert w.timeline_panel.geometry().bottom()<w.height()
         w.resize(1360,890); application.processEvents(); QTest.qWait(20)
-        assert not w.compact_transport.compact and w.transport_widget.widget().height()==42
+        assert not w.compact_transport.compact and w.transport_widget.widget().height()==48
         assert not any('Aligner les positions' in key for key in w.action_registry)
         assert w.action_registry['Synchronisation 3D/Adapter la cadence du média courant…'][1]=='Ctrl+Alt+R'
     finally:

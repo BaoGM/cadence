@@ -19,7 +19,7 @@ def test_drawing_menu_uses_selection_from_any_track(window,track,operation):
         assert [k.start for k in d.state.drawings]==[2,22]
         d.undo();assert d.state.drawings==keys
         d.redo();assert [k.start for k in d.state.drawings]==[2,22]
-    assert t.height()==80
+    assert t.height()==t.media_height()
 
 def test_right_click_outside_selection_targets_only_clicked_key(window):
     w=window;d=w.doc;t=w.timeline

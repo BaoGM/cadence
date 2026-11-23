@@ -16,7 +16,7 @@ PREVIEW_SIZES={'480p':(854,480),'720p':(1280,720),'1080p':(1920,1080),'4k':(3840
 def ffmpeg(): return str(Path(__file__).parent/'vendor'/'ffmpeg.exe')
 
 def cache_root():
-    root = Path(os.environ.get('CADENCE_CACHE',Path(os.environ.get('LOCALAPPDATA',tempfile.gettempdir()))/'CadenceStudio'/'cache'))
+    root = Path(os.environ.get('CADENCE_CACHE',Path(os.environ.get('LOCALAPPDATA',tempfile.gettempdir()))/'CadenceStudio-2'/'cache'))
     root.mkdir(parents=True,exist_ok=True)
     return root
 

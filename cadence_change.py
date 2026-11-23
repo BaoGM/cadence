@@ -136,4 +136,9 @@ def build_change(state,media,fps,ranges,target,mode,preserve_pitch,quality,progr
         if value is None: return None
         a,b=map(warp,value); return (a,b) if a<b else None
     new=replace(state,segments=video,audio_segments=audio,drawings=tuple(keys),position=min(length,warp(state.position)),selection=selection(state.selection),loop_range=selection(state.loop_range),frame_markers=tuple(sorted(set(min(length-1,warp(f)) for f in state.frame_markers))))
-    return new,updated
+    names={}
+    for frame,name in state.marker_names:
+        dest=min(length-1,warp(frame))
+        if dest>=0:
+            names.setdefault(dest,[]).append(name)
+    return replace(new,marker_names=tuple((f,' / '.join(dict.fromkeys(labels))) for f,labels in sorted(names.items()))),updated

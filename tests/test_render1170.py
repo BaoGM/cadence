@@ -100,14 +100,16 @@ def test_tracks_reference_volume_and_dialog(application,clips,tmp_path,monkeypat
     try:
         rendered(); timeline=window.timeline
         first,second=doc.state.tracks
-        assert timeline.height()==113
-        QTest.mouseClick(timeline,Qt.LeftButton,Qt.NoModifier,QPoint(40,55))
+        upper,lower=(y+8 for _,y,_ in timeline.media_rows())
+        folded=timeline.height()
+        assert folded==timeline.media_height()
+        QTest.mouseClick(timeline,Qt.LeftButton,Qt.NoModifier,QPoint(40,upper))
         assert doc.selected_track_ids==(first.info.id,)
-        QTest.mouseClick(timeline,Qt.LeftButton,Qt.ControlModifier,QPoint(40,88))
+        QTest.mouseClick(timeline,Qt.LeftButton,Qt.ControlModifier,QPoint(40,lower))
         assert set(doc.selected_track_ids)=={first.info.id,second.info.id}
-        QTest.mouseClick(timeline,Qt.LeftButton,Qt.NoModifier,QPoint(9,88))
+        QTest.mouseClick(timeline,Qt.LeftButton,Qt.NoModifier,QPoint(9,lower))
         assert doc.state.second_track.info.audio_expanded
-        assert timeline.height()==139
+        assert timeline.height()>folded and timeline.height()==timeline.media_height()
         doc.exposure(1.)
         doc.select_track(first); doc.exposure(0.)
         doc.select_track(second,extend=True)

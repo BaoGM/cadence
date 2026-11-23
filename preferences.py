@@ -104,7 +104,7 @@ def validate(data,registry):
     return result
 
 def preference_path():
-    return Path(os.environ['CADENCE_PREFS']) if os.environ.get('CADENCE_PREFS') else Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'CadenceStudio'/'preferences.json'
+    return Path(os.environ['CADENCE_PREFS']) if os.environ.get('CADENCE_PREFS') else Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'CadenceStudio-2'/'preferences.json'
 
 def load_preferences(registry):
     try: return validate(json.loads(preference_path().read_text(encoding='utf-8')),registry)
@@ -123,11 +123,11 @@ class ShortcutDialog(QDialog):
     shortcutsChanged=Signal(dict)
     def __init__(self,registry,current,parent=None):
         super().__init__(parent); self.live_data=dict(current,shortcuts=dict(current['shortcuts'])); self.populating=False; self.registry=registry; self.result_data=None; self.setWindowTitle(tr('Options')); self.resize(950,650)
-        root=QVBoxLayout(self); tabs=QTabWidget(); root.addWidget(tabs)
-        self.tabs=tabs; prefs=QWidget(); general=QVBoxLayout(prefs); general.setContentsMargins(24,20,24,20); general.setSpacing(20)
+        from studio_options import build_options_layout, scroll_page
+        tabs=QTabWidget(); root=build_options_layout(self,tabs)
+        self.tabs=tabs; prefs=QWidget(); general=QVBoxLayout(prefs); general.setContentsMargins(20,14,20,12); general.setSpacing(14)
         def section(title):
-            group=QGroupBox(tr(title)); group.setStyleSheet('QGroupBox {border:1px solid #354254;border-radius:7px;margin-top:10px;padding:16px;} QGroupBox::title {subcontrol-origin:margin;left:12px;padding:0 6px;}')
-            return group
+            return QGroupBox(tr(title))
         display=section('Affichage et lecture'); grid=QGridLayout(display); grid.setHorizontalSpacing(20); grid.setVerticalSpacing(14); grid.setColumnStretch(1,1); general.addWidget(display)
         self.language=QComboBox(); self.language.addItem(tr('Français'),'fr'); self.language.addItem(tr('English'),'en')
         self.video_renderer=QComboBox()
@@ -154,7 +154,8 @@ class ShortcutDialog(QDialog):
         updates=section('Mises à jour'); updates_col=QVBoxLayout(updates); general.addWidget(updates)
         self.auto_update_check=QCheckBox(tr('Vérifier automatiquement les mises à jour')); updates_col.addWidget(self.auto_update_check)
         self.update_previews=QCheckBox(tr('Proposer les versions de test')); updates_col.addWidget(self.update_previews)
-        general.addStretch(); tabs.addTab(prefs,tr('Préférences')); self.cache_probe=CacheProbe(self); self.cache_probe.ready.connect(self.cache_ready); self.cache_generation=0
+        prefs.setObjectName('optionsPreferences')
+        general.addStretch(); tabs.addTab(scroll_page(prefs,maintenance),tr('Préférences')); self.cache_probe=CacheProbe(self); self.cache_probe.ready.connect(self.cache_ready); self.cache_generation=0
         QTimer.singleShot(0,self.update_cache_label)
         keys=QWidget(); self.keys_layout=QVBoxLayout(keys); tabs.addTab(keys,tr('Raccourcis'))
         self._editors={}; self._key_values={}; self.keys_ready=False; tabs.currentChanged.connect(lambda index:self.ensure_keys() if index==1 else None)
@@ -175,7 +176,8 @@ class ShortcutDialog(QDialog):
         row.addStretch(); root.addWidget(exchanges); exchanges.hide(); tabs.currentChanged.connect(lambda index:exchanges.setVisible(index>0))
         buttons=QDialogButtonBox(QDialogButtonBox.StandardButton.Save|QDialogButtonBox.StandardButton.Cancel|QDialogButtonBox.StandardButton.Close); buttons.button(QDialogButtonBox.StandardButton.Save).setText(tr('Enregistrer')); buttons.button(QDialogButtonBox.StandardButton.Cancel).setText(tr('Annuler')); buttons.accepted.connect(self.accept); buttons.rejected.connect(self.reject); root.addWidget(buttons)
         from dialogs import ButtonStyle
-        self.button_style=ButtonStyle('Fusion'); self.button_style.setParent(self); buttons.setCenterButtons(True)
+        self.button_style=ButtonStyle('Fusion'); self.button_style.setParent(self); buttons.setCenterButtons(False)
+        buttons.button(QDialogButtonBox.StandardButton.Save).setObjectName('optionsApply')
         for standard,title in [(QDialogButtonBox.StandardButton.Save,tr('Enregistrer')),(QDialogButtonBox.StandardButton.Cancel,tr('Annuler'))]:
             button=buttons.button(standard); button.setText('&'+title); button.setStyle(self.button_style)
         close=buttons.button(QDialogButtonBox.StandardButton.Close); close.setText('&'+tr('Fermer')); close.setStyle(self.button_style); close.hide()

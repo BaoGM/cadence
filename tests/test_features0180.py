@@ -25,9 +25,9 @@ def visible(w): return {k for k,p in w.workspaces.panels.items() if not p.isHidd
 def test_first_open_modes_reset_and_persist(application,tmp_path):
     from app import MainWindow
     w=MainWindow(); w.show(); application.processEvents()
-    assert w.workspaces.mode=='read' and visible(w)=={'timeline','transport','timecode'} and w.timeline.simple
+    assert w.workspaces.mode=='read' and visible(w)=={'timeline','transport','library'} and w.timeline.simple
     w.workspaces.switch('edit'); application.processEvents()
-    assert visible(w)==set(w.workspaces.panels) and not w.timeline.simple
+    assert visible(w)=={'timeline','transport','library','tools'} and not w.timeline.simple
     w.set_layout_editable(True); w.header.hide(); w.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea,w.library)
     w.resize(1580,940); application.processEvents(); w.close()
     w=MainWindow(); w.show(); application.processEvents()
@@ -36,15 +36,15 @@ def test_first_open_modes_reset_and_persist(application,tmp_path):
     assert json.loads((tmp_path/'workspaces.json').read_text(encoding='utf-8'))['geometry']
     w.workspaces.switch('read'); w.timecode_overlay.setVisible(False); w.workspaces.switch('edit')
     assert w.header.isHidden() and w.dockWidgetArea(w.library)==Qt.DockWidgetArea.RightDockWidgetArea
-    w.reset_panel_layout(); assert visible(w)==set(w.workspaces.panels) and not w.layout_editable
+    w.reset_panel_layout(); assert visible(w)=={'timeline','transport','library','tools'} and not w.layout_editable
     w.workspaces.switch('read'); assert w.timecode_overlay.isHidden()
-    w.reset_panel_layout(); assert visible(w)=={'timeline','transport','timecode'}
+    w.reset_panel_layout(); assert visible(w)=={'timeline','transport','library'}
     w.workspaces.switch('edit'); w.header.hide()
     from preferences import ShortcutDialog,validate
     dialog=ShortcutDialog(w.action_registry,w.preferences,w)
     next(b for b in dialog.findChildren(QPushButton) if b.text()=='Restaurer l’interface').click()
-    assert w.workspaces.mode=='read' and visible(w)=={'timeline','transport','timecode'}
-    w.workspaces.switch('edit'); assert visible(w)==set(w.workspaces.panels)
+    assert w.workspaces.mode=='read' and visible(w)=={'timeline','transport','library'}
+    w.workspaces.switch('edit'); assert visible(w)=={'timeline','transport','library','tools'}
     dialog.reject(); w.close()
 
 def test_options_does_not_wait_for_cache_and_keeps_lazy_keys(window,application,monkeypatch):
@@ -153,6 +153,6 @@ def test_timeline_exception_and_disable_translation(window,monkeypatch):
     assert ui_text.tr('Afficher la timeline')=='Afficher la timeline'
     assert ui_text.tr('Toute la timeline')=='Toute la timeline'
     monkeypatch.setattr(ui_text,'_language','en')
-    menu=window.timeline.context_menu(QPointF(window.timeline.x_for(3),60))
+    menu=window.timeline.context_menu(QPointF(window.timeline.x_for(3),window.timeline.track_y('video')+9))
     assert 'Disable / Enable video' in [a.text() for a in menu.actions()]
     menu.deleteLater()

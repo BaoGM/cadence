@@ -59,7 +59,7 @@ def write_snapshot(path,document,view,encoder=None):
     state,media,fps,review,project,dirty=document
     payload=dict(format='cadence-session',version=1,updated=datetime.now(timezone.utc).isoformat(),
                  project_path=project,dirty=dirty,view=view)
-    document=dict(format='cadence-studio',version=16 if state.second_track is not None or not state.track_info.audio_enabled or review.get('reference_track') else 15 if len(review.get('references',[]))>1 else 14 if review.get('reference_cadence') or any(m.get('cadence') for m in media.values()) else 13 if any(m.get('has_video') is False for m in media.values()) else 12 if state.frame_markers else 11,
+    document=dict(format='cadence-studio',version=17 if state.marker_names else 16 if state.second_track is not None or not state.track_info.audio_enabled or review.get('reference_track') else 15 if len(review.get('references',[]))>1 else 14 if review.get('reference_cadence') or any(m.get('cadence') for m in media.values()) else 13 if any(m.get('has_video') is False for m in media.values()) else 12 if state.frame_markers else 11,
                   media=list(media.values()),fps=str(fps),comparison=review)
     encoded_state=(encoder or SnapshotEncoder()).state(state)
     text=encode_json(payload)[:-1]+',"document":'+encode_json(document)[:-1]+',"state":'+encoded_state+'}}'

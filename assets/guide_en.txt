@@ -1,4 +1,4 @@
-Cadence 1.18.5 - Quick guide
+Cadence 2.0.3 - Quick guide
 
 These are the default shortcuts. The complete list is at the end of the guide; customize them in File > Options > Shortcuts.
 
@@ -20,9 +20,9 @@ Ctrl + wheel raises or lowers the master volume in 5% steps without changing the
 
 Space: play / pause. Left and Right: one frame. Home and End: timeline boundaries. Comma and Period: previous / next keyframe or marker, wrapping at either end.
 
-K switches the keyframe commands and their buttons between keyframe and frame stepping. Left and Right always step one frame. Loop playback is enabled by default. The loop button changes mode without interrupting playback; your choice is kept for the next launch.
+K switches the comma and period shortcuts between keyframe and frame stepping. The Previous key and Next key buttons always visit drawing keys and markers. Left and Right always step one frame. Loop playback is enabled by default. The loop button changes mode without interrupting playback; your choice is kept for the next launch.
 
-Drag on the timeline to scrub. With Pointer (Q), you can also drag on the video; Shift makes this more precise. Playback resumes on release if it was running; otherwise it stays paused.
+Drag on the timeline or the empty part of its header to scrub. The ruler shows the selected frame count and duration. You can also drag horizontally in the empty space around the playback controls or, with Pointer (Q), on the video. Hold Shift for finer control. If playback was running, it resumes on release.
 
 Shift-drag selects a range while displaying the current frame. You can press Shift during a drag already in progress. Release the mouse before Shift to keep the selection; the opposite order returns to scrubbing.
 
@@ -35,17 +35,17 @@ A media track pairs a video lane and an audio lane. The + Media track button add
 
 The tracks are named Track 1 and Track 2. Click a title to select a track. Ctrl-click adds or removes a track from the selection, on its title or timeline. Edits affect the selected tracks. Drag a title above or below the other to change their order. Right-click a title to move or delete the entire track. Ctrl+Z undoes these actions. Audio lanes start collapsed: click the triangle next to the title to expand them.
 
-Click the chevron next to a track title, or use the context menu, to expand or collapse its audio lane. Right-click to disable or enable all its audio, including in exports. With both tracks selected, drag media onto the other track to move its video and audio together. The source range is removed and later clips close the gap, leaving no empty clip. Alt+Shift-drag copies it while preserving the source. Drawing keys appear above the playback bar without overlapping the numbers, including on the simplified timeline.
+Click the chevron next to a track title, or use the context menu, to expand or collapse its audio lane. Right-click to disable or enable all its audio, including in exports. In detailed view, drag a clip onto the other track to move its video and audio together. Later clips on the source track close the gap. Alt+Shift-drag copies the clip. In simplified view, hold Alt and drag the clip onto the track title on the left. The title shows the destination track during the drag. Hold Shift as well to copy. Markers sit on the media strip. Drawing keys and their handles occupy the lower edge of the time ruler, below the numbers.
 
 Drawings, their keys and frame markers remain shared above both tracks. Editing one track keeps drawings in place; when both tracks are selected, linked drawings follow the edits.
 
-Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste the current frame or selected range. Delete removes the range. Sound is copied only when Copy/paste audio is checked in the top panel. Ctrl+Z undoes; Ctrl+Y redoes.
+Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste the current frame or selected range. Delete removes the range. Sound is copied only when Copy/paste audio is checked in the top panel. Ctrl+Z undoes. Ctrl+Y or Ctrl+Shift+Z redoes.
 
-Alt-drag moves a segment or range. Alt+Shift-drag duplicates it with sound. Drop before or after a segment, or inside a gap. The gap is filled; only the portion exceeding it shifts later content. Leave a gap preserves the original empty position. Linking options control whether audio and drawings follow video.
+Alt-drag moves a segment or range. A floating card follows the pointer and shows where the block will land. Press Escape to cancel the drag. Alt+Shift-drag duplicates it with sound. Drop before or after a segment, or inside a gap. The gap is filled; only the portion exceeding it shifts later content. Leave a gap preserves the original empty position. Linking options control whether audio and drawings follow video.
 
 Right-click for Split, Duplicate, Disable / Enable and deletion commands. Delete media removes video and audio and closes the gap. Deleting only video or audio preserves the positions of other elements.
 
-Mouse wheel: zoom. Ctrl + middle-button drag, or the scrollbar: horizontal navigation. Ctrl+0: fit the whole timeline. T or the context menu switches timecode / frames. The context menu also switches between simplified and detailed timelines.
+Mouse wheel: zoom. Ctrl + middle-button drag, or the scrollbar: horizontal navigation. Ctrl+0: fit the whole timeline. Alt+T or the context menu switches timecode / frames. Alt+Shift+T or the context menu switches between simplified and detailed timelines.
 
 In the playlist, Ctrl-click or Shift-click selects multiple entries; right-click > Delete removes them from the edit without deleting the original files.
 
@@ -58,13 +58,15 @@ Color, size and opacity control the stroke. Tablet pressure affects size; Sensit
 
 While drawing a shape, Alt moves it, Shift constrains proportions or the arrow angle, Ctrl transforms from the center and Alt+Ctrl rotates it. Modifiers can be combined. Start drawing before pressing Shift or Ctrl to use them as constraints.
 
-With Text, drag a box: the text fits its size. Choose a font and style in the panel. Double-click text to edit it; hold Alt to move it.
+With Text, drag a box and type directly on the image. Text fits the box as you type. Press Enter or click outside to apply. Shift + Enter adds a line and Escape cancels. Double-click existing text to edit it. Hold Alt to move it. Choose the font and style in the panel.
 
 The lasso selects and moves objects. Changing color or opacity updates the selection for its entire keyframe range. Delete removes these objects first; their context menu offers copy, cut, paste and delete.
 
-Keyframes appear below the timeline ticks. On this strip, Shift-drag selects multiple keyframes and Alt-drag moves them. A one-frame key has a single handle: drag left or right to extend it. Longer keys keep two handles. C copies, X cuts, V pastes at the playhead and D deletes keyframes while keeping the selection. Shift+K duplicates a keyframe at the playhead. These commands are also in the ruler context menu and Drawing menu.
+Drag across the empty space in the timeline header to scrub. The ruler shows the selected frame count and duration as a timecode. In detailed view, drawing keys have their own row above the ruler. In simplified view, edit them along the lower edge of the time ruler. Drag the body of a drawing key to move it. Drag a handle to change its exposure. Shift-drag selects multiple keys and Alt-drag moves the selected range. C copies, X cuts, V pastes at the playhead and D deletes keyframes while keeping the selection. Shift+K duplicates a keyframe at the playhead. These commands are also in the ruler context menu and Drawing menu.
 
-S adds a turquoise marker independent of drawings; press S on it again to remove it. Drawing keyframes are yellow. Show drawing layer controls visibility; Include drawings in export controls their inclusion in exported files.
+To adjust a drawing key with the keyboard, tab to the timeline and press Enter. An outline marks the body of the key at the playhead, the next key, or the last key if the playhead is past all keys. From the body, Shift+Tab selects the start handle and Tab selects the end handle. You can also click the body or either handle directly. Left and Right move the focused part by one frame. Ctrl+Z undoes each change. Enter or Escape returns the arrow keys to playback.
+
+Press S to add a frame marker. Press S again on the marker to remove it. Right-click its flag and choose “Rename marker…” to give it a name. Clear the field to show just the flag. Drag the flag to move the marker. Escape cancels the drag and Ctrl+Z undoes the move. Names are saved in the project. Show drawing layer controls visibility; Include drawings in export controls their inclusion in exported files.
 
 Onion skinning extends drawings over the chosen number of video frames before and after their keyframe, retaining their color and fading from the adjacent frame. A range of 0 disables that direction. It works while paused, playing and exporting.
 
@@ -80,9 +82,11 @@ Compare videos
 
 A is the working edit; B is one or more reference videos. Right-click a track title > Use as reference B to choose that track for B; the other track becomes A in the comparison preview. Export keeps the complete two-track edit. Comparison > Add B references appends them in sequence. The playlist's References tab lets you reorder them by dragging or remove them with the context menu.
 
-Modes are Side by side, Top / bottom, Overlay, Difference, Wipe and Foreground. Shift+X or the comparison button cycles through them, then returns to A alone. Alt+X swaps A and B.
+Modes are Side by side, Top / bottom, Overlay, Difference, Wipe and Foreground. Shift+X or the comparison button cycles continuously through the modes. Use A/B or Shift+C to turn comparison on or off. Alt+X swaps A and B.
 
 Opacity controls the overlay, Gain amplifies differences and Reference offset shifts B in timeline frames. In Wipe mode, drag the divider. Drawings stay on A; sound and export always come from edit A.
+
+To adjust the wipe with the keyboard, click the divider, or tab to the video and press Enter. Left and Right move the divider by 2%. Enter or Tab keeps the new position and leaves the handle. Escape restores its position when you focused it.
 
 ----------------------------------------
 Frame rate and quality
@@ -106,7 +110,7 @@ The View menu and a right-click on the background show or hide panels. Dividers 
 
 When playback controls are hidden, hover over the bottom of the video area, just above the timeline, to reveal only the Editing mode checkbox and label in a small transparent frame on the left. It disappears when the pointer leaves the frame and does not change the panels saved for the current mode.
 
-Playback and Editing modes are fully configurable in View > Playback / editing mode settings: choose panels and the simplified timeline separately for each. The Editing mode checkbox switches modes. Each mode retains its layout. File > Options > Preferences > Restore interface resets both modes to their initial state.
+Playback and Editing modes are fully configurable in View > Playback / editing mode settings: choose panels and the simplified timeline separately for each. Use Playback and Editing at the top of the window to switch modes. Press F10 to open the main menu. F1 or the ? key opens the quick guide. Custom shortcuts take priority. Each mode retains its layout. File > Options > Preferences > Restore interface resets both modes to their initial state.
 
 ----------------------------------------
 Synchronize Blender or Maya
@@ -165,7 +169,7 @@ In Maya, images are compensated for the view transform active when they are sent
 ----------------------------------------
 Updates
 
-Cadence checks for new versions at startup, at most once a day. File > Options > Preferences lets you disable this check and include prereleases. Help > Check for updates starts a manual check.
+This edition uses its own Windows 2.0 update channel. Cadence checks for new versions at startup, at most once a day. File > Options > Preferences lets you disable this check and include prereleases. Help > Check for updates starts a manual check.
 
 Per-user and portable installations download updates in the background. Cadence verifies the signed manifest and package checksum. The update takes effect on the next launch or via “Update ready · Restart now”. If the first startup fails, the previous version starts again. An administrator manages shared installations.
 
@@ -193,3 +197,5 @@ Moving a clip to the other track removes its video and audio from the source tra
 Clicking the independent preview does not bring the main window to the front. Single playback uses the same loop symbol, greyed out and crossed out.
 
 By default the panel shows four icons and the active tab name. Right-click the tabs to show all labels. Click a library folder to browse it in the background. In References, choose source B and reorder with the arrows or by dragging.
+
+In Media, right-click and choose Add to track to append the selected sources to a track. To choose their position, drag them onto the track. The line marks the insertion point at a clip boundary or at the chosen frame in an empty area.

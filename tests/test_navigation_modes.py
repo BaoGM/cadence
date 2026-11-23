@@ -23,11 +23,11 @@ def test_shortcut_only_actions_cycle_and_rebind(window,application):
     for _,mode in MODES:
         QTest.keySequence(w,QKeySequence(default)); application.processEvents()
         assert w.compare_enabled.isChecked() and w.compare_mode.currentData()==mode
-    QTest.keySequence(w,QKeySequence(default)); assert not w.compare_enabled.isChecked()
+    QTest.keySequence(w,QKeySequence(default)); assert w.compare_enabled.isChecked() and w.compare_mode.currentIndex()==0
     data={**w.preferences,'shortcuts':{**w.preferences['shortcuts'],key:'Ctrl+Alt+J'}}
     w.apply_preferences(data)
-    QTest.keySequence(w,QKeySequence(default)); assert not w.compare_enabled.isChecked()
-    QTest.keySequence(w,QKeySequence('Ctrl+Alt+J')); assert w.compare_enabled.isChecked()
+    QTest.keySequence(w,QKeySequence(default)); assert w.compare_mode.currentIndex()==0
+    QTest.keySequence(w,QKeySequence('Ctrl+Alt+J')); assert w.compare_mode.currentIndex()==1
     w.compare_media=None
 
 
@@ -44,6 +44,8 @@ def test_step_toggle_wrap_selection_buttons_and_persistence(window,application):
     assert w.next_key_btn.symbol=='last' and w.previous_key_btn.symbol=='first' and w.next_frame_btn.symbol=='next'
     w.action_registry['Lecture/Clé suivante'][0].trigger(); assert w.doc.state.position==71
     w.previous_key_btn.click(); assert w.doc.state.position==70
+    w.previous_key_btn.click(); assert w.doc.state.position==40
+    w.next_key_btn.click(); assert w.doc.state.position==70
     QTest.keySequence(w,QKeySequence('Right')); assert w.doc.state.position==71
     assert w.doc.state.selection==(4,80)
     from playback_preferences import save,load

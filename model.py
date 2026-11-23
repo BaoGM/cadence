@@ -87,6 +87,7 @@ class State:
     track_info: TrackInfo = TrackInfo()
     second_track: MediaTrack | None = None
     selected_clips: tuple[tuple[str, int, int], ...] = ()
+    marker_names: tuple[tuple[int, str], ...] = ()
 
     def selection_ranges(self, track_id=None):
         if not self.selection:
@@ -168,6 +169,23 @@ def empty_duration(segments,frame):
         at=end
     return length
 
+
+def insert_track_media(track, destination, video_block, audio_block):
+    size = sum(segment.length for segment in video_block)
+    missing = max(0, destination - track.length)
+    padding = (Segment(None, 0, missing),) if missing else ()
+    video, audio = track.segments + padding, track.audio + padding
+    filled = min(size, empty_duration(video, destination), empty_duration(audio, destination))
+
+    def insert(segments, block):
+        left = slice_segments(segments, 0, destination)
+        right = slice_segments(segments, destination + filled, max(destination, track.length))
+        if right:
+            right = (replace(right[0], cut_before=True),) + right[1:]
+        return compact(left + (replace(block[0], cut_before=True),) + block[1:] + right)
+
+    return replace(track, segments=insert(video, video_block), audio_segments=insert(audio, audio_block))
+
 class Document:
     def __init__(self, fps=Fraction(24)):
         self.drawing_transfer_id = uuid.uuid4().hex
@@ -185,7 +203,27 @@ class Document:
         self.project_path = None
 
     def signature(self):
-        return (self.state.tracks, self.fps, self.state.drawings, self.state.drawings_linked, self.state.frame_markers, json.dumps(self.review,sort_keys=True))
+        return (self.state.tracks, self.fps, self.state.drawings, self.state.drawings_linked, self.state.frame_markers, self.state.marker_names, json.dumps(self.review,sort_keys=True))
+
+    def rename_marker(self, frame, name):
+        if frame not in self.state.frame_markers:
+            return False
+        names = dict(self.state.marker_names)
+        name = name.strip()
+        if name:
+            names[frame] = name
+        else:
+            names.pop(frame, None)
+        return self.commit('Renommer le marqueur', replace(self.state, marker_names=tuple(sorted(names.items()))))
+
+    def move_marker(self, source, dest):
+        state=self.state
+        if source not in state.frame_markers or dest in state.frame_markers or not 0<=dest<state.length:
+            return False
+        points=tuple(sorted(dest if f==source else f for f in state.frame_markers))
+        names=tuple(sorted((dest if f==source else f,name) for f,name in state.marker_names))
+        return self.commit('Déplacer le marqueur', replace(state,frame_markers=points,marker_names=names,
+                           position=dest if state.position==source else state.position))
 
     def normalize_tracks(self):
         ids=tuple(t.info.id for t in self.state.tracks)
@@ -246,27 +284,17 @@ class Document:
 
     def transfer_media(self,source_id,target_id,start,end,destination,copy=False):
         tracks={t.info.id:t for t in self.state.tracks}
-        if source_id==target_id or not {source_id,target_id}<=set(self.selected_track_ids): return False
+        if source_id==target_id or source_id not in tracks or target_id not in tracks: return False
         source,target=tracks[source_id],tracks[target_id]
         start,end,destination=int(start),int(end),int(destination)
         if not 0<=start<end<=source.length or not 0<=destination<=self.state.length: return False
         size=end-start
-        def pad(segments):
-            missing=max(0,destination-target.length)
-            return segments+((Segment(None,0,missing),) if missing else ())
-        video,audio=pad(target.segments),pad(target.audio)
-        filled=min(size,empty_duration(video,destination),empty_duration(audio,destination))
-        def insert(segments,block):
-            block=(replace(block[0],cut_before=True),)+block[1:]
-            right=slice_segments(segments,destination+filled,max(destination,target.length))
-            if right: right=(replace(right[0],cut_before=True),)+right[1:]
-            return compact(slice_segments(segments,0,destination)+block+right)
-        tracks[target_id]=replace(target,segments=insert(video,slice_segments(source.segments,start,end)),
-                                 audio_segments=insert(audio,slice_segments(source.audio,start,end)))
+        tracks[target_id]=insert_track_media(target,destination,slice_segments(source.segments,start,end),slice_segments(source.audio,start,end))
         if not copy:
             def remove(segments): return compact(slice_segments(segments,0,start)+slice_segments(segments,end,source.length))
             tracks[source_id]=replace(source,segments=remove(source.segments),audio_segments=remove(source.audio))
         result=with_tracks(self.state,tuple(tracks[t.info.id] for t in self.state.tracks))
+        if target_id not in self.selected_track_ids: self.select_track(target_id)
         self.active_track_id=target_id
         return self.commit('Copier vers une autre piste' if copy else 'Déplacer vers une autre piste',replace(result,position=destination,selection=(destination,destination+size),loop_range=None))
 
@@ -284,7 +312,8 @@ class Document:
     def commit(self, label, new):
         if new.selected_clips and (new.selection!=self.state.selection or new.tracks!=self.state.tracks):
             new=replace(new,selected_clips=())
-        new=replace(new,frame_markers=tuple(sorted(set(f for f in new.frame_markers if 0<=f<new.length))))
+        markers={f for f in new.frame_markers if 0<=f<new.length}
+        new=replace(new,frame_markers=tuple(sorted(markers)),marker_names=tuple((f,name) for f,name in new.marker_names if f in markers))
         if new.position>new.length: new=replace(new,position=max(0,new.length-1))
         if new.selection and new.selection[1]>new.length:
             a,b=new.selection; new=replace(new,selection=(a,new.length) if a<new.length else None)
@@ -367,6 +396,27 @@ class Document:
         at=self.state.length
         segments=self.state.segments+tuple(Segment(m['id'] if m.get('has_video',True) else None,0,m['frames']) for m in items)
         return self.commit('Ajouter des médias',replace(self.state,segments=segments,audio_segments=self.state.audio+tuple(Segment(m['id'],0,m['frames']) for m in items),position=at,selection=None,loop_range=None))
+
+    def add_sources_to_track(self, identity, keys, destination=None):
+        tracks = self.state.tracks
+        target = next((track for track in tracks if track.info.id == identity), None)
+        if target is None or not keys or any(key not in self.media for key in keys):
+            return False
+        at = target.length if destination is None else int(destination)
+        if not 0 <= at <= self.state.length:
+            return False
+        audio = tuple(Segment(key, 0, self.media[key]['frames']) for key in keys)
+        video = tuple(segment if self.media[segment.media].get('has_video', True)
+                      else Segment(None, 0, segment.length) for segment in audio)
+        updated = insert_track_media(target, at, video, audio)
+        state = with_tracks(self.state, tuple(updated if t.info.id == identity else t for t in tracks))
+        if len(tracks) == 1 and state.drawings_linked and state.drawings:
+            extra = updated.length - target.length
+            if extra:
+                filled = sum(segment.length for segment in video) - extra
+                state = replace(state, drawings=insert_keys(state.drawings, at + filled, extra, ()))
+        self.select_track(identity)
+        return self.commit('Ajouter des médias', replace(state, position=at, selection=None, selected_clips=(), loop_range=None))
 
     @selected_tracks
     def duplicate_range(self,start,end,destination=None):
@@ -540,6 +590,7 @@ class Document:
         return {'format':'cadence-studio','version':self.format_version(),'fps':str(self.fps),'media':[m for k,m in self.media.items() if all_media or any(s.media==k for s in self.state.all_segments)],'state':asdict(self.state),'comparison':self.review,'drawing_transfer_id':self.drawing_transfer_id}
 
     def format_version(self):
+        if self.state.marker_names: return 17
         if self.state.second_track is not None or not self.state.track_info.audio_enabled or self.review.get('reference_track'): return 16
         used={s.media for s in self.state.segments+self.state.audio}
         return 15 if len(self.review.get('references',[]))>1 else 14 if self.review.get('reference_cadence') or any(m.get('cadence') for k,m in self.media.items() if k in used) else 13 if any(m.get('has_video') is False for m in self.media.values()) else 12 if self.state.frame_markers else 11
@@ -560,7 +611,7 @@ class Document:
 
     @classmethod
     def from_data(cls, data, project_path=None):
-        if data.get('format') != 'cadence-studio' or data.get('version') not in range(1,17):
+        if data.get('format') != 'cadence-studio' or data.get('version') not in range(1,18):
             raise ValueError('Ce fichier n’est pas un projet Cadence compatible.')
         doc = cls(Fraction(data['fps']))
         identity=data.get('drawing_transfer_id')
@@ -615,6 +666,12 @@ class Document:
         markers=st.get('frame_markers',[])
         if not isinstance(markers,(list,tuple)) or any(type(f) is not int or not 0<=f<length for f in markers): raise ValueError('Marqueurs invalides.')
         doc.state = State(segs,ev,max(0,min(int(st.get('position',0)),length)),tuple(sel) if sel else None,tuple(loop) if loop else None,bool(st.get("flip_h",False)),bool(st.get("flip_v",False)),audio,load_keys(st.get('drawings',[])),bool(st.get('drawings_linked',True)),tuple(sorted(set(markers))),first_info,second)
+        names=st.get('marker_names',())
+        frames=set(markers)
+        if not isinstance(names,(tuple,list)) or any(not isinstance(item,(tuple,list)) or len(item)!=2 or type(item[0]) is not int or item[0] not in frames or not isinstance(item[1],str) or not item[1].strip() for item in names):
+            raise ValueError('Marqueurs invalides.')
+        if names:
+            doc.state=replace(doc.state,marker_names=tuple(sorted(dict(names).items())))
         ids={t.info.id for t in doc.state.tracks}
         clips=st.get('selected_clips') or ()
         if doc.state.selection and isinstance(clips,(list,tuple)):

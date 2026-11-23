@@ -15,7 +15,7 @@ def run(directory):
     tls_context = ssl.create_default_context()
     assert tls_context.check_hostname and tls_context.verify_mode == ssl.CERT_REQUIRED
     from PySide6.QtWidgets import QApplication
-    from PySide6.QtGui import QFontDatabase
+    from PySide6.QtGui import QFontDatabase,QFontMetrics
     from PySide6.QtTest import QTest
     from app import MainWindow,STYLE
     from model import Document,State,Segment
@@ -31,16 +31,23 @@ def run(directory):
     win=MainWindow(); win.scrub_audio.set_enabled(False); win.show(); app.processEvents()
     assert win.playback_mode=='loop' and win.loop_btn.isChecked() and win.loop_btn.symbol=='loop'
     win.set_loop(False)
-    assert win.workspaces.mode=='read' and {k for k,p in win.workspaces.panels.items() if not p.isHidden()}=={'timeline','transport','timecode'}
+    assert win.workspaces.mode=='read' and {k for k,p in win.workspaces.panels.items() if not p.isHidden()}=={'timeline','transport','library'}
     win.grab().save(str(output/'accueil.png')); win.workspaces.switch('edit'); app.processEvents()
-    assert all(not p.isHidden() for p in win.workspaces.panels.values())
+    assert {k for k,p in win.workspaces.panels.items() if not p.isHidden()}=={'timeline','transport','library','tools'}
+    for key in ('header','timecode','comparison','drawing'): win.set_panel(key,True)
+    app.processEvents()
     check_navigation_shortcuts(win)
-    assert win.timeline.track_left()==win.timeline.width()-win.timeline.track_right()
-    for panel in (win.transport_widget,win.timeline_panel):
-        assert panel.x()==0 and panel.width()==win.width()
-        assert win.edit_toolbar.geometry().bottom()<panel.y()
+    from timeline_skin import font
+    timeline=win.timeline
+    label_width=QFontMetrics(font(10,True),timeline).horizontalAdvance('9999')
+    assert timeline.track_left()>=100 and timeline.track_right()+3+label_width<=timeline.width()
+    assert win.timeline_panel.x()==0 and win.timeline_panel.width()==win.width()
+    assert win.transport_widget.x()==0 and win.transport_widget.width()==win.viewer_workspace.width()
+    assert win.edit_toolbar.geometry().bottom()<win.transport_widget.y()
     win.install_doc(doc)
     try:
+        last=doc.state.length-1
+        assert timeline.frame_for(timeline.x_for(last))==last and timeline.frame_for(timeline.track_right())==last
         assert not win.copy_audio.isChecked()
         win.select(24,48); win.cut_selection()
         assert doc.state.length==168
@@ -103,7 +110,8 @@ def run(directory):
             win.grab().save(str(output/f'comparison-{mode}.png'))
             win.compare_controls.grab().save(str(output/f'buttons-{mode}.png'))
         win.compare_swap_btn.click(); assert win.viewer.compare_swapped and win.compare_cycle_btn.symbol=='front_b'
-        win.compare_cycle_btn.click(); assert not win.viewer.comparing and not win.compare_swap_btn.isEnabled()
+        win.compare_cycle_btn.click(); assert win.viewer.comparing and win.viewer.compare_mode=='horizontal'
+        win.compare_action.trigger(); assert not win.viewer.comparing and not win.compare_swap_btn.isEnabled()
         win.compare_cycle_btn.click(); assert win.viewer.comparing and win.viewer.compare_mode=='horizontal'
         win.loop_btn.click(); assert win.playback_mode=='loop'
         win.loop_btn.grab().save(str(output/'loop-button.png'))
@@ -193,29 +201,35 @@ def run(directory):
         win.select(48,72); app.processEvents()
         menu=win.timeline.context_menu(QPointF(win.timeline.x_for(60),35))
         assert tr('Supprimer les clés') in [a.text() for a in menu.actions()]; menu.deleteLater()
-        assert win.compare_cycle_btn.isVisible()
-        win.compare_cycle_btn.click(); app.processEvents(); assert win.viewer.comparing and win.comparison_panel.isHidden()
+        win.studio.headers.show_reader()
+        assert win.studio.compare_button.isVisible() and not win.compare_cycle_btn.isVisible()
+        win.studio.compare_button.click(); app.processEvents()
+        assert win.viewer.comparing and win.comparison_panel.isHidden() and win.compare_cycle_btn.isVisible()
         from PySide6.QtCore import QPoint
         strip=win.transport_widget.widget()
-        center=win.transport_buttons.mapTo(strip,win.transport_buttons.rect().center()).x()
-        assert abs(center-strip.rect().center().x())<=2
+        center=win.transport_buttons.mapTo(win,win.transport_buttons.rect().center()).x()
+        assert abs(center-win.rect().center().x())<=2
         assert win.volume.mapTo(strip,QPoint(win.volume.width(),0)).x()>=strip.width()-16
-        assert strip.height()==42 and win.transport_widget.height()<=44
+        assert strip.height()==48 and abs(win.transport_widget.height()-strip.height())<=2
+        win.set_panel('timecode',True); app.processEvents()
         assert not win.timecode_overlay.rect().isEmpty() and win.timecode_overlay.rect().height()==22
-        assert win.timeline.x_for(0)==win.timeline.width()-win.timeline.x_for(doc.state.length)
+        assert win.timeline.x_for(0)==win.timeline.track_left()
+        assert win.timeline.x_for(doc.state.length)==win.timeline.track_right()
         win.grab().save(str(output/'mode-lecture.png'))
         win.workspaces.switch('edit'); app.processEvents()
         from capture import CaptureDialog
         dialog=CaptureDialog(win); dialog.show(); app.processEvents(); dialog.grab().save(str(output/'capture-options.png')); dialog.reject()
         from preferences import ShortcutDialog
-        from PySide6.QtWidgets import QTabWidget
+        from PySide6.QtWidgets import QTabWidget,QToolButton
         shortcuts=ShortcutDialog(win.action_registry,win.preferences,win); shortcuts.show(); app.processEvents()
-        assert [shortcuts.tabs.tabText(i) for i in range(3)]==tr(['Préférences','Raccourcis','Vue et navigation'])
+        sections=shortcuts.findChildren(QToolButton,'optionsSection')
+        assert [b.text() for b in sections]==tr(['Préférences','Raccourcis','Vue et navigation'])
         assert shortcuts.language.currentData()=='fr' and not shortcuts.clear_on_exit.isChecked()
         assert 'Fichier/Options…' in win.action_registry and 'Édition/Raccourcis et navigation…' not in win.action_registry
         shortcuts.grab().save(str(output/'options-preferences.png'))
-        shortcuts.tabs.setCurrentIndex(1); app.processEvents(); shortcuts.grab().save(str(output/'raccourcis-clavier.png'))
-        shortcuts.tabs.setCurrentIndex(2); app.processEvents()
+        sections[1].click(); app.processEvents(); assert shortcuts.tabs.currentIndex()==1
+        shortcuts.grab().save(str(output/'raccourcis-clavier.png'))
+        sections[2].click(); app.processEvents(); assert shortcuts.tabs.currentIndex()==2
         shortcuts.grab().save(str(output/'raccourcis-canvas.png')); shortcuts.reject()
         from guide import fill_browser
         from PySide6.QtWidgets import QTextBrowser
@@ -600,9 +614,10 @@ def check_review_tools(window,output):
     assert w.drawing.wheel.color()=='#1f5395' and w.doc.state is original and not w.drawing.panel.isVisible()
     assert w.drawing.tool_actions['picker'].shortcut().toString()=='P'
     w.timeline.simple=True; w.doc.state=replace(w.doc.state,selection=(2,22)); w.refresh()
-    w.timeline.set_units('frames'); assert w.timeline.selection_label()=='20 '+tr('img')
+    expected=f"20 {tr('images')} · 00:00:00:20"
+    w.timeline.set_units('frames'); assert w.timeline.selection_label()==expected
     w.timeline.grab().save(str(output/'selection-count.png'))
-    w.timeline.set_units('time'); assert w.timeline.selection_label()=='00:00.833'
+    w.timeline.set_units('time'); assert w.timeline.selection_label()==expected
     w.timeline.grab().save(str(output/'selection-duration.png'))
     return dict(loop_change_uninterrupted=True,color_sampler=True,selection_measurement=True)
 
@@ -906,7 +921,8 @@ def check_navigation_shortcuts(window):
     toggle.trigger(); assert not window.key_step and window.next_key_btn.symbol=='last'
     for _,mode in MODES:
         cycle.trigger(); assert window.compare_enabled.isChecked() and window.compare_mode.currentData()==mode
-    cycle.trigger(); assert not window.compare_enabled.isChecked()
+    cycle.trigger(); assert window.compare_enabled.isChecked() and window.compare_mode.currentIndex()==0
+    window.compare_action.trigger(); assert not window.compare_enabled.isChecked()
     window.compare_mode.setCurrentIndex(0)
 
 

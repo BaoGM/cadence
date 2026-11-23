@@ -28,8 +28,9 @@ class Task(QThread):
 class Decoder(QThread):
     ready=Signal(int,object)
     failed=Signal(int,str)
-    def __init__(self,parent=None):
+    def __init__(self,parent=None,*,warm_codecs=False):
         super().__init__(parent); self.cache=getattr(parent,'frame_cache',None); self.condition=threading.Condition(); self.requested=None; self.prefetch=[]; self.stopping=False; self.generation=0; self.last_target=None; self.backwards=False
+        self.warm_codecs=warm_codecs
     def request(self,token,media,index,ahead=()):
         cached=self.cache.get(frame_cache_key(media,index)) if self.cache is not None and 'proxy' in media else None
         with self.condition:
@@ -50,6 +51,12 @@ class Decoder(QThread):
             self.requested=(token,None,(layers,size))
             self.prefetch=[]; self.condition.notify()
     def run(self):
+        if self.warm_codecs:
+            # Load the FFmpeg bindings on the decoder thread while Qt builds the window.
+            try:
+                import av
+            except (ImportError,OSError) as error:
+                logging.warning('Preview codec warm-up: %s',error)
         reader=PreviewReader(cache=self.cache,retain_decoded=True) if self.cache is not None else PreviewReader(retain_decoded=True)
         try:
             while True:
@@ -130,6 +137,7 @@ class PlaybackSlices:
 
 class Transport:
     def __init__(self,parent=None):
+        self.slices=None
         self.parent=parent; self.sink=None; self.device=None; self.pcm=None; self.running=False; self.suspended=False; self.volume=.8
     def start(self,state,media,fps,mode,passes):
         self.stop()

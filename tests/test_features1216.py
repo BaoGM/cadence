@@ -63,9 +63,9 @@ def test_wipe_pixels_and_drag_with_drawing_tool(window,application):
 def test_association_points_all_launchers_to_current_exe():
  from association import registration_values
  values=registration_values('C:/Cadence nouvelle/Cadence.exe')
- for path in (r'Software\Classes\Applications\Cadence.exe\shell\open\command',r'Software\Classes\Cadence.Video\shell\open\command',r'Software\Classes\CadenceStudio.Project\shell\open\command'):
+ for path in (r'Software\Classes\Cadence.Studio2.Video\shell\open\command',r'Software\Classes\Cadence.Studio2.Project\shell\open\command'):
   assert values[path][0]=='"C:\\Cadence nouvelle\\Cadence.exe" "%1"'
- assert not any('UserChoice' in key for key in values)
+ assert not any('UserChoice' in key or r'Applications\Cadence.exe' in key for key in values)
 
 
 def test_ffmpeg_fallback_on_direct_decode_failure(tmp_path,monkeypatch):

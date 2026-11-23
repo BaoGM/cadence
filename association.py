@@ -8,15 +8,14 @@ VIDEO_EXTENSIONS=('.mp4','.mov','.avi','.mkv','.webm','.m4v','.mpg','.mpeg','.mt
 def registration_values(executable):
     exe=str(Path(executable).resolve())
     values={
-        r'Software\Classes\CadenceStudio.Project': ('Cadence (.cadence)',),
-        r'Software\Classes\CadenceStudio.Project\DefaultIcon': (f'"{exe}",0',),
-        r'Software\Classes\CadenceStudio.Project\shell\open\command': (f'"{exe}" "%1"',),
+        r'Software\Classes\Cadence.Studio2.Project': ('Cadence 2.0 (.cadence)',),
+        r'Software\Classes\Cadence.Studio2.Project\DefaultIcon': (f'"{exe}",0',),
+        r'Software\Classes\Cadence.Studio2.Project\shell\open\command': (f'"{exe}" "%1"',),
     }
     values.update({
-        r'Software\Classes\Cadence.Video': ('Cadence',),
-        r'Software\Classes\Cadence.Video\DefaultIcon': (f'"{exe}",0',),
-        r'Software\Classes\Cadence.Video\shell\open\command': (f'"{exe}" "%1"',),
-        r'Software\Classes\Applications\Cadence.exe\shell\open\command': (f'"{exe}" "%1"',),
+        r'Software\Classes\Cadence.Studio2.Video': ('Cadence 2.0',),
+        r'Software\Classes\Cadence.Studio2.Video\DefaultIcon': (f'"{exe}",0',),
+        r'Software\Classes\Cadence.Studio2.Video\shell\open\command': (f'"{exe}" "%1"',),
     })
     return values
 
@@ -27,25 +26,15 @@ def register():
     executable=base_executable()
     for path,values in registration_values(executable).items():
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER,path) as key: winreg.SetValueEx(key,'',0,winreg.REG_SZ,values[0])
-    with winreg.CreateKey(winreg.HKEY_CURRENT_USER,r'Software\Classes\.cadence') as key:
-        # Do not replace an unrelated existing default.
-        try: current=winreg.QueryValueEx(key,'')[0]
-        except FileNotFoundError: current=''
-        if not current or current=='CadenceStudio.Project': winreg.SetValueEx(key,'',0,winreg.REG_SZ,'CadenceStudio.Project')
-    with winreg.CreateKey(winreg.HKEY_CURRENT_USER,r'Software\Classes\.cadence\OpenWithProgids') as key:
-        winreg.SetValueEx(key,'CadenceStudio.Project',0,winreg.REG_NONE,b'')
     def value(path,name,data):
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER,path) as key: winreg.SetValueEx(key,name,0,winreg.REG_SZ,data)
-    app=r'Software\Classes\Applications\Cadence.exe'
-    value(app,'FriendlyAppName','Cadence')
-    capabilities=r'Software\Cadence\Capabilities'
-    value(capabilities,'ApplicationName','Cadence')
-    value(capabilities,'ApplicationDescription','Cadence')
-    value(capabilities,'ApplicationIcon',f'"{sys.executable}",0')
-    value(r'Software\RegisteredApplications','Cadence',capabilities)
+    capabilities=r'Software\CadenceStudio2\Capabilities'
+    value(capabilities,'ApplicationName','Cadence 2.0')
+    value(capabilities,'ApplicationDescription','Cadence 2.0')
+    value(capabilities,'ApplicationIcon',f'"{executable}",0')
+    value(r'Software\RegisteredApplications','Cadence 2.0',capabilities)
     for extension in VIDEO_EXTENSIONS+('.cadence',):
-        progid='CadenceStudio.Project' if extension=='.cadence' else 'Cadence.Video'
-        value(app+r'\SupportedTypes',extension,'')
+        progid='Cadence.Studio2.Project' if extension=='.cadence' else 'Cadence.Studio2.Video'
         value(capabilities+r'\FileAssociations',extension,progid)
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER,'Software\\Classes\\'+extension+r'\OpenWithProgids') as key:
             winreg.SetValueEx(key,progid,0,winreg.REG_NONE,b'')

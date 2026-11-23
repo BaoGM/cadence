@@ -9,7 +9,6 @@ from test_tools0160 import mouse
 from drawing import active_key,render_layer,Mark,DrawingKey,vector_path
 from shape_gesture import ShapeGesture,rotate,add,sub,mul
 from PySide6.QtGui import QKeyEvent,QFont,QFontInfo
-from PySide6.QtWidgets import QInputDialog
 from draw_fonts import FAMILIES
 from preferences import defaults,validate
 
@@ -101,14 +100,14 @@ def test_modifier_events_preview_save_lasso_and_undo(window,application,tmp_path
     w.redo(); assert w.doc.state.drawings[0].marks==(mark,)
 
 
-def test_alt_moves_new_text_box_and_existing_text(window,application,monkeypatch):
+def test_alt_moves_new_text_box_and_existing_text(window,application):
     d=window.drawing; window.request_frame=lambda:None; d.choose_tool('text'); application.processEvents()
-    monkeypatch.setattr(QInputDialog,'getMultiLineText',lambda *a:('Texte libre',True))
     d.begin(screen_point(d,.2,.2),1); d.move(screen_point(d,.5,.4),1)
     before=d.pending_text_rect()
     d.move(screen_point(d,.6,.5),1,ALT); after=d.pending_text_rect()
     assert after.size()==before.size() and after.x()==pytest.approx(before.x()+.1)
-    d.finish(); key=window.doc.state.drawings[0]; mark=key.marks[0]
+    d.finish(); d.text_editor.setPlainText('Texte libre'); d.text_editor.finish(True)
+    key=window.doc.state.drawings[0]; mark=key.marks[0]
     hit=d.selection.geometry(mark).boundingRect().center()
     d.begin(screen_point(d,hit.x(),hit.y()),1,modifiers=ALT)
     d.move(screen_point(d,hit.x()+.05,hit.y()+.04),1,ALT); d.finish()
@@ -177,7 +176,7 @@ def test_moved_draw_menu_preserves_shortcut_and_transport_centers(window,applica
     data['shortcuts']['Dessin/Afficher les outils de dessin']='Ctrl+Alt+D'
     assert validate(data,w.action_registry)['shortcuts']['Affichage/Afficher les outils de dessin']=='Ctrl+Alt+D'
     w.workspaces.switch('read'); application.processEvents(); strip=w.transport_widget.widget()
-    for widget in (w.transport_buttons,w.workspaces.toggle,w.volume,w.media_info):
+    for widget in (w.transport_buttons,w.volume):
         center=widget.mapTo(strip,widget.rect().center()).y()
         assert abs(center-strip.rect().center().y())<=8
         assert widget.mapTo(strip,widget.rect().topLeft()).y()>=0

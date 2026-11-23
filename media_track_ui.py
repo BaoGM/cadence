@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from dataclasses import replace
 from PySide6.QtCore import QSignalBlocker
-from PySide6.QtWidgets import QPushButton
 from ui_text import tr
 
 
@@ -16,8 +15,8 @@ class MediaTrackController:
         timeline.mediaAudioEnabled.connect(lambda identity,enabled:self.edit_track_structure(self.doc.enable_track_audio,identity,enabled))
         timeline.mediaTransferred.connect(lambda source,target,a,b,at,copy:self.edit_track_structure(self.doc.transfer_media,source,target,a,b,at,copy))
         timeline.mediaReferenceRequested.connect(self.use_track_reference)
-        self.add_track_button=QPushButton(tr('+ Piste média'))
-        self.add_track_button.setToolTip(tr('Ajouter une seconde piste média sous la première.'))
+        from studio_chrome import control
+        self.add_track_button=control('Ajouter une seconde piste média sous la première.', 'plus', 'Piste média')
         self.add_track_button.clicked.connect(self.add_media_track)
         self.header_scroll.widget().layout().addWidget(self.add_track_button)
         from volume_shortcut import VolumeShortcut

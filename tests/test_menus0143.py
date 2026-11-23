@@ -62,7 +62,7 @@ def test_background_panel_menu_works_with_locked_and_floating_panels(window,appl
     choose(w.viewer,'tools'); assert w.edit_toolbar.isVisible() and w.toolbar_action.isChecked()
     w.layout_action.trigger(); w.library.show(); w.library.setFloating(True); application.processEvents()
     # A detached panel's empty background offers the same menu.
-    choose(w.library.widget(),'comparison',QPoint(2,2)); assert w.comparison_panel.isVisible() and w.panel_actions['comparison'].isChecked()
+    choose(w.library.titleBarWidget(),'comparison',QPoint(12,8)); assert w.comparison_panel.isVisible() and w.panel_actions['comparison'].isChecked()
     w.layout_action.trigger(); application.processEvents(); assert not w.library.isFloating()
     w.header.hide(); w.toggle_fullscreen(); application.processEvents()
     choose(w.viewer,'header'); assert not w.video_fullscreen and not w.header.isHidden()

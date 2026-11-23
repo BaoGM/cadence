@@ -30,5 +30,16 @@
   "tests/test_fixes1182.py",
   "tests/test_features1180.py",
   "tests/test_fixes1184.py",
-  "tests/test_fixes1185.py"
+  "tests/test_fixes1185.py",
+  "tests/test_canvas_text202.py",
+  "tests/test_handle_focus202.py",
+  "tests/test_marker_names201.py",
+  "tests/test_media_source_drop203.py",
+  "tests/test_shortcut_aliases202.py",
+  "tests/test_studio200.py",
+  "tests/test_timeline200.py",
+  "tests/test_timeline202.py",
+  "tests/test_timeline203.py",
+  "tests/test_transport_scrub203.py",
+  "tests/test_workspace_migration202.py"
 ]

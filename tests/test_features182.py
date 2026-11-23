@@ -42,16 +42,16 @@ def test_selection_measurement_both_modes(window):
     t.set_document(State((Segment('a',0,200),),selection=(10,58)),{},Fraction(24))
     for simple in (False,True):
         t.simple=simple; t.resize(900,100)
-        for units,text in [('frames','48 img'),('time','00:02.000')]:
-            t.units=units; assert t.selection_label()==text
+        for units in ('frames','time'):
+            t.units=units; assert t.selection_label()=='48 images · 00:00:02:00'
             image=QImage(t.size(),QImage.Format.Format_ARGB32); image.fill(Qt.GlobalColor.transparent)
             painter=QPainter(image); t.paint_selection_label(painter); painter.end()
             from test_drawing import pixels
             ys,xs=np.nonzero(pixels(image)[:,:,3])
-            center=(t.x_for(10)+t.x_for(58))/2
+            center=t.track_left()/2
             assert len(xs)>0 and abs((xs.min()+xs.max()+1)/2-center)<2
     t.state=replace(t.state,selection=(10,11)); t.units='frames'
-    assert t.selection_label()=='1 img'
+    assert t.selection_label()=='1 image · 00:00:00:01'
 
 
 def test_picker_visible_pixels_transformed_and_no_key(window):

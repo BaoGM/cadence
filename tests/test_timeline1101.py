@@ -52,7 +52,7 @@ def test_compact_layout_preserves_custom_arrangement(window,application):
     application.processEvents(); original=w.library.geometry()
     modes.fit_comparison_stack(); application.processEvents()
     assert w.library.geometry()==original
-    modes.reset(); application.processEvents()
+    modes.reset(); w.set_panel('comparison',True); application.processEvents(); modes.fit_comparison_stack(); application.processEvents()
     panel=w.comparison_panel; scroll=panel.widget(); body=scroll.widget()
     assert scroll.verticalScrollBar().maximum()==0
     assert abs(panel.height()-(body.minimumSizeHint().height()+2*scroll.frameWidth()))<=3
@@ -66,10 +66,14 @@ def test_compact_layout_uses_styled_control_heights(window,application):
     w=window; previous=application.styleSheet()
     try:
         application.setStyleSheet(STYLE); w.hide(); w.resize(1600,900)
-        w.workspaces.reset(); w.show(); QTest.qWait(50)
+        w.workspaces.reset(); w.set_panel('comparison',True); w.show(); QTest.qWait(50)
         scroll=w.comparison_panel.widget()
         assert scroll.verticalScrollBar().maximum()==0
         assert w.comparison_panel.height()>=scroll.widget().minimumSizeHint().height()
-        assert w.library.height()>250
+        w.library_tabs.setCurrentWidget(w.playlists_panel)
+        application.processEvents()
+        for listing in (w.playlists_panel.tree,w.playlists_panel.files):
+            assert listing.isVisible()
+            assert listing.viewport().height()>=listing.fontMetrics().height()
     finally:
         application.setStyleSheet(previous)

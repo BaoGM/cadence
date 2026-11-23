@@ -5,13 +5,14 @@ import sys
 root = Path(SPECPATH)
 
 datas = [(str(root / 'assets' / name), 'assets') for name in (
-    'cadence.ico', 'cadence.png', 'update-key.txt', 'guide_fr.txt',
+    'cadence.ico', 'cadence.png', 'studio-check.svg', 'studio-down.svg', 'update-key.txt', 'guide_fr.txt',
     'guide_en.txt', 'qtbase_fr.qm', 'ui_en.txt', 'ui_patterns.json')]
 datas += [(str(root / 'assets' / 'fonts'), 'assets/fonts')]
 datas += [(str(root / 'integrations' / 'cadence_bridge.py'), 'integrations')]
-datas += [(str(root / 'integrations' / 'cadence_autostart.py'), 'integrations')]
 datas += [(str(root / 'integrations' / name), 'integrations') for name in (
-    'cadence_drawings.py', 'cadence_drawings_blender.py', 'cadence_drawings_maya.py', 'cadence_runtime.py')]
+    'cadence_autostart.py', 'cadence_runtime.py')]
+datas += [(str(root / 'integrations' / name), 'integrations') for name in (
+    'cadence_drawings.py', 'cadence_drawings_blender.py', 'cadence_drawings_maya.py')]
 datas += [(str(root/'vendor'/'ffmpeg.exe'),'vendor')]
 
 
@@ -53,7 +54,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,
+    upx=True,
     console=False,
     icon=str(root / 'assets' / 'cadence.ico'),
     version=str(root / 'version_info.txt'),
@@ -68,7 +69,7 @@ coll = COLLECT(
     a.binaries,
     a.datas,
     strip=False,
-    upx=False,
+    upx=True,
     upx_exclude=[],
     name='Cadence',
 )

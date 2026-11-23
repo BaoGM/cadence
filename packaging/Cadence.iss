@@ -8,13 +8,13 @@
   #error ManifestFile is required
 #endif
 #ifndef TestBuild
-  #define InstallId "Cadence.Hybrid"
+  #define InstallId "Cadence.Hybrid.Studio2"
   #define RegistryBase "Software"
-  #define InstallName "Cadence"
+  #define InstallName "Cadence 2.0"
 #else
-  #define InstallId "Cadence.Installer.Test"
-  #define RegistryBase "Software\CadenceInstallerTests"
-  #define InstallName "Cadence Installer Test"
+  #define InstallId "Cadence.Installer.Studio2.Test"
+  #define RegistryBase "Software\CadenceStudio2InstallerTests"
+  #define InstallName "Cadence 2.0 Installer Test"
 #endif
 
 [Setup]
@@ -25,9 +25,9 @@ AppVersion={#AppVersion}
 UninstallDisplayName={#InstallName}
 AppPublisher=Cadence
 VersionInfoVersion={#AppVersion}.0
-DefaultDirName={autopf}\Cadence
+DefaultDirName={autopf}\Cadence 2.0
 DisableDirPage=no
-DefaultGroupName=Cadence
+DefaultGroupName=Cadence 2.0
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 #ifdef TestBuild
@@ -74,10 +74,12 @@ french.LaunchCadence=Lancer Cadence
 english.LaunchCadence=Launch Cadence
 french.DefaultApps=Choisir les applications par défaut de Windows
 english.DefaultApps=Choose Windows default apps
+french.SeparateDirectory=Ce dossier contient déjà une autre version de Cadence. Choisissez un dossier réservé à Cadence 2.0.
+english.SeparateDirectory=This folder already contains another version of Cadence. Choose a separate folder for Cadence 2.0.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:DesktopShortcut}"; Flags: unchecked
-Name: "filetypes"; Description: "{cm:FileRegistration}"
+Name: "filetypes"; Description: "{cm:FileRegistration}"; Flags: unchecked
 
 [Files]
 Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -85,8 +87,8 @@ Source: "{#ManifestFile}"; DestDir: "{app}\uninstall"; DestName: "installed-file
 
 [Icons]
 #ifndef TestBuild
-Name: "{autoprograms}\Cadence"; Filename: "{app}\Cadence.exe"; WorkingDir: "{app}"
-Name: "{autodesktop}\Cadence"; Filename: "{app}\Cadence.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autoprograms}\Cadence 2.0"; Filename: "{app}\Cadence.exe"; WorkingDir: "{app}"
+Name: "{autodesktop}\Cadence 2.0"; Filename: "{app}\Cadence.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 #else
 Name: "{app}\Test Start Menu\Cadence"; Filename: "{app}\Cadence.exe"; WorkingDir: "{app}"
 #endif
@@ -95,16 +97,16 @@ Name: "{app}\Test Start Menu\Cadence"; Filename: "{app}\Cadence.exe"; WorkingDir
 Type: filesandordirs; Name: "{app}\.cadence-updates"; Check: not IsAdminInstallMode and FileExists(ExpandConstant('{app}\.cadence-updates\state.json'))
 
 [Registry]
-Root: HKA; Subkey: "{#RegistryBase}\Classes\Cadence.Installed.Project"; ValueType: string; ValueData: "Cadence Project"; Flags: uninsdeletekey; Tasks: filetypes
-Root: HKA; Subkey: "{#RegistryBase}\Classes\Cadence.Installed.Project\DefaultIcon"; ValueType: string; ValueData: """{app}\Cadence.exe"",0"; Tasks: filetypes
-Root: HKA; Subkey: "{#RegistryBase}\Classes\Cadence.Installed.Project\shell\open\command"; ValueType: string; ValueData: """{app}\Cadence.exe"" ""%1"""; Tasks: filetypes
-Root: HKA; Subkey: "{#RegistryBase}\Classes\Cadence.Installed.Media"; ValueType: string; ValueData: "Cadence Media"; Flags: uninsdeletekey; Tasks: filetypes
-Root: HKA; Subkey: "{#RegistryBase}\Classes\Cadence.Installed.Media\DefaultIcon"; ValueType: string; ValueData: """{app}\Cadence.exe"",0"; Tasks: filetypes
-Root: HKA; Subkey: "{#RegistryBase}\Classes\Cadence.Installed.Media\shell\open\command"; ValueType: string; ValueData: """{app}\Cadence.exe"" ""%1"""; Tasks: filetypes
-Root: HKA; Subkey: "{#RegistryBase}\Cadence\InstalledCapabilities"; ValueName: "ApplicationName"; ValueType: string; ValueData: "Cadence"; Flags: uninsdeletekey; Tasks: filetypes
-Root: HKA; Subkey: "{#RegistryBase}\Cadence\InstalledCapabilities"; ValueName: "ApplicationDescription"; ValueType: string; ValueData: "Cadence video player and editor"; Tasks: filetypes
-Root: HKA; Subkey: "{#RegistryBase}\Cadence\InstalledCapabilities"; ValueName: "ApplicationIcon"; ValueType: string; ValueData: """{app}\Cadence.exe"",0"; Tasks: filetypes
-Root: HKA; Subkey: "{#RegistryBase}\RegisteredApplications"; ValueName: "Cadence.Installed"; ValueType: string; ValueData: "{#RegistryBase}\Cadence\InstalledCapabilities"; Flags: uninsdeletevalue; Tasks: filetypes
+Root: HKA; Subkey: "{#RegistryBase}\Classes\Cadence.Studio2.Installed.Project"; ValueType: string; ValueData: "Cadence Project"; Flags: uninsdeletekey; Tasks: filetypes
+Root: HKA; Subkey: "{#RegistryBase}\Classes\Cadence.Studio2.Installed.Project\DefaultIcon"; ValueType: string; ValueData: """{app}\Cadence.exe"",0"; Tasks: filetypes
+Root: HKA; Subkey: "{#RegistryBase}\Classes\Cadence.Studio2.Installed.Project\shell\open\command"; ValueType: string; ValueData: """{app}\Cadence.exe"" ""%1"""; Tasks: filetypes
+Root: HKA; Subkey: "{#RegistryBase}\Classes\Cadence.Studio2.Installed.Media"; ValueType: string; ValueData: "Cadence Media"; Flags: uninsdeletekey; Tasks: filetypes
+Root: HKA; Subkey: "{#RegistryBase}\Classes\Cadence.Studio2.Installed.Media\DefaultIcon"; ValueType: string; ValueData: """{app}\Cadence.exe"",0"; Tasks: filetypes
+Root: HKA; Subkey: "{#RegistryBase}\Classes\Cadence.Studio2.Installed.Media\shell\open\command"; ValueType: string; ValueData: """{app}\Cadence.exe"" ""%1"""; Tasks: filetypes
+Root: HKA; Subkey: "{#RegistryBase}\CadenceStudio2\InstalledCapabilities"; ValueName: "ApplicationName"; ValueType: string; ValueData: "Cadence 2.0"; Flags: uninsdeletekey; Tasks: filetypes
+Root: HKA; Subkey: "{#RegistryBase}\CadenceStudio2\InstalledCapabilities"; ValueName: "ApplicationDescription"; ValueType: string; ValueData: "Cadence video player and editor"; Tasks: filetypes
+Root: HKA; Subkey: "{#RegistryBase}\CadenceStudio2\InstalledCapabilities"; ValueName: "ApplicationIcon"; ValueType: string; ValueData: """{app}\Cadence.exe"",0"; Tasks: filetypes
+Root: HKA; Subkey: "{#RegistryBase}\RegisteredApplications"; ValueName: "Cadence.Studio2.Installed"; ValueType: string; ValueData: "{#RegistryBase}\CadenceStudio2\InstalledCapabilities"; Flags: uninsdeletevalue; Tasks: filetypes
 #include AssociationsFile
 
 [Run]
@@ -114,6 +116,17 @@ Filename: "ms-settings:defaultapps"; Description: "{cm:DefaultApps}"; Flags: pos
 [Code]
 var
   PreviousFiles: TArrayOfString;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ExistingExe, ExistingVersion: String;
+begin
+  Result := '';
+  ExistingExe := ExpandConstant('{app}\Cadence.exe');
+  if FileExists(ExistingExe) then
+    if not GetVersionNumbersString(ExistingExe, ExistingVersion) or (Pos('2.', ExistingVersion) <> 1) then
+      Result := CustomMessage('SeparateDirectory');
+end;
 
 procedure RemoveObsoleteFiles;
 var

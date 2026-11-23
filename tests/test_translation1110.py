@@ -65,7 +65,7 @@ def test_catalog_has_unique_entries_and_valid_patterns():
 def test_french_ui_literals_have_english_translation():
     ui_text._language='en'
     missing=[]
-    for path in Path(__file__).parent.glob('*.py'):
+    for path in Path(__file__).resolve().parents[1].glob('*.py'):
         if path.name.startswith(('test_','bench_')) or path.name in ('ui_text.py','smoke.py','guide.py'): continue
         for node in ast.walk(ast.parse(path.read_text(encoding='utf-8-sig'))):
             if not isinstance(node,ast.Call) or not isinstance(node.func,ast.Name) or node.func.id!='tr' or not node.args: continue
@@ -82,7 +82,6 @@ def test_runtime_ui_options_and_context_menus(tmp_path,monkeypatch,lang):
     monkeypatch.setenv('CADENCE_PREFS',str(tmp_path/'prefs.json'))
     monkeypatch.setenv('CADENCE_CACHE',str(tmp_path/'cache'))
     monkeypatch.setenv('CADENCE_LANGUAGE',lang)
-    from PySide6.QtCore import QSettings
     from PySide6.QtGui import QAction
     from PySide6.QtWidgets import QApplication,QLabel,QAbstractButton,QComboBox,QFileDialog
     import app
@@ -90,7 +89,6 @@ def test_runtime_ui_options_and_context_menus(tmp_path,monkeypatch,lang):
     from preferences import ShortcutDialog
     from shortcut_edit import ConflictDialog
     monkeypatch.setattr(StopHotkey,'register',lambda self:False)
-    monkeypatch.setattr(app,'QSettings',lambda *args:QSettings(str(tmp_path/'settings.ini'),QSettings.Format.IniFormat))
     qt=QApplication.instance() or QApplication([])
     window=app.MainWindow()
     dialogs=[]

@@ -8,7 +8,7 @@ from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import (QDialog,QVBoxLayout,QHBoxLayout,QGridLayout,QGroupBox,QTabWidget,QWidget,QTableWidget,QTableWidgetItem,QPushButton,QComboBox,QCheckBox,QLabel,QDialogButtonBox,QFileDialog,QMessageBox,QHeaderView)
 
 from cache_ram import default_cache_mb,maximum_cache_mb
-from shortcut_defaults import REVISION,migrate
+from shortcut_defaults import KEYBOARD_LAYOUTS, REVISION, migrate, physical_shortcut
 
 MODIFIERS=['Aucun','Ctrl','Shift','Alt','Ctrl+Shift','Ctrl+Alt','Shift+Alt','Ctrl+Shift+Alt']
 
@@ -27,12 +27,22 @@ def preferred_renderer(data):
         return default_renderer()
     return renderer if renderer in ('direct3d','opengl','software') else default_renderer()
 
-def defaults(registry):
-    return dict(format='cadence-shortcuts',version=1,shortcut_defaults_revision=REVISION,shortcuts={key:value[1] for key,value in registry.items()},canvas=default_canvas(),scrub_pixels=4.,language='fr',clear_cache_on_exit=False,preview_quality='native',scrub_audio=True,tooltips=True,auto_update_check=True,update_previews=False,video_renderer=default_renderer(),video_renderer_version=2,ram_cache_mb=default_cache_mb())
+DEFAULT_SCRUB_PIXELS = 25.
+
+def defaults(registry, layout='QWERTY'):
+    return dict(format='cadence-shortcuts',version=1,shortcut_defaults_revision=REVISION,keyboard_layout=layout,shortcut_profiles={},shortcuts={key:physical_shortcut(value[1],layout) for key,value in registry.items()},canvas=default_canvas(),scrub_pixels=DEFAULT_SCRUB_PIXELS,language='fr',clear_cache_on_exit=False,preview_quality='native',scrub_audio=True,tooltips=False,auto_update_check=True,update_previews=True,video_renderer=default_renderer(),video_renderer_version=2,ram_cache_mb=default_cache_mb())
 
 def validate(data,registry):
     if not isinstance(data,dict) or data.get('format')!='cadence-shortcuts' or data.get('version')!=1: raise ValueError('Format de raccourcis incompatible.')
-    result=defaults(registry); supplied=data.get('shortcuts',{})
+    layout=data.get('keyboard_layout','QWERTY')
+    if layout not in KEYBOARD_LAYOUTS: raise ValueError('Disposition du clavier invalide.')
+    result=defaults(registry,layout); supplied=data.get('shortcuts',{})
+    profiles=data.get('shortcut_profiles',{})
+    if not isinstance(profiles,dict): raise ValueError('Liste de raccourcis invalide.')
+    for name,bindings in profiles.items():
+        if name in KEYBOARD_LAYOUTS and name!=layout:
+            saved=dict(data,keyboard_layout=name,shortcuts=bindings,shortcut_profiles={})
+            result['shortcut_profiles'][name]=validate(saved,registry)['shortcuts']
     if not isinstance(supplied,dict): raise ValueError('Liste de raccourcis invalide.')
     supplied=dict(supplied)
     # Preserve customized shortcuts when older labels used long dash separators.
@@ -87,7 +97,7 @@ def validate(data,registry):
         if not isinstance(config,dict) or config.get('modifiers') not in MODIFIERS or config.get('axis') not in ('x','y') or any(type(config.get(x)) is not bool for x in ('invert_x','invert_y')): raise ValueError('Geste du canvas invalide : '+key)
         result['canvas'][key]={field:config[field] for field in default}
     if len({v['modifiers'] for v in result['canvas'].values()})!=3: raise ValueError('Chaque geste au bouton central doit utiliser une combinaison différente.')
-    sensitivity=data.get('scrub_pixels',4.)
+    sensitivity=data.get('scrub_pixels',DEFAULT_SCRUB_PIXELS)
     if isinstance(sensitivity,bool) or not isinstance(sensitivity,(int,float)) or not .25<=sensitivity<=100: raise ValueError('La sensibilité du scrub doit être comprise entre 0,25 et 100 pixels par image.')
     result['scrub_pixels']=float(sensitivity)
     result['language']=data.get('language','fr') if data.get('language','fr') in ('fr','en') else 'fr'
@@ -95,9 +105,9 @@ def validate(data,registry):
     quality=data.get('preview_quality','native')
     result['preview_quality']=quality if quality in ('native','480p','720p','1080p','4k') else 'native'
     result['scrub_audio']=data.get('scrub_audio',True) is not False
-    result['tooltips']=data.get('tooltips',True) is not False
+    result['tooltips']=data.get('tooltips',False) is True
     result['auto_update_check']=data.get('auto_update_check',True) is not False
-    result['update_previews']=data.get('update_previews',False) is True
+    result['update_previews']=data.get('update_previews',True) is not False
     result['video_renderer']=preferred_renderer(data)
     ram=data.get('ram_cache_mb',default_cache_mb())
     result['ram_cache_mb']=max(64,min(maximum_cache_mb(),ram)) if type(ram) is int else default_cache_mb()
@@ -115,6 +125,16 @@ def write_file(path,data):
     tmp=path.with_suffix(path.suffix+'.tmp'); tmp.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf-8'); tmp.replace(path)
 
 def save_preferences(data): write_file(preference_path(),data)
+
+def switch_keyboard_layout(data,layout,registry):
+    current=data['keyboard_layout']
+    if current==layout: return data
+    profiles=dict(data['shortcut_profiles'])
+    bindings=profiles.pop(layout,None)
+    if bindings is None:
+        bindings={key:physical_shortcut(value,layout,current) for key,value in data['shortcuts'].items()}
+    profiles[current]=dict(data['shortcuts'])
+    return validate(dict(data,keyboard_layout=layout,shortcuts=bindings,shortcut_profiles=profiles),registry)
 
 class CacheProbe(QObject):
     ready=Signal(int,float)
@@ -138,7 +158,7 @@ class ShortcutDialog(QDialog):
         self.preview_quality.setEnabled(not bool(getattr(parent,'job',None)))
         for row,(title,control) in enumerate([('Langue',self.language),('Affichage vidéo',self.video_renderer),('Résolution de l’aperçu',self.preview_quality)]):
             grid.addWidget(QLabel(tr(title)),row,0); grid.addWidget(control,row,1)
-        note=QLabel(tr('Les changements de langue et d’affichage vidéo prennent effet au prochain démarrage.')); note.setWordWrap(True); note.setStyleSheet('color:#8895a7;'); grid.addWidget(note,3,0,1,2)
+        note=QLabel(tr('Le changement d’affichage vidéo prend effet au prochain démarrage.')); note.setWordWrap(True); note.setStyleSheet('color:#8895a7;'); grid.addWidget(note,3,0,1,2)
         self.scrub_audio=QCheckBox(tr('Son pendant le défilement et le pas-à-pas')); grid.addWidget(self.scrub_audio,4,0,1,2)
         maintenance=QHBoxLayout(); maintenance.setSpacing(20); general.addLayout(maintenance)
         cache=section('Cache'); cache_col=QVBoxLayout(cache); cache_col.setSpacing(14); maintenance.addWidget(cache,1)
@@ -158,6 +178,12 @@ class ShortcutDialog(QDialog):
         general.addStretch(); tabs.addTab(scroll_page(prefs,maintenance),tr('Préférences')); self.cache_probe=CacheProbe(self); self.cache_probe.ready.connect(self.cache_ready); self.cache_generation=0
         QTimer.singleShot(0,self.update_cache_label)
         keys=QWidget(); self.keys_layout=QVBoxLayout(keys); tabs.addTab(keys,tr('Raccourcis'))
+        layout_row=QHBoxLayout(); layout_label=QLabel(tr('Disposition du clavier'))
+        self.keyboard_layout=QComboBox(); self.keyboard_layout.addItems(KEYBOARD_LAYOUTS)
+        layout_label.setBuddy(self.keyboard_layout); self.keyboard_layout.setAccessibleName(layout_label.text())
+        layout_row.addWidget(layout_label); layout_row.addWidget(self.keyboard_layout); layout_row.addStretch()
+        self.keys_layout.addLayout(layout_row)
+        self.keyboard_layout.currentTextChanged.connect(self.change_keyboard_layout)
         self._editors={}; self._key_values={}; self.keys_ready=False; tabs.currentChanged.connect(lambda index:self.ensure_keys() if index==1 else None)
         gestures=QWidget(); gl=QVBoxLayout(gestures)
         self.gestures={}; table=QTableWidget(3,6); table.setHorizontalHeaderLabels(tr(['Geste','Avec clic molette','Axe','Inverser G/D','Inverser H/B',''])); table.verticalHeader().hide(); table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch); gl.addWidget(table)
@@ -232,14 +258,28 @@ class ShortcutDialog(QDialog):
         self.ensure_keys(); self.tabs.setCurrentIndex(1)
         self.key_tabs.setCurrentWidget(self.key_tables[key.split('/',1)[0]])
         self.editors[key].setFocus()
+    def change_keyboard_layout(self,layout):
+        if self.populating: return
+        try:
+            data=switch_keyboard_layout(self.live_data,layout,self.registry)
+            save_preferences(data)
+        except (ValueError,OSError) as error:
+            with QSignalBlocker(self.keyboard_layout): self.keyboard_layout.setCurrentText(self.live_data['keyboard_layout'])
+            QMessageBox.warning(self,tr('Raccourcis invalides'),tr(str(error))); return
+        self.live_data=data; self._key_values=dict(data['shortcuts'])
+        for key,edit in self._editors.items():
+            with QSignalBlocker(edit): edit.setKeySequence(QKeySequence(self._key_values[key]))
+        self.shortcutsChanged.emit(data)
     def populate(self,data):
         self.populating=True
         self.ram_cache.setValue(data.get('ram_cache_mb',default_cache_mb()))
         self.video_renderer.setCurrentIndex(self.video_renderer.findData(preferred_renderer(data)))
         self.language.setCurrentIndex(self.language.findData(data.get('language','fr'))); self.clear_on_exit.setChecked(data.get('clear_cache_on_exit',False))
         self.preview_quality.setCurrentIndex(self.preview_quality.findData(data.get('preview_quality','native'))); self.scrub_audio.setChecked(data.get('scrub_audio',True))
-        self.tooltips.setChecked(data.get('tooltips',True))
-        self.auto_update_check.setChecked(data.get('auto_update_check',True)); self.update_previews.setChecked(data.get('update_previews',False))
+        self.tooltips.setChecked(data.get('tooltips',False))
+        self.auto_update_check.setChecked(data.get('auto_update_check',True)); self.update_previews.setChecked(data.get('update_previews',True))
+        self.keyboard_layout.setCurrentText(data.get('keyboard_layout','QWERTY'))
+        self._profiles=dict(data.get('shortcut_profiles',{}))
         self._key_values=dict(data['shortcuts'])
         for key,edit in self._editors.items(): edit.setKeySequence(QKeySequence(data['shortcuts'].get(key,self.registry[key][1])))
         for name,config in data['canvas'].items(): self.populate_gesture(name,config)
@@ -255,6 +295,7 @@ class ShortcutDialog(QDialog):
         data['preview_quality']=self.preview_quality.currentData(); data['scrub_audio']=self.scrub_audio.isChecked()
         data['tooltips']=self.tooltips.isChecked()
         data['auto_update_check']=self.auto_update_check.isChecked(); data['update_previews']=self.update_previews.isChecked()
+        data['keyboard_layout']=self.keyboard_layout.currentText(); data['shortcut_profiles']=self.live_data.get('shortcut_profiles',{})
         data['video_renderer']=self.video_renderer.currentData()
         data['ram_cache_mb']=self.ram_cache.value()
         return validate(data,self.registry)
@@ -271,7 +312,7 @@ class ShortcutDialog(QDialog):
         data=dict(self.live_data)
         data['canvas']={name:dict(modifiers=MODIFIERS[mod.currentIndex()],axis=axis.currentData(),invert_x=x.isChecked(),invert_y=y.isChecked()) for name,(mod,axis,x,y) in self.gestures.items()}
         data['scrub_pixels']=self.scrub.value()
-        if include_keys: data['shortcuts']=dict(self._key_values)
+        if include_keys: data.update(shortcuts=dict(self._key_values),keyboard_layout=self.keyboard_layout.currentText(),shortcut_profiles=self._profiles)
         try: data=validate(data,self.registry); save_preferences(data)
         except (ValueError,OSError) as error:
             QMessageBox.warning(self,tr('Enregistrement impossible'),tr(str(error))); return
@@ -333,15 +374,15 @@ class ShortcutDialog(QDialog):
     def confirm_reset(self,message):
         return QMessageBox.warning(self,tr('Réinitialiser les réglages'),tr(message+'\nLes personnalisations concernées seront remplacées. Continuer ?'),QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,QMessageBox.StandardButton.No)==QMessageBox.StandardButton.Yes
     def reset_key(self,key):
-        if self.confirm_reset(tr('Réinitialiser « {command} » ?').format(command=tr(key))): self.set_key(key,self.registry[key][1])
+        if self.confirm_reset(tr('Réinitialiser « {command} » ?').format(command=tr(key))): self.set_key(key,physical_shortcut(self.registry[key][1],self.keyboard_layout.currentText()))
     def reset_gesture(self,name):
         if self.confirm_reset('Réinitialiser ce geste du canvas ?'):
             self.populating=True; self.populate_gesture(name,default_canvas()[name]); self.populating=False; self.gesture_changed(name)
     def reset_scrub(self):
-        if self.confirm_reset('Réinitialiser la sensibilité du scrub ?'): self.scrub.setValue(4)
+        if self.confirm_reset('Réinitialiser la sensibilité du scrub ?'): self.scrub.setValue(DEFAULT_SCRUB_PIXELS)
     def reset_all(self):
         if self.confirm_reset('Réinitialiser TOUS les raccourcis, gestes du canvas et réglages du scrub ?'):
-            data=defaults(self.registry); data.update(self.general_preferences()); self.populate(data)
+            data=defaults(self.registry,self.keyboard_layout.currentText()); data.update(self.general_preferences()); self.populate(data)
     def general_preferences(self):
         return dict(auto_update_check=self.auto_update_check.isChecked(),update_previews=self.update_previews.isChecked(),ram_cache_mb=self.ram_cache.value(),language=self.language.currentData(),clear_cache_on_exit=self.clear_on_exit.isChecked(),preview_quality=self.preview_quality.currentData(),scrub_audio=self.scrub_audio.isChecked(),tooltips=self.tooltips.isChecked(),video_renderer=self.video_renderer.currentData(),video_renderer_version=2)
     def import_file(self):

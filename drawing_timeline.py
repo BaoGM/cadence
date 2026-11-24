@@ -52,7 +52,9 @@ class DrawingTimeline(QObject):
         return min(candidates,key=lambda k:(max(t.x_for(k.start)-x,0,x-t.x_for(k.end)),abs(x-t.x_for((k.start+k.end)/2))),default=None)
     def contains(self,pos):
         t=self.t
-        return t.track_left()<=pos.x()<=t.track_right() and t.track_y('drawing')-3<=pos.y()<=t.track_y('drawing')+6
+        y=t.track_y('drawing')
+        top,bottom=(y-3,y+6) if t.simple else (t.marker_lane_height,t.ruler_y()-1)
+        return t.track_left()<=pos.x()<=t.track_right() and top<=pos.y()<=bottom
     def resize_mode(self,key,x):
         left,right=self.t.x_for(key.start),self.t.x_for(key.end)
         center=(left+right)/2
@@ -184,18 +186,19 @@ class DrawingTimeline(QObject):
         self.paint_cached(p,keys,True)
         p.restore()
     def paint_cached(self,p,keys,simple=False):
-        t=self.t; ratio=t.devicePixelRatioF(); y=t.track_y('drawing')-3
+        t=self.t; ratio=t.devicePixelRatioF(); y=t.track_y('drawing')-3 if simple else t.marker_lane_height
+        lane_height=10 if simple else t.drawing_lane_height
         if t.selection_track=='drawing' and t.state.selection:
             a,b=t.state.selection
             left=max(t.track_left(),t.x_for(a)); right=min(t.track_right(),t.x_for(b))
             if right>left:
-                height=9 if simple else 11
+                height=lane_height-1
                 p.fillRect(QRectF(left,y,right-left,height),QColor(104,224,207,96))
                 p.fillRect(QRectF(left,y+height-1,right-left,1),QColor('#68e0cf'))
         signature=(id(keys),t.width(),ratio,t.view_start,t.span(),simple,y,p.font().toString())
         cached=getattr(self,'raster',None)
         if cached is None or cached[0]!=signature:
-            image=QImage(ceil(t.width()*ratio),ceil(12*ratio),QImage.Format.Format_ARGB32_Premultiplied)
+            image=QImage(ceil(t.width()*ratio),ceil(lane_height*ratio),QImage.Format.Format_ARGB32_Premultiplied)
             image.setDevicePixelRatio(ratio); image.fill(Qt.GlobalColor.transparent)
             ink=QPainter(image); ink.setRenderHints(p.renderHints()); ink.setFont(p.font()); ink.translate(0,-y)
             self.paint_keys(ink,keys,simple,None)
@@ -206,7 +209,7 @@ class DrawingTimeline(QObject):
         if self.focus_handle is not None and self.focus_handle.hasFocus() and self.focus_valid():
             k=self.focus_key
             mid=t.x_for((k.start+k.end)/2); half=max(5,(t.x_for(k.end)-t.x_for(k.start))/2)
-            area=QRectF(mid-half,y+.5,half*2,9 if simple else 10)
+            area=QRectF(mid-half,y+.5,half*2,lane_height-1)
             if self.focus_part_name!='body':
                 x=area.left() if self.focus_part_name=='left' else area.right()
                 area=QRectF(x-2.5,area.top(),5,area.height())
@@ -217,15 +220,15 @@ class DrawingTimeline(QObject):
                 middle=t.x_for((key.start+key.end)/2)
                 dx=max(5,(t.x_for(key.end)-t.x_for(key.start))/2)-1
                 x=middle-dx if edge=='left' else middle+dx
-                top=t.track_y('drawing')
+                top=t.track_y('drawing')-(0 if simple else 6)
                 p.setPen(QPen(QColor('#e1faf4'),2.6,Qt.SolidLine,Qt.RoundCap))
-                p.drawLine(QPointF(x,top-1),QPointF(x,top+(5 if simple else 7)))
+                p.drawLine(QPointF(x,top-1),QPointF(x,top+(5 if simple else 13)))
     def paint(self,p):
         t=self.t
         if not t.state.drawings:
             self.raster=None; return
         y=t.track_y('drawing')
-        p.save(); p.setClipRect(QRectF(t.track_left(),y-3,t.track_width(),12))
+        p.save(); p.setClipRect(QRectF(t.track_left(),t.marker_lane_height,t.track_width(),t.drawing_lane_height))
         keys=self.preview if self.preview is not None else t.state.drawings
         self.paint_cached(p,keys)
         if self.change:
@@ -234,7 +237,7 @@ class DrawingTimeline(QObject):
             p.setClipping(False); p.setPen(QColor('#ff7f70' if not self.valid else '#ffe0a0')); p.drawText(QRectF(t.track_left(),y+7,300,20),Qt.AlignmentFlag.AlignVCenter,tr(text))
         p.restore()
     def paint_keys(self,p,keys,simple=False,active_start=None):
-        t=self.t; y=t.track_y('drawing')
+        t=self.t; y=t.track_y('drawing')-(0 if simple else 6)
         left,right=t.track_left(),t.track_right(); scale=t.track_width()/t.span(); last_pixel=None
         for key in visible_keys(keys,t.view_start-13/scale,t.view_start+t.span()):
             x1=left+(key.start-t.view_start)*scale; x2=left+(key.end-t.view_start)*scale
@@ -249,7 +252,7 @@ class DrawingTimeline(QObject):
             edge=QColor('#94ded4' if active else '#849aab')
             if not key.marks:
                 fill=QColor('#303d48')
-            height=4 if simple else 6
+            height=4 if simple else 12
             p.setBrush(fill)
             p.setPen(QPen(edge,1))
             p.drawRoundedRect(QRectF(x1+.5,y+.5,width,height),1.5,1.5)

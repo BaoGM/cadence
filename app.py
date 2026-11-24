@@ -3,7 +3,7 @@ from __future__ import annotations
 import time as _startup_time
 _STARTUP=_startup_time.perf_counter()
 import sys
-VERSION='2.0.3'
+VERSION='2.0.5'
 if __name__=='__main__' and getattr(sys,'frozen',False) and not any(arg.startswith('--self-test') for arg in sys.argv):
     from pathlib import Path
     from update_store import base_executable,dispatch
@@ -67,8 +67,10 @@ QPushButton#danger {color:#f1b3a6;}
 QToolButton:checked {background:#355558;border:1px solid #68e0cf;border-radius:4px;}
 QPushButton#transport {font-size:16px;min-width:28px;}
 QComboBox,QSpinBox,QDoubleSpinBox,QLineEdit {background:#111720;border:1px solid #354254;border-radius:5px;padding:6px;color:#dfe8f1;min-height:20px;}
+QComboBox {combobox-popup:0;}
 QComboBox::drop-down {border:0;width:18px;}
 QComboBox QAbstractItemView {background:#243040;selection-background-color:#42616b;}
+QComboBox QAbstractItemView::item {min-height:24px;}
 QSlider::groove:horizontal {height:4px;background:#344354;border-radius:2px;}
 QSlider::sub-page:horizontal {background:#68e0cf;border-radius:2px;}
 QSlider::handle:horizontal {background:#d5fff7;border:2px solid #68e0cf;width:12px;height:12px;margin:-5px 0;border-radius:7px;}
@@ -95,14 +97,13 @@ QFrame#studioStage {background:#0c1116;border:0;}
 QFrame#studioRail,QFrame#studioRailTools {background:#151c23;border:0;}
 QFrame#studioRailRule,QFrame#studioDivider {background:#333f4c;border:0;}
 QFrame#studioTimeline {background:#161d25;border-bottom:1px solid #333f4c;border-top:1px solid #40505e;}
-QFrame#studioTimelineFoot {background:#141b22;border:0;border-top:1px solid #2a3440;}
 QWidget#studioTransport {background:#1b232c;border:0;border-top:1px solid #333f4c;}
 #studioTransport QWidget {background:transparent;}
 #studioTransport QFrame#studioDivider {background:#333f4c;}
 #studioTransport QFrame#studioLibraryContinuation {background:#171e26;border-right:1px solid #333f4c;}
 QFrame#studioModes {background:#10161c;border:1px solid #333f4c;border-radius:7px;}
 QFrame#studioSegment {background:#10161c;border:1px solid #333f4c;border-radius:5px;}
-#studioTop QLabel,#studioView QLabel,#studioTimeline QLabel,#studioTimelineFoot QLabel {background:transparent;}
+#studioTop QLabel,#studioView QLabel,#studioTimeline QLabel {background:transparent;}
 QLabel#studioBrand {font-size:20px;font-weight:700;color:#e9eef3;}
 QLabel#studioProject,QLabel#studioSource,QLabel#studioSection {font-size:13px;font-weight:600;color:#e3eaf1;}
 QLabel#studioClock {font-family:Consolas;font-size:16px;font-weight:600;color:#e3eaf1;}
@@ -121,14 +122,10 @@ QFrame#studioEditing {background:#181f27;border:0;border-bottom:1px solid #333f4
 #studioTop QToolButton:pressed,#studioView QToolButton:pressed,#studioTimeline QToolButton:pressed,#studioRail QToolButton:pressed {background:#334151;}
 #studioTop QToolButton:focus,#studioView QToolButton:focus,#studioTimeline QToolButton:focus,#studioRail QToolButton:focus {border:1px solid #68e0cf;}
 #studioTop QToolButton:checked,#studioView QToolButton:checked,#studioTimeline QToolButton:checked,#studioRail QToolButton:checked {background:#244044;color:#68e0cf;}
-#studioRail QToolButton[railTool="true"]:checked {border-left:2px solid #68e0cf;padding-right:6px;}
 #studioTop QToolButton#studioMode {font-weight:600;padding:3px 9px;}
 #studioTop QToolButton#studioMode:checked {background:#68e0cf;color:#0a2a28;}
 #studioTop QToolButton#studioMenuButton {border:1px solid #333f4c;padding:3px 8px;}
 #studioSegment QToolButton {font-size:11px;border-radius:3px;padding:1px 6px;}
-#studioTimeline QSlider {background:transparent;}
-#studioTimeline QSlider::groove:horizontal {height:3px;background:#425260;border-radius:1px;}
-#studioTimeline QSlider::handle:horizontal {width:11px;height:11px;background:#68e0cf;border:0;border-radius:5px;margin:-4px 0;}
 #studioTop QToolButton::menu-indicator,#studioView QToolButton::menu-indicator {width:0;height:0;}
 '''
 
@@ -155,6 +152,8 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         super().__init__(); self.doc=Document(); self.token=0; self.job=None; self.dialog=None
         from ui_text import initialize_language
         initialize_language()
+        from PySide6.QtCore import QLocale
+        self.setLocale(QLocale())
         from ui_style import install_tooltip_delay
         install_tooltip_delay()
         startup.checkpoint('language and styles')
@@ -333,19 +332,24 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         return panel_menu(self)
 
     def apply_preferences(self,data):
+        previous_language=getattr(self,'preferences',{}).get('language')
         previous=getattr(self,'preferences',{}).get('preview_quality','native')
         self.preferences=data
         from ui_style import set_tooltips_enabled
-        set_tooltips_enabled(data.get('tooltips',True))
+        set_tooltips_enabled(data.get('tooltips',False))
         from cache_ram import default_cache_mb,MIB
         self.frame_cache.set_budget(data.get('ram_cache_mb',default_cache_mb())*MIB)
         for key,(action,default) in self.action_registry.items(): action.setShortcut(QKeySequence(data['shortcuts'].get(key,default)))
         from shortcut_defaults import apply_aliases
-        apply_aliases(self.action_registry)
+        apply_aliases(self.action_registry,data.get('keyboard_layout','QWERTY'))
         self.studio.sync_menu_shortcut()
         self.viewer.controls=data['canvas']; self.viewer.scrub_pixels=data['scrub_pixels']
         self.viewer.setToolTip(tr(''))
         if hasattr(self,'scrub_audio'): self.scrub_audio.set_enabled(data.get('scrub_audio',True))
+        if previous_language and previous_language!=data['language']:
+            from live_language import retranslate
+            retranslate(self,data['language'])
+        self.sync_tool_shortcuts()
         if previous!=data.get('preview_quality','native') and (self.doc.media or self.reference_sources): self.rebuild_previews()
     def rebuild_previews(self):
         if self.job: return
@@ -367,6 +371,29 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
             self.reference_signature=None; self.viewer.reference_rgb=None; self.rebuild_reference_index()
             self.install_doc(self.doc)
         self.begin_task('Mise à jour des aperçus',prepare,apply)
+    def toggle_language(self):
+        from preferences import save_preferences
+        from ui_text import language
+        data=dict(self.preferences,language='en' if language()=='fr' else 'fr')
+        try: save_preferences(data)
+        except OSError as error:
+            self.error(str(error)); return
+        self.apply_preferences(data)
+        if language()!=data['language']:
+            from live_language import retranslate
+            retranslate(self,data['language'])
+            self.sync_tool_shortcuts()
+    def sync_tool_shortcuts(self):
+        from draw_ui import TOOL_SPECS
+        for title,tool,_ in TOOL_SPECS:
+            action=self.drawing.tool_actions[tool]
+            key=action.shortcut().toString(QKeySequence.SequenceFormat.NativeText)
+            label=tr(title)
+            tip=label+' · '+key if key else label
+            action.setToolTip(tip)
+            self.drawing.tool_buttons[tool].setToolTip(tip)
+            self.drawing.tool_buttons[tool].setAccessibleName(label)
+            self.studio.rail_buttons[tool].setAccessibleName(label)
     def edit_shortcuts(self, checked=False, *, language_focus=False):
         dialog=ShortcutDialog(self.action_registry,self.preferences,self)
         if language_focus:
@@ -381,7 +408,6 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         self.layout_editable=enabled
         for dock in list(self.panel_widgets().values())+[self.library]:
             if not isinstance(dock,QDockWidget): continue
-            if not enabled and dock.isFloating(): dock.setFloating(False)
             dock.setFeatures((QDockWidget.DockWidgetFeature.DockWidgetClosable|QDockWidget.DockWidgetFeature.DockWidgetMovable|QDockWidget.DockWidgetFeature.DockWidgetFloatable) if enabled else QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
             old=dock.titleBarWidget(); bar=QWidget(dock); bar.setFixedHeight(22 if enabled else 0)
             if enabled:
@@ -421,19 +447,21 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         self.resizeDocks([top,timeline],[78,150],Qt.Orientation.Vertical)
 
     def build_library(self):
-        self.library=QDockWidget(tr('Liste de lecture et médias'),self); self.library.setObjectName('library'); self.library.setMinimumWidth(180)
+        self.library=QDockWidget(tr('Liste de lecture et médias'),self); self.library.setObjectName('library')
         from library_style import LibraryPages,LibraryTabs,SourceRows,EmptyHint,PANEL_STYLE,panel_heading,panel_strip,style_button
         box=QWidget(); col=QVBoxLayout(box); col.setContentsMargins(0,0,0,0)
         tabs=LibraryPages(); tabs.setDocumentMode(True); tabs.setTabBar(LibraryTabs(self.settings,tabs))
         tabs.setStyleSheet(PANEL_STYLE); self.library_tabs=tabs; col.addWidget(tabs)
         from media_source_drop import MediaSourceDrops, MediaSources
+        from timeline_thumbnails import ClipThumbnails
+        self.source_previews=ClipThumbnails(self,repaint=False)
         self.playlist=QListWidget(); self.media_list=MediaSources()
         self.media_source_drops=MediaSourceDrops(self)
         for listing,tab,heading in ((self.playlist,'Lecture','Ordre de lecture'),(self.media_list,'Médias','Sources du montage')):
             page=QWidget(); page.setObjectName('studioPage')
             layout=QVBoxLayout(page); layout.setContentsMargins(0,0,0,0); layout.setSpacing(0)
             _,count=panel_heading(panel_strip(layout),tr(heading))
-            listing.setItemDelegate(SourceRows(listing)); layout.addWidget(listing,1)
+            listing.setItemDelegate(SourceRows(listing,thumbnails=self.source_previews)); layout.addWidget(listing,1)
             listing.empty_hint=EmptyHint(listing,tr('Aucun média dans le montage.'))
             footer=panel_strip(layout,'footer')
             reference=style_button(QPushButton(tr('Utiliser comme référence B')),'refs')
@@ -451,6 +479,11 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
                 listing.itemSelectionChanged.connect(lambda:self.add_reference_button.setEnabled(bool(self.selected_reference_sources())))
             reference.setEnabled(False)
         box.setMinimumHeight(60); tabs.setMinimumHeight(40)
+        # The tab strip updates its label widths as the dock is resized.
+        from PySide6.QtWidgets import QLayout
+        self.library.layout().setSizeConstraint(QLayout.SetNoConstraint)
+        self.library.setMinimumWidth(204)
+        self.library.setMinimumHeight(60)
         self.library.setWidget(box); self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea,self.library); self.library.hide(); self.library_signature=None
         self.playlist.itemDoubleClicked.connect(self.play_list_item); self.media_list.itemDoubleClicked.connect(self.seek_media)
         from playlist_ui import PlaylistPanel
@@ -530,7 +563,7 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         if self.doc.delete(): self.refresh(); self.request_frame()
 
     def refresh_library(self):
-        from library_style import icon,media_details,TITLE_ROLE,DETAIL_ROLE,SYMBOL_ROLE,MEDIA_ROLE
+        from library_style import icon,media_details,set_preview,TITLE_ROLE,DETAIL_ROLE,SYMBOL_ROLE,MEDIA_ROLE
         track=self.doc.active_track
         signature=(self.doc.state.tracks,self.doc.active_track_id)
         if signature==self.library_signature: return
@@ -541,6 +574,7 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
             item=QListWidgetItem(f'{i+1}. {name} · {seg.length} '+tr('images')); item.setData(Qt.ItemDataRole.UserRole,(at,at+seg.length))
             media=self.doc.media.get(key,{})
             item.setData(MEDIA_ROLE,key); item.setData(TITLE_ROLE,name)
+            set_preview(item,media,seg.start)
             item.setData(SYMBOL_ROLE,'film' if media.get('has_video',True) else 'wave')
             millis=round(at*1000/self.doc.fps)
             stamp=f'{millis//3600000:02}:{millis//60000%60:02}:{millis//1000%60:02}.{millis%1000:03}'
@@ -551,6 +585,7 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         for key in keys:
             media=self.doc.media[key]; details=media_details(media)
             item=QListWidgetItem(icon('film' if media.get('has_video', True) else 'wave'),media['name']+('\n'+details if details else ''))
+            set_preview(item,media)
             item.setData(SYMBOL_ROLE,'film' if media.get('has_video',True) else 'wave')
             item.setToolTip(media['path']); item.setData(Qt.ItemDataRole.UserRole,key); self.media_list.addItem(item)
         self.playlist_count.setText(str(self.playlist.count())); self.media_count.setText(str(self.media_list.count()))
@@ -1148,7 +1183,7 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         close_button=buttons.button(QDialogButtonBox.StandardButton.Close); close_button.setText('&'+tr('Fermer')); close_button.setStyle(guide.button_style)
         close_shortcut=QShortcut(QKeySequence(tr('Fermer')[0]),guide); close_shortcut.setAutoRepeat(False); close_shortcut.activated.connect(close_button.click)
         from guide import fill_browser
-        fill_browser(browser,self.action_registry)
+        fill_browser(browser,self.action_registry,self.preferences.get('keyboard_layout','QWERTY'))
         guide.exec(); guide.deleteLater()
     def closeEvent(self,e):
         if self.job:

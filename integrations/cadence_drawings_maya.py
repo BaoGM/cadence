@@ -109,6 +109,27 @@ def cameras():
     return [(c.listRelatives(shape,parent=True) or [shape])[0] for shape in (c.ls(type='camera',long=True) or [])][:64]
 
 
+def drawing_layers(c):
+    return [layer for layer in c.ls(type='displayLayer') or []
+            if c.attributeQuery('cadenceDrawingsLayer',node=layer,exists=True)
+            and c.getAttr(layer+'.cadenceDrawingsLayer') and not c.referenceQuery(layer,isNodeReferenced=True)]
+
+
+def group_drawables(c, nodes):
+    layers=drawing_layers(c)
+    if layers:
+        layer=layers[0]
+    else:
+        layer=c.createDisplayLayer(name='Cadence_Drawings',empty=True,makeCurrent=False)
+        c.addAttr(layer,longName='cadenceDrawingsLayer',attributeType='bool',defaultValue=True)
+    try:
+        c.editDisplayLayerMembers(layer,nodes,noRecurse=True)
+    except RuntimeError:
+        if not layers: c.delete(layer)
+        raise
+    return layer
+
+
 def image_groups(c,owner,camera):
     return [node for node in c.ls(type='network',long=True) or []
         if c.attributeQuery('cadenceOwner',node=node,exists=True)
@@ -176,6 +197,11 @@ def clear():
             if all(c.attributeQuery(attr,node=node,exists=True) for attr in ('cadenceOwner','cadenceCamera','drawings'))
             and fullmatch('[0-9a-f]{32}',c.getAttr(node+'.cadenceOwner') or '')]
         remove_images(c,groups)
+        current=c.editDisplayLayerGlobals(query=True,currentDisplayLayer=True)
+        flags={'ufeObjects':True} if c.about(apiVersion=True)>=20240000 else {}
+        for layer in drawing_layers(c):
+            if layer!=current and not c.editDisplayLayerMembers(layer,query=True,**flags):
+                c.delete(layer)
     finally:
         c.undoInfo(closeChunk=True)
         c.select([node for node in selection if c.objExists(node)],replace=True) if selection else c.select(clear=True)
@@ -249,6 +275,22 @@ def apply(data,folder):
                 gain,bias=adjustments[index]
                 for curve,value in zip(curves,(gain,bias)):
                     c.setKeyframe(curve,time=item['frame'],value=value,inTangentType='flat',outTangentType='step')
+            if c.about(apiVersion=True)<20230000:
+                group_drawables(c,[transform,shape])
+            else:
+                # Newer layer editors resolve a camera's underworld image plane to the camera itself.
+                member=c.createNode('transform',name='Cadence_drawing_display')
+                created.append(member)
+                c.connectAttr(member+'.message',group+'.drawings[3]')
+                layer=group_drawables(c,[member])
+                switch=c.createNode('condition',name='Cadence_drawing_visibility')
+                created.append(switch)
+                c.connectAttr(switch+'.message',group+'.drawings[4]')
+                c.connectAttr(layer+'.visibility',switch+'.firstTerm')
+                c.setAttr(switch+'.secondTerm',1)
+                c.setAttr(switch+'.colorIfTrueR',3)
+                c.setAttr(switch+'.colorIfFalseR',0)
+                c.connectAttr(switch+'.outColorR',shape+'.displayMode')
         remove_blue(c,owner,camera)
         remove_images(c,old)
     except BaseException:
@@ -449,6 +491,14 @@ def grease_pencil_steps(data,folder,shape):
                 raise RuntimeError('Grease Pencil ownership failed for '+node+': '+str(error))
         yield dict(progress=98)
         if progress_dialog.cancelled: raise TransferCancelled()
+        if sequence:
+            # The native plane and its two paint meshes belong to Cadence. The camera does not.
+            drawables=[plane]
+            for attr in ('renderPlane','sourcePlane'):
+                for node in c.listConnections(plane+'.'+attr,source=True,destination=False) or []:
+                    drawables.append(node)
+                    drawables.extend(c.listRelatives(node,shapes=True,fullPath=True) or [])
+            group_drawables(c,drawables)
         remove_images(c,old)
     except BaseException:
         c.setToolTo('selectSuperContext')
@@ -496,6 +546,8 @@ def blue_pencil(data,folder,shape):
         remove_images(c,image_groups(c,data['owner'],shape))
         return dict(keys=len(data['keys']),native=0,images=len(data['keys']),collapsed=data['collapsed'],blue_pencil=True)
     selection=c.ls(selection=True,long=True) or []; frame=c.currentTime(query=True)
+    previous_visible=next((c.bluePencilLayer(camera,queryVis=index) for index,name in enumerate(previous)
+                           if name.startswith(owner)),True)
     imported=None
     previous_nodes=set(c.ls(type='bluePencil',long=True) or [])
     c.undoInfo(openChunk=True,chunkName='Cadence Blue Pencil')
@@ -509,6 +561,7 @@ def blue_pencil(data,folder,shape):
             if imported!=camera and layer in names(imported):
                 c.bluePencilLayer(imported,move=(names(imported).index(layer),len(names())),newCamera=camera)
             if layer not in names(): raise RuntimeError('Blue Pencil did not import the expected layer')
+            if not previous_visible: c.bluePencilLayer(camera,editVis=(False,names().index(layer)))
             # The imported frames already contain Cadence ghosts; native ghosts would duplicate them.
             c.bluePencilUtil(edit=True,ghostPrevious=False)
             c.bluePencilUtil(edit=True,ghostNext=False)

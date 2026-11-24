@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from fractions import Fraction
 from library_style import (icon, style_button, media_details, SourceRows, panel_strip, panel_heading,
-                           TITLE_ROLE, DETAIL_ROLE, POSTER_ROLE, EmptyHint)
+                           TITLE_ROLE, DETAIL_ROLE, POSTER_ROLE, EmptyHint, set_preview)
 from PySide6.QtGui import QImage,QPixmap,QIcon
 from PySide6.QtCore import Qt,Signal,QEvent,QSignalBlocker
 from PySide6.QtWidgets import QWidget,QVBoxLayout,QListWidget,QListWidgetItem,QAbstractItemView,QPushButton,QMenu,QComboBox,QHBoxLayout,QLabel
@@ -39,7 +39,7 @@ class ReferenceQueueMixin:
         self.ref_panel_source.activated.connect(self.pick_panel_source)
         self.ref_caption,self.ref_count=panel_heading(panel_strip(layout,'heading'),tr('Ordre de comparaison'))
         self.reference_list=ReferenceList(); self.reference_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.reference_list.setItemDelegate(SourceRows(self.reference_list,ordered=True))
+        self.reference_list.setItemDelegate(SourceRows(self.reference_list,ordered=True,thumbnails=self.source_previews))
         self.reference_list.empty_hint=EmptyHint(self.reference_list,tr('Ajoutez une référence pour comparer les images.'))
         self.reference_list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.reference_list.setDefaultDropAction(Qt.DropAction.MoveAction)
@@ -49,12 +49,12 @@ class ReferenceQueueMixin:
         self.reference_list.deleteRequested.connect(self.remove_reference_items)
         self.reference_list.itemDoubleClicked.connect(self.seek_reference)
         layout.addWidget(self.reference_list,1)
-        self.track_ref_readout=QListWidget(); self.track_ref_readout.setItemDelegate(SourceRows(self.track_ref_readout,ordered=True))
+        self.track_ref_readout=QListWidget(); self.track_ref_readout.setItemDelegate(SourceRows(self.track_ref_readout,ordered=True,thumbnails=self.source_previews))
         self.track_ref_readout.hide(); self.track_ref_signature=None; layout.addWidget(self.track_ref_readout,1)
         footer=panel_strip(layout,'footer')
         self.ref_compare_button=style_button(QPushButton(tr('Comparer')),'ab'); self.ref_compare_button.setCheckable(True)
         self.ref_compare_button.setToolTip(tr('Activer la comparaison')); footer.addWidget(self.ref_compare_button)
-        self.ref_compare_button.clicked.connect(self.compare_enabled.setChecked)
+        self.ref_compare_button.toggled.connect(self.compare_enabled.setChecked)
         self.compare_enabled.toggled.connect(self.ref_compare_button.setChecked)
         footer.addStretch()
         add=style_button(QPushButton(tr('Ajouter des références…')),'plus',True); add.clicked.connect(self.open_reference); footer.addWidget(add)
@@ -101,6 +101,7 @@ class ReferenceQueueMixin:
         media=self.doc.media.get(key)
         if media:
             item=QListWidgetItem(icon('film'),media['name']); item.setToolTip(media['path'])
+            set_preview(item,media)
             item.setData(DETAIL_ROLE,self.ref_panel_source.currentText())
         else:
             item=QListWidgetItem(tr('Aucun média à cette image.'))
@@ -139,6 +140,7 @@ class ReferenceQueueMixin:
                 item=QListWidgetItem(self.ref_thumbnails.get(media['id'],icon('film')),f'{index+1}. {name}'+('\n'+details if details else '')); item.setData(Qt.ItemDataRole.UserRole,index)
                 item.setData(TITLE_ROLE,name); item.setData(DETAIL_ROLE,f'{index+1} · {details}' if details else str(index+1))
                 item.setData(POSTER_ROLE,media['id'] in self.ref_thumbnails)
+                set_preview(item,media)
                 item.setToolTip(media['path']); item.setFlags(item.flags()&~Qt.ItemFlag.ItemIsDropEnabled)
                 self.reference_list.addItem(item)
         self.ref_count.setText(str(self.reference_list.count())); self.ref_button_state()

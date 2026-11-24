@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from fractions import Fraction
 
-from PySide6.QtCore import QRect, QSize, Qt
-from PySide6.QtGui import QColor, QFont, QPainter
+from PySide6.QtCore import QRect, QRectF, QSize, Qt
+from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QMenu, QSizePolicy, QSplitter, QSplitterHandle,
                                QStyle, QStyledItemDelegate, QTabBar, QTabWidget, QTreeWidget, QWidget)
 
@@ -234,15 +234,25 @@ DETAIL_ROLE=TITLE_ROLE+1
 SYMBOL_ROLE=TITLE_ROLE+2
 POSTER_ROLE=TITLE_ROLE+3
 MEDIA_ROLE=TITLE_ROLE+4
+PREVIEW_ROLE=TITLE_ROLE+5
+
+
+def set_preview(item,media,frame=0):
+    path=media.get('proxy') or media.get('path')
+    if path and media.get('has_video',True):
+        key=(path,media.get('size'),media.get('mtime_ns'),media.get('preview_rotation',0),
+             frame,frame+1,str(media.get('fps') or 24),str(media.get('direct_start') or 0))
+        item.setData(PREVIEW_ROLE,key)
 
 
 def row_background(painter,rect,state):
     selected=bool(state & QStyle.StateFlag.State_Selected)
     if selected or state & QStyle.StateFlag.State_MouseOver:
-        painter.setPen(Qt.NoPen); painter.setBrush(QColor('#244044' if selected else '#202c37'))
-        painter.drawRoundedRect(rect,4,4)
-    if selected:
-        painter.fillRect(rect.left(),rect.top()+2,2,rect.height()-4,QColor('#68e0cf'))
+        shape=QPainterPath()
+        shape.addRoundedRect(QRectF(rect),5,5)
+        painter.fillPath(shape,QColor('#244044' if selected else '#202c37'))
+        if selected:
+            painter.fillPath(shape.subtracted(shape.translated(2,0)),QColor('#68e0cf'))
     return selected
 
 
@@ -250,7 +260,7 @@ class LibraryTree(QTreeWidget):
     def drawRow(self,painter,option,index):
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        rect=QRect(0,option.rect.y(),self.viewport().width(),option.rect.height()-1)
+        rect=QRect(0,option.rect.y(),self.viewport().width(),option.rect.height())
         state=option.state
         if self.selectionModel().isSelected(index): state|=QStyle.StateFlag.State_Selected
         row_background(painter,rect,state)
@@ -274,13 +284,13 @@ class TreeRows(QStyledItemDelegate):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect=option.rect.adjusted(0,0,0,-1)
         group=not index.parent().isValid()
-        selected=bool(option.state & QStyle.StateFlag.State_Selected)
+        selected=self.parent().selectionModel().isSelected(index)
         symbol=index.data(SYMBOL_ROLE)
         if symbol:
             icon(symbol,selected,color=None if selected or not group else '#9aaabb').paint(
                 painter,QRect(rect.left()+3,rect.center().y()-8,16,16))
         font=QFont(option.font); font.setPixelSize(12)
-        painter.setFont(font); painter.setPen(QColor('#9aaabb' if group else '#e1e8f0'))
+        painter.setFont(font); painter.setPen(QColor('#e0fbf4' if selected else '#9aaabb' if group else '#e1e8f0'))
         text_rect=rect.adjusted(24,0,-5,0)
         if group:
             count=str(index.model().rowCount(index))
@@ -316,9 +326,12 @@ class EmptyHint(QLabel):
 class SourceRows(QStyledItemDelegate):
     row_height = 34
 
-    def __init__(self,parent,ordered=False):
+    def __init__(self,parent,ordered=False,thumbnails=None):
         super().__init__(parent)
         self.ordered=ordered
+        self.thumbnails=thumbnails
+        if thumbnails:
+            thumbnails.changed.connect(parent.viewport().update)
         parent.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         parent.setMouseTracking(True)
 
@@ -328,25 +341,34 @@ class SourceRows(QStyledItemDelegate):
 
     def paint(self,painter,option,index):
         painter.save(); painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        rect=option.rect.adjusted(0,0,0,-1)
+        rect=option.rect
         font=QFont(option.font)
         active=row_background(painter,rect,option.state)
         text,_,secondary=(index.data() or '').partition('\n')
         title=index.data(TITLE_ROLE) or text
         detail=index.data(DETAIL_ROLE) or secondary
         left=rect.left()+7
-        if self.ordered:
+        key=index.data(PREVIEW_ROLE)
+        if self.ordered or key:
             poster=QRect(left,rect.center().y()-13,44,27)
             painter.setPen(Qt.NoPen); painter.setBrush(QColor('#10171d')); painter.drawRoundedRect(poster,3,3)
             if index.data(POSTER_ROLE):
                 index.data(Qt.ItemDataRole.DecorationRole).paint(painter,poster)
-            else: icon('film',active).paint(painter,QRect(poster.center().x()-8,poster.center().y()-8,16,16))
+            else:
+                images=self.thumbnails.request((*key[:6],Fraction(key[6]),Fraction(key[7]))) if key and self.thumbnails else ()
+                if images:
+                    image=images[0]; scale=min(poster.width()/image.width(),poster.height()/image.height())
+                    box=QRect(0,0,max(1,round(image.width()*scale)),max(1,round(image.height()*scale)))
+                    box.moveCenter(poster.center()); painter.setRenderHint(QPainter.SmoothPixmapTransform)
+                    painter.drawImage(box,image)
+                else:
+                    icon(index.data(SYMBOL_ROLE) or 'film',active).paint(painter,QRect(poster.center().x()-8,poster.center().y()-8,16,16))
             left+=52
         else:
             icon(index.data(SYMBOL_ROLE) or 'film',active).paint(painter,QRect(left,rect.center().y()-8,16,16))
             left+=24
         room=max(0,rect.right()-left-6)
-        font.setPixelSize(13); painter.setFont(font); painter.setPen(QColor('#e1e8f0'))
+        font.setPixelSize(13); painter.setFont(font); painter.setPen(QColor('#e0fbf4' if active else '#e1e8f0'))
         anchor=Qt.AlignLeft|Qt.AlignVCenter
         label=QRect(left,rect.top()+1 if detail else rect.top(),room,19 if detail else rect.height())
         painter.drawText(label,anchor,painter.fontMetrics().elidedText(title,Qt.ElideMiddle,room))

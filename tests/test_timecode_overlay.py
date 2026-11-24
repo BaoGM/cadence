@@ -31,6 +31,7 @@ def test_overlay_position_visibility_and_fullscreen(window,application):
 
 def test_drag_overlay_does_not_scrub_or_draw(window,application):
     w=window; w.set_panel('timecode',True); v=w.viewer; o=w.timecode_overlay
+    o.set_locked(False)
     v.set_frame(np.full((540,960,3),90,np.uint8)); w.drawing.choose_tool('brush'); application.processEvents()
     original=w.doc.state; start=o.rect().center(); end=start+QPointF(40,-50)
     QTest.mousePress(v,Qt.MouseButton.LeftButton,pos=start.toPoint())
@@ -92,7 +93,7 @@ def test_timecode_context_lock_and_persistence(window,application):
         point=o.rect().center().toPoint(); QTimer.singleShot(20,choose)
         application.sendEvent(v,QContextMenuEvent(QContextMenuEvent.Reason.Mouse,point,v.mapToGlobal(point)))
         assert seen[-1]==(tr('Verrouiller la position du code temporel'),True,expected)
-    toggle(False); assert o.locked
+    assert o.locked
     position=o.position(); start=o.rect().center().toPoint(); end=start+QPointF(30,-40).toPoint()
     QTest.mousePress(v,Qt.MouseButton.LeftButton,pos=start)
     QTest.mouseMove(v,end); QTest.mouseRelease(v,Qt.MouseButton.LeftButton,pos=end)
@@ -100,4 +101,5 @@ def test_timecode_context_lock_and_persistence(window,application):
     save(w); assert json.loads(path().read_text())['timecode_locked'] is True
     o.set_locked(False); load(w); assert o.locked
     toggle(True); assert not o.locked
-    o.set_locked(True); w.workspaces.reset(); assert not o.locked and o.position()==[.5,1]
+    save(w); o.set_locked(True); load(w); assert not o.locked
+    w.workspaces.reset(); assert o.locked and o.position()==[.5,1]

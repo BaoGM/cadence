@@ -61,7 +61,9 @@ def test_selected_cursor_decodes_live_video(window,application,prepared,simple):
         for frame in (70,8):
             mouse(t,QEvent.Type.MouseMove,points[frame],SHIFT)
             deadline=time.monotonic()+5
-            while getattr(w,'rendered_token',None)!=w.token and time.monotonic()<deadline: QTest.qWait(10)
+            while getattr(w,'rendered_token',None)!=w.token and time.monotonic()<deadline:
+                application.processEvents()
+                time.sleep(.005)
             assert w.rendered_token==w.token and d.state.position==frame
             assert np.array_equal(w.viewer.rgb,reader.read(media,frame))
             assert d.state.selection==(min(frame,20),max(frame,20)+1)
@@ -77,7 +79,7 @@ def test_simplified_context_toggle_preserves_workspace_and_saved_mode(window,app
         assert action.isChecked()==bool(t.simple)
         action.trigger(); menu.deleteLater(); application.processEvents()
     toggle(t.track_y('video')+9)
-    assert t.simple and t.height()==52 and w.workspaces.mode=='edit'
+    assert t.simple and t.height()==42 and w.workspaces.mode=='edit'
     assert before=={k:p.isHidden() for k,p in w.workspaces.panels.items()} and w.doc.state.selection==(2,8)
     assert json.loads(w.workspaces.path.read_text(encoding='utf-8'))['simple']['edit']
     w.workspaces.switch('read'); w.workspaces.switch('edit'); assert t.simple

@@ -71,6 +71,7 @@ docs/UNINSTALL.md
 docs/release-notes-1.18.3.txt
 docs/release-notes-1.18.4.txt
 docs/release-notes-1.18.5.txt
+docs/release-notes-2.0.5.txt
 drag.py
 draw_fonts.py
 draw_selection.py
@@ -96,6 +97,7 @@ integrations/cadence_drawings_blender.py
 integrations/cadence_drawings_maya.py
 integrations/cadence_runtime.py
 library_style.py
+live_language.py
 media.py
 media_source_drop.py
 media_track_ui.py
@@ -223,6 +225,7 @@ tests/test_picker1110.py
 tests/test_playback117.py
 tests/test_playback160.py
 tests/test_playlists1180.py
+tests/test_preferences204.py
 tests/test_preview110.py
 tests/test_preview1162.py
 tests/test_preview181.py
@@ -252,6 +255,8 @@ tests/test_timeline1152.py
 tests/test_timeline200.py
 tests/test_timeline202.py
 tests/test_timeline203.py
+tests/test_timeline205.py
+tests/test_timeline_library204.py
 tests/test_toolbar_layout.py
 tests/test_tools0160.py
 tests/test_tools0170.py

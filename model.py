@@ -202,8 +202,8 @@ class Document:
         self.saved_signature = self.signature()
         self.project_path = None
 
-    def signature(self):
-        return (self.state.tracks, self.fps, self.state.drawings, self.state.drawings_linked, self.state.frame_markers, self.state.marker_names, json.dumps(self.review,sort_keys=True))
+    def signature(self, *, fps=None):
+        return (self.state.tracks, self.fps if fps is None else fps, self.state.drawings, self.state.drawings_linked, self.state.frame_markers, self.state.marker_names, json.dumps(self.review,sort_keys=True))
 
     def rename_marker(self, frame, name):
         if frame not in self.state.frame_markers:
@@ -398,16 +398,23 @@ class Document:
         return self.commit('Ajouter des médias',replace(self.state,segments=segments,audio_segments=self.state.audio+tuple(Segment(m['id'],0,m['frames']) for m in items),position=at,selection=None,loop_range=None))
 
     def add_sources_to_track(self, identity, keys, destination=None):
+        if any(key not in self.media for key in keys): return False
+        return self.insert_track_sources(identity,[self.media[key] for key in keys],destination)
+
+    def insert_track_sources(self,identity,items,destination=None,*,adopt_rate=False):
         tracks = self.state.tracks
         target = next((track for track in tracks if track.info.id == identity), None)
-        if target is None or not keys or any(key not in self.media for key in keys):
+        if target is None or not items:
             return False
         at = target.length if destination is None else int(destination)
         if not 0 <= at <= self.state.length:
             return False
-        audio = tuple(Segment(key, 0, self.media[key]['frames']) for key in keys)
-        video = tuple(segment if self.media[segment.media].get('has_video', True)
-                      else Segment(None, 0, segment.length) for segment in audio)
+        rate=Fraction(items[0]['fps']) if adopt_rate else self.fps
+        if any(Fraction(item.get('fps',rate))!=rate or item['frames']<=0 for item in items): return False
+        baseline=self.signature(fps=rate) if adopt_rate and not self.dirty else None
+        audio = tuple(Segment(item['id'], 0, item['frames']) for item in items)
+        video = tuple(segment if item.get('has_video', True) else Segment(None, 0, segment.length)
+                      for item,segment in zip(items,audio))
         updated = insert_track_media(target, at, video, audio)
         state = with_tracks(self.state, tuple(updated if t.info.id == identity else t for t in tracks))
         if len(tracks) == 1 and state.drawings_linked and state.drawings:
@@ -415,8 +422,12 @@ class Document:
             if extra:
                 filled = sum(segment.length for segment in video) - extra
                 state = replace(state, drawings=insert_keys(state.drawings, at + filled, extra, ()))
+        if not self.commit('Ajouter des médias', replace(state, position=at, selection=None, selected_clips=(), loop_range=None)): return False
+        for item in items: self.media.setdefault(item['id'],item)
         self.select_track(identity)
-        return self.commit('Ajouter des médias', replace(state, position=at, selection=None, selected_clips=(), loop_range=None))
+        self.fps=rate
+        if baseline is not None: self.saved_signature=baseline
+        return True
 
     @selected_tracks
     def duplicate_range(self,start,end,destination=None):

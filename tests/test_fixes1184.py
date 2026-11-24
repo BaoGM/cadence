@@ -70,7 +70,7 @@ def test_chevron_still_expands_audio(window, application):
 
 
 @pytest.mark.parametrize('kind', ['list', 'nested_folder'])
-def test_library_click_opens_only_chosen_video_and_autoplays(window, application, clips, monkeypatch, tmp_path, kind):
+def test_library_double_click_opens_only_chosen_video_and_autoplays(window, application, clips, monkeypatch, tmp_path, kind):
     w=window; panel=w.playlists_panel; old=document(clips); w.install_doc(old)
     original=old.state
     selected_folder=None
@@ -90,6 +90,10 @@ def test_library_click_opens_only_chosen_video_and_autoplays(window, application
     selected_path=panel.files.item(1).data(Qt.ItemDataRole.UserRole)
     point=panel.files.visualItemRect(panel.files.item(1)).center()
     QTest.mouseClick(panel.files.viewport(),Qt.LeftButton,Qt.NoModifier,point)
+    assert panel.files.selectedItems()==[panel.files.item(1)] and w.doc is old and w.job is None
+    assert not w.transport.running and not panel.temporary
+    QTest.mouseDClick(panel.files.viewport(),Qt.LeftButton,Qt.NoModifier,point)
+    QTest.mouseRelease(panel.files.viewport(),Qt.LeftButton,Qt.NoModifier,point)
     try: pump(application,lambda:w.job is None and w.transport.running,timeout=30)
     except AssertionError:
         raise AssertionError(dict(errors=errors, same_doc=w.doc is old, job=bool(w.job),
@@ -105,16 +109,23 @@ def test_library_click_opens_only_chosen_video_and_autoplays(window, application
 
 def test_library_selection_and_drag_do_not_open_a_video(window, application, tmp_path, monkeypatch):
     panel=window.playlists_panel
-    paths=[tmp_path/'a.mp4',tmp_path/'b.mp4']
+    paths=[tmp_path/'a.mp4',tmp_path/'b.mp4',tmp_path/'c.mp4']
     for path in paths:path.write_bytes(b'fixture')
     identity=panel.store.create('Playlist',paths); panel.rebuild((identity,None))
     window.library.show(); window.library_tabs.setCurrentWidget(panel); application.processEvents()
     jobs=[]; monkeypatch.setattr(window,'begin_task',lambda *a:jobs.append(a))
     first=panel.files.visualItemRect(panel.files.item(0)).center()
     second=panel.files.visualItemRect(panel.files.item(1)).center()
+    third=panel.files.visualItemRect(panel.files.item(2)).center()
+    QTest.mouseClick(panel.files.viewport(),Qt.LeftButton,Qt.NoModifier,first)
+    QTest.mouseClick(panel.files.viewport(),Qt.LeftButton,Qt.ShiftModifier,third)
+    assert len(panel.files.selectedItems())==3 and not jobs
     QTest.mouseClick(panel.files.viewport(),Qt.LeftButton,Qt.ControlModifier,first)
-    QTest.mouseClick(panel.files.viewport(),Qt.LeftButton,Qt.ControlModifier,second)
     assert len(panel.files.selectedItems())==2 and not jobs
+    import json
+    from playlist_ui import LIBRARY_MIME
+    payload=panel.files.mimeData(panel.files.selectedItems())
+    assert json.loads(bytes(payload.data(LIBRARY_MIME)))['paths']==[str(path) for path in paths[1:]]
     QTest.mouseClick(panel.files.viewport(),Qt.RightButton,Qt.NoModifier,first)
     assert not jobs
     panel.files.setDragEnabled(False)

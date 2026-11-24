@@ -16,6 +16,8 @@ class CompactTransport(QObject):
         for part in self.parts:
             strip.layout().removeWidget(part)
             part.installEventFilter(self)
+        for column in (0,2):
+            strip.layout().setColumnMinimumWidth(column,0)
         strip.layout().setContentsMargins(0,0,0,0)
         self.controls = QScrollArea(strip)
         self.controls.setFrameShape(QFrame.NoFrame)

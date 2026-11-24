@@ -54,7 +54,7 @@ class UpdateManager(QObject):
         if self.ready_button is not None: return
         self.manual = manual
         self.phase = 'check'
-        previews = self.window.preferences.get('update_previews', False)
+        previews = self.window.preferences.get('update_previews', True)
         self.run(lambda: check(self.version, False, previews))
 
     def run(self, operation):

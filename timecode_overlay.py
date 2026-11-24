@@ -12,7 +12,7 @@ class TimecodeOverlay(QObject):
     frameChanged=Signal(str,str)
 
     def __init__(self,viewer):
-        super().__init__(viewer); self.viewer=viewer; self.visible=True; self.locked=False
+        super().__init__(viewer); self.viewer=viewer; self.visible=True; self.locked=True
         self.anchor=QPointF(.5,1); self.time='00:00:00.000'; self.frame=''
         self.drag=None; self.font=QFont('Consolas'); self.font.setPixelSize(12)
         self.small_font=QFont('Segoe UI'); self.small_font.setPixelSize(10)

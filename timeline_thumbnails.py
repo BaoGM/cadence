@@ -57,8 +57,12 @@ class ReadThumbnails(QRunnable):
 
 
 class ClipThumbnails(QObject):
-    def __init__(self, timeline):
-        super().__init__(timeline)
+    changed = Signal()
+
+    def __init__(self, owner, repaint=True):
+        super().__init__(owner)
+        if repaint:
+            self.changed.connect(owner.update)
         self.result = ThumbnailResult(self)
         self.result.ready.connect(self.complete, Qt.ConnectionType.QueuedConnection)
         self.cache = OrderedDict()
@@ -71,6 +75,9 @@ class ClipThumbnails(QObject):
         fps = Fraction(str(media.get('fps') or 24))
         key = (str(path), media.get('size'), media.get('mtime_ns'), media.get('preview_rotation', 0),
                segment.start, segment.end, fps, Fraction(str(media.get('direct_start') or 0)))
+        return self.request(key,strip)
+
+    def request(self,key,strip=False):
         full, first = (*key, 7), (*key, 1)
         if full in self.cache:
             self.cache.move_to_end(full)
@@ -93,4 +100,4 @@ class ClipThumbnails(QObject):
         self.cache[key] = images
         if len(self.cache) > 256:
             self.cache.popitem(last=False)
-        self.parent().update()
+        self.changed.emit()

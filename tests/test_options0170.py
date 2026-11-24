@@ -42,7 +42,8 @@ def test_options_tabs_persistence_and_legacy_shortcut(window,tmp_path,monkeypatc
     d.reject()
 
 
-def test_actual_keyboard_dispatch_for_every_default(window,application):
+@pytest.mark.parametrize('layout',['QWERTY','AZERTY'])
+def test_actual_keyboard_dispatch_for_every_default(window,application,layout):
     class CatchShortcut(QObject):
         def __init__(self): super().__init__(); self.delivered=[]
         def eventFilter(self,obj,event):
@@ -52,10 +53,11 @@ def test_actual_keyboard_dispatch_for_every_default(window,application):
     w=window; guard=CatchShortcut(); w.activateWindow(); w.raise_(); w.viewer.setFocus()
     QTest.qWait(30); application.processEvents()
     registry=w.action_registry
-    validate(defaults(registry),registry) # Includes prefix conflicts, not only duplicates.
-    for action,default in registry.values():
-        action.setEnabled(True); action.setShortcut(QKeySequence(default)); action.installEventFilter(guard)
-    for key,(action,default) in registry.items():
+    bindings=validate(defaults(registry,layout),registry)['shortcuts']
+    for key,(action,_) in registry.items():
+        action.setEnabled(True); action.setShortcut(QKeySequence(bindings[key])); action.installEventFilter(guard)
+    for key,(action,_) in registry.items():
+        default=bindings[key]
         if not default: continue
         guard.delivered.clear(); QTest.keySequence(w,QKeySequence(default)); application.processEvents()
         assert guard.delivered==[(action,False)],(key,default,guard.delivered)

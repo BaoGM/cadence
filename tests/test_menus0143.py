@@ -63,6 +63,14 @@ def test_background_panel_menu_works_with_locked_and_floating_panels(window,appl
     w.layout_action.trigger(); w.library.show(); w.library.setFloating(True); application.processEvents()
     # A detached panel's empty background offers the same menu.
     choose(w.library.titleBarWidget(),'comparison',QPoint(12,8)); assert w.comparison_panel.isVisible() and w.panel_actions['comparison'].isChecked()
-    w.layout_action.trigger(); application.processEvents(); assert not w.library.isFloating()
+    w.layout_action.trigger(); application.processEvents()
+    assert not w.layout_editable and w.library.isFloating() and w.library.isVisible()
+    tabs=w.library_tabs.tabBar()
+    library_index=w.library_tabs.indexOf(w.playlists_panel)
+    w.library_tabs.setCurrentIndex(0)
+    QTest.mouseClick(tabs,Qt.LeftButton,pos=tabs.tabRect(library_index).center())
+    assert w.library_tabs.currentWidget() is w.playlists_panel
+    w.workspaces.switch('read'); w.workspaces.switch('edit'); application.processEvents()
+    assert w.library.isFloating() and w.library.isVisible()
     w.header.hide(); w.toggle_fullscreen(); application.processEvents()
     choose(w.viewer,'header'); assert not w.video_fullscreen and not w.header.isHidden()

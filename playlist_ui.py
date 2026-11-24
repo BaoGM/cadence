@@ -1,22 +1,36 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from datetime import datetime
+import json
 from fractions import Fraction
 from threading import Thread
 from library_style import (icon, style_button, panel_strip, panel_heading, LibrarySplitter, LibraryTree,
-                           TreeRows, SourceRows, SYMBOL_ROLE, EmptyHint)
+                           TreeRows, SourceRows, SYMBOL_ROLE, EmptyHint, set_preview)
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal, QTimer, QFile, QSignalBlocker, QEvent
+from PySide6.QtCore import Qt, Signal, QTimer, QFile, QSignalBlocker, QEvent, QMimeData
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtCore import QUrl
 from shiboken6 import isValid
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
                               QListWidget, QListWidgetItem, QAbstractItemView, QPushButton,
-                              QMenu, QFileDialog, QInputDialog, QMessageBox, QSplitter, QApplication,
+                              QMenu, QFileDialog, QInputDialog, QMessageBox, QSplitter,
                               QScrollArea, QLayout, QLabel)
 
 from playlist_store import PlaylistStore, scan_folder, has_subfolders, copy_into_folder, path_key, VIDEO_EXTENSIONS
 from ui_text import tr
+
+LIBRARY_MIME='application/x-cadence-library'
+
+
+class PlaylistTree(LibraryTree):
+    def mimeTypes(self):
+        return [LIBRARY_MIME]
+
+    def mimeData(self,items):
+        nodes=[item.data(0,Qt.UserRole) for item in items if item.data(0,Qt.UserRole)]
+        data=QMimeData()
+        if nodes: data.setData(LIBRARY_MIME,json.dumps(dict(node=nodes[0])).encode())
+        return data
 
 
 class PlaylistFiles(QListWidget):
@@ -28,30 +42,22 @@ class PlaylistFiles(QListWidget):
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.setDefaultDropAction(Qt.DropAction.MoveAction)
-        self.play_press = None
 
-    def mousePressEvent(self, event):
-        item = self.itemAt(event.position().toPoint())
-        self.play_press = (item.data(Qt.ItemDataRole.UserRole), event.position().toPoint()) if item and event.button() == Qt.MouseButton.LeftButton and event.modifiers() == Qt.KeyboardModifier.NoModifier else None
-        super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event):
-        if self.play_press and (event.position().toPoint()-self.play_press[1]).manhattanLength() >= QApplication.startDragDistance():
-            self.play_press = None
-        super().mouseMoveEvent(event)
-
-    def startDrag(self, actions):
-        self.play_press = None
-        super().startDrag(actions)
-
-    def mouseReleaseEvent(self, event):
-        pressed = self.play_press; self.play_press = None
+    def mouseDoubleClickEvent(self, event):
         item = self.itemAt(event.position().toPoint())
         path = item.data(Qt.ItemDataRole.UserRole) if item else None
-        super().mouseReleaseEvent(event)
-        if pressed and pressed[0] == path and event.button() == Qt.MouseButton.LeftButton and event.modifiers() == Qt.KeyboardModifier.NoModifier:
-            if (event.position().toPoint()-pressed[1]).manhattanLength() < QApplication.startDragDistance():
-                self.playRequested.emit(path)
+        super().mouseDoubleClickEvent(event)
+        if path and event.button() == Qt.MouseButton.LeftButton and event.modifiers() == Qt.KeyboardModifier.NoModifier:
+            self.playRequested.emit(path)
+
+    def startDrag(self, actions):
+        super().startDrag(actions | Qt.CopyAction)
+
+    def mimeData(self,items):
+        data=super().mimeData(items)
+        paths=[item.data(Qt.UserRole) for item in sorted(items,key=self.row)]
+        data.setData(LIBRARY_MIME,json.dumps(dict(paths=paths)).encode())
+        return data
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls(): event.acceptProposedAction()
@@ -94,7 +100,9 @@ class PlaylistPanel(QWidget):
         row.addStretch(); self.refresh_button = QPushButton(tr('Actualiser')); self.refresh_button.clicked.connect(lambda: self.browse(refresh=True)); row.addWidget(self.refresh_button)
         style_button(new,'plus'); style_button(self.open_button,'open'); style_button(self.refresh_button,'refresh',True)
         splitter = LibrarySplitter(Qt.Orientation.Vertical); splitter.setHandleWidth(6); splitter.setChildrenCollapsible(False)
-        self.tree = LibraryTree(); self.tree.setHeaderHidden(True)
+        self.tree = PlaylistTree(); self.tree.setHeaderHidden(True)
+        self.tree.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
+        self.tree.setDefaultDropAction(Qt.CopyAction)
         self.tree.setItemDelegate(TreeRows(self.tree)); self.tree.setIndentation(13); self.tree.setMouseTracking(True)
         self.tree.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tree.currentItemChanged.connect(self.selected)
@@ -106,7 +114,7 @@ class PlaylistPanel(QWidget):
         self.tree.customContextMenuRequested.connect(self.tree_menu)
         splitter.addWidget(self.tree)
         self.files = PlaylistFiles()
-        self.files.setItemDelegate(SourceRows(self.files)); self.empty_files=EmptyHint(self.files,'')
+        self.files.setItemDelegate(SourceRows(self.files,thumbnails=window.source_previews)); self.empty_files=EmptyHint(self.files,'')
         self.files.model().rowsMoved.connect(self.reordered)
         self.files.filesDropped.connect(self.add_paths)
         self.files.playRequested.connect(self.play_file)
@@ -159,6 +167,8 @@ class PlaylistPanel(QWidget):
         if data:
             symbol='time' if data[0]=='temporary' else 'folder' if data[1] else 'list'
             item.setIcon(0,icon(symbol)); item.setData(0,SYMBOL_ROLE,symbol)
+        else:
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsDragEnabled)
         return item
 
     def folder_icon(self,item,opened):
@@ -228,14 +238,15 @@ class PlaylistPanel(QWidget):
         self.file_footer.setVisible(editable)
         self.refresh_button.setEnabled(editable)
         self.add_button.setEnabled(editable); self.remove_button.setEnabled(editable)
-        self.files.setDragEnabled(editable); self.files.setAcceptDrops(editable)
+        self.files.setDragEnabled(bool(data)); self.files.setAcceptDrops(editable)
         paths = []
         if editable: paths = self.store.files(*data)
         elif data:
             record = next((r for r in self.temporary if r['id'] == data[1]), None)
-            if record: paths = [m['path'] for m in record['doc'].media.values()]
+            if record: paths = self.temporary_paths(record['doc'])
         for path in paths:
             item = QListWidgetItem(icon('film'), Path(path).name); item.setData(Qt.ItemDataRole.UserRole, path)
+            set_preview(item,dict(path=path))
             item.setToolTip(path); self.files.addItem(item)
             if not Path(path).is_file(): item.setText(item.text() + ' — ' + tr('Introuvable'))
         self.empty_files.setText(tr('Aucun fichier dans ce dossier.') if editable and data[1] else
@@ -247,6 +258,18 @@ class PlaylistPanel(QWidget):
         self.folder_label.parentWidget().setVisible(bool(current and data))
         self.open_button.setEnabled(bool(paths) or bool(data and data[0] == 'temporary'))
         self.rebuilding = False
+
+    @staticmethod
+    def temporary_paths(doc):
+        occurrences={}
+        for lane,track in enumerate(doc.state.tracks):
+            for segments in (track.segments,track.audio):
+                frame=0
+                for segment in segments:
+                    if segment.media in doc.media:
+                        occurrences[frame,lane,segment.media]=doc.media[segment.media]['path']
+                    frame+=segment.length
+        return [occurrences[key] for key in sorted(occurrences,key=lambda key:key[:2])]
 
     def browse(self, refresh=False, item=None):
         if not self.store: return

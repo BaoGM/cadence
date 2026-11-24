@@ -25,26 +25,29 @@ def visible(w): return {k for k,p in w.workspaces.panels.items() if not p.isHidd
 def test_first_open_modes_reset_and_persist(application,tmp_path):
     from app import MainWindow
     w=MainWindow(); w.show(); application.processEvents()
-    assert w.workspaces.mode=='read' and visible(w)=={'timeline','transport','library'} and w.timeline.simple
+    assert w.workspaces.mode=='read' and visible(w)=={'timeline','transport'} and w.timeline.simple
+    assert w.timecode_overlay.locked
+    w.library.show()
     w.workspaces.switch('edit'); application.processEvents()
-    assert visible(w)=={'timeline','transport','library','tools'} and not w.timeline.simple
+    assert visible(w)==set(w.workspaces.panels) and not w.timeline.simple
     w.set_layout_editable(True); w.header.hide(); w.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea,w.library)
     w.resize(1580,940); application.processEvents(); w.close()
     w=MainWindow(); w.show(); application.processEvents()
     assert w.workspaces.mode=='edit' and w.header.isHidden() and w.layout_editable
     assert w.dockWidgetArea(w.library)==Qt.DockWidgetArea.RightDockWidgetArea
     assert json.loads((tmp_path/'workspaces.json').read_text(encoding='utf-8'))['geometry']
-    w.workspaces.switch('read'); w.timecode_overlay.setVisible(False); w.workspaces.switch('edit')
+    w.workspaces.switch('read'); assert w.library.isVisible()
+    w.timecode_overlay.setVisible(False); w.workspaces.switch('edit')
     assert w.header.isHidden() and w.dockWidgetArea(w.library)==Qt.DockWidgetArea.RightDockWidgetArea
-    w.reset_panel_layout(); assert visible(w)=={'timeline','transport','library','tools'} and not w.layout_editable
+    w.reset_panel_layout(); assert visible(w)==set(w.workspaces.panels) and not w.layout_editable
     w.workspaces.switch('read'); assert w.timecode_overlay.isHidden()
-    w.reset_panel_layout(); assert visible(w)=={'timeline','transport','library'}
+    w.reset_panel_layout(); assert visible(w)=={'timeline','transport'}
     w.workspaces.switch('edit'); w.header.hide()
     from preferences import ShortcutDialog,validate
     dialog=ShortcutDialog(w.action_registry,w.preferences,w)
     next(b for b in dialog.findChildren(QPushButton) if b.text()=='Restaurer l’interface').click()
-    assert w.workspaces.mode=='read' and visible(w)=={'timeline','transport','library'}
-    w.workspaces.switch('edit'); assert visible(w)=={'timeline','transport','library','tools'}
+    assert w.workspaces.mode=='read' and visible(w)=={'timeline','transport'}
+    w.workspaces.switch('edit'); assert visible(w)==set(w.workspaces.panels)
     dialog.reject(); w.close()
 
 def test_options_does_not_wait_for_cache_and_keeps_lazy_keys(window,application,monkeypatch):

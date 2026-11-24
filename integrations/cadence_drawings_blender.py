@@ -8,6 +8,11 @@ def linear(value):
     return value/12.92 if value<=.04045 else ((value+.055)/1.055)**2.4
 
 
+def drawing_roots(scene):
+    return [collection for collection in scene.collection.children_recursive
+            if collection.library is None and collection.get('cadence_drawings_root')==1]
+
+
 def remove_collections(bpy,collections,owner):
     if collections: bpy.context.view_layer.update()
     for collection in collections:
@@ -35,14 +40,18 @@ def clear():
     import bpy
     import re
     if bpy.app.is_job_running('RENDER'): raise RuntimeError('Wait for the current render to finish')
-    collections=[collection for collection in bpy.data.collections
+    scene=bpy.context.scene
+    collections=[collection for collection in scene.collection.children_recursive
         if isinstance(collection.get('cadence_owner'),str) and re.fullmatch('[0-9a-f]{32}',collection['cadence_owner'])
         and 'cadence_camera' in collection]
     owners={collection['cadence_owner'] for collection in collections}
     for owner in owners:
-        remove_collections(bpy,[collection for collection in bpy.data.collections
+        remove_collections(bpy,[collection for collection in scene.collection.children_recursive
             if collection.get('cadence_owner')==owner and 'cadence_camera' in collection],owner)
         prune_resources(bpy,owner)
+    for root in drawing_roots(scene):
+        if not root.objects and not root.children and root.users==1:
+            bpy.data.collections.remove(root)
 
 
 def apply(data, folder):
@@ -54,12 +63,14 @@ def apply(data, folder):
     if data['mode']=='native' and bpy.app.version<(4,3,0):
         raise RuntimeError('Grease Pencil transfer requires Blender 4.3 or later; choose transparent images')
     owner=data['owner']
-    old=[c for c in bpy.data.collections if c.get('cadence_owner')==owner and c.get('cadence_camera')==camera.name]
+    old=[c for c in scene.collection.children_recursive if c.get('cadence_owner')==owner and c.get('cadence_camera')==camera.name]
     distance=max(camera.data.clip_start*2,1.)
     if distance>=camera.data.clip_end: raise ValueError('Camera clipping range is too small')
-    collection=bpy.data.collections.new('Cadence - '+owner[:8])
+    collection=bpy.data.collections.new(camera.name+' - '+owner[:8])
     collection['cadence_owner']=owner; collection['cadence_camera']=camera.name
-    scene.collection.children.link(collection)
+    if old:
+        collection.hide_viewport=old[0].hide_viewport
+        collection.hide_render=old[0].hide_render
     created=[]; resources=[]
     corners=camera.data.view_frame(scene=scene)
     projected=[v if camera.data.type=='ORTHO' else v*(distance/abs(v.z)) for v in corners]
@@ -186,6 +197,14 @@ def apply(data, folder):
         for key in data['keys']:
             if key['strokes'] is None or data['mode']=='images': plane(key)
             if any(alpha>0 and not key['start']<=frame<key['end'] for frame,alpha in key['envelope']): plane(key,True)
+        roots=drawing_roots(scene)
+        if roots:
+            root=roots[0]
+        else:
+            root=bpy.data.collections.new('Cadence Drawings')
+            root['cadence_drawings_root']=1
+            scene.collection.children.link(root)
+        root.children.link(collection)
         remove_collections(bpy,old,owner)
         for library,resource in resources: resource['cadence_owner']=owner
         prune()

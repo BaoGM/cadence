@@ -16,7 +16,7 @@ def load(window):
     window.timeline.set_units('frames' if data.get('units')=='frames' else 'time')
     window.master_volume()
     window.timecode_overlay.set_position(data.get('timecode_position',[.5,1]))
-    window.timecode_overlay.set_locked(data.get('timecode_locked') is True)
+    window.timecode_overlay.set_locked(data.get('timecode_locked') is not False)
     from navigation_modes import set_key_step
     set_key_step(window,data.get('key_step') is True)
     window.set_loop(data.get('playback_mode')!='once')

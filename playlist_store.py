@@ -2,6 +2,7 @@
 import copy
 import json
 import os
+import stat
 from pathlib import Path
 import uuid
 
@@ -28,11 +29,14 @@ def unique_paths(paths):
     return result
 
 
-def scan_folder(path):
+def scan_folder(path,*,skip_junctions=False):
     directories, files = [], []
     with os.scandir(path) as entries:
         for entry in entries:
-            if entry.is_dir(follow_symlinks=False): directories.append(canonical(entry.path))
+            if entry.is_dir(follow_symlinks=False):
+                if skip_junctions and os.name=='nt' and entry.stat(follow_symlinks=False).st_reparse_tag==stat.IO_REPARSE_TAG_MOUNT_POINT:
+                    continue
+                directories.append(canonical(entry.path))
             elif entry.is_file() and Path(entry.name).suffix.lower() in VIDEO_EXTENSIONS: files.append(canonical(entry.path))
     return sorted(directories, key=str.casefold), sorted(files, key=str.casefold)
 
@@ -43,6 +47,29 @@ def has_subfolders(path):
             return any(entry.is_dir(follow_symlinks=False) for entry in entries)
     except OSError:
         return False
+
+
+def ordered_folder_files(record, files):
+    excluded={path_key(path) for path in record.get('excluded',())}
+    available={path_key(path):path for path in files if path_key(path) not in excluded}
+    ordered=[available.pop(path_key(path)) for path in record.get('files',()) if path_key(path) in available]
+    return ordered+list(available.values())
+
+
+def folder_tree_files(folder, records, cancel):
+    from media import Cancelled
+    root=Path(canonical(folder))
+    pending=[str(root)]; result=[]; visited=set()
+    while pending:
+        if cancel.is_set(): raise Cancelled()
+        directory=pending.pop()
+        key=path_key(directory)
+        if key in visited or not Path(directory).is_relative_to(root): continue
+        visited.add(key)
+        children,files=scan_folder(directory,skip_junctions=True)
+        result.extend(ordered_folder_files(records.get(directory,{}),files))
+        pending.extend(reversed(children))
+    return result
 
 
 class PlaylistStore:
@@ -128,10 +155,8 @@ class PlaylistStore:
         def operation(item):
             previous = item['folders'].get(folder, dict(files=[], excluded=[]))
             excluded = [] if refresh else previous['excluded']
-            excluded_keys = {path_key(p) for p in excluded}
-            available = {path_key(p): p for p in files if path_key(p) not in excluded_keys}
-            ordered = [available.pop(path_key(p)) for p in previous['files'] if path_key(p) in available]
-            item['folders'][folder] = dict(files=ordered + list(available.values()), excluded=excluded)
+            ordered = ordered_folder_files(dict(files=previous['files'],excluded=excluded),files)
+            item['folders'][folder] = dict(files=ordered, excluded=excluded)
         self.update(identity, operation)
 
     def set_files(self, identity, paths, folder=None, removed=()):

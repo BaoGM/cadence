@@ -4,7 +4,8 @@ from pathlib import Path
 import sys
 from ui_text import language,tr
 
-def shortcut_lines(registry):
+def shortcut_lines(registry,layout='QWERTY'):
+    from shortcut_defaults import physical_shortcut
     french=language()=='fr'
     lines=['Raccourcis clavier par défaut' if french else 'Default keyboard shortcuts','']
     from menu_layout import alphabetical
@@ -13,7 +14,7 @@ def shortcut_lines(registry):
         if not entries: continue
         lines+=['',tr(category)]
         for action,default in sorted(entries,key=lambda item:alphabetical(item[0].text())):
-            keys=default
+            keys=physical_shortcut(default,layout)
             if french:
                 for a,b in [('Shift','Maj'),('Delete','Suppr'),('Space','Espace'),('Escape','Échap'),('Left','Gauche'),('Right','Droite'),('Home','Début'),('End','Fin')]: keys=keys.replace(a,b)
             if keys==',': keys='Virgule' if french else 'Comma'
@@ -21,12 +22,12 @@ def shortcut_lines(registry):
             lines.append(keys+' : '+action.text())
     return '\n'.join(lines)
 
-def guide_text(registry):
+def guide_text(registry,layout='QWERTY'):
     root=Path(getattr(sys,'_MEIPASS',Path(__file__).parent))/'assets'
-    return (root/('guide_'+language()+'.txt')).read_text(encoding='utf-8')+'\n\n'+'-'*40+'\n\n'+shortcut_lines(registry)+'\n'
+    return (root/('guide_'+language()+'.txt')).read_text(encoding='utf-8')+'\n\n'+'-'*40+'\n\n'+shortcut_lines(registry,layout)+'\n'
 
-def fill_browser(browser,registry):
-    text=guide_text(registry)
+def fill_browser(browser,registry,layout='QWERTY'):
+    text=guide_text(registry,layout)
     browser.setStyleSheet("QTextBrowser {font-family:'Noto Sans';font-size:13px;padding:12px;}")
     parts=[]
     for index,paragraph in enumerate(text.strip().split('\n\n')):

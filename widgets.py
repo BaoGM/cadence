@@ -5,7 +5,7 @@ import math
 import numpy as np
 from PySide6.QtCore import Qt, Signal, QRectF, QPointF, QEvent, QVariantAnimation, QEasingCurve, QSize
 from PySide6.QtGui import QColor, QPainter, QPen, QFont, QImage, QPainterPath, QPainterPathStroker, QPolygonF
-from PySide6.QtWidgets import QWidget, QDoubleSpinBox, QSpinBox, QMenu, QPushButton
+from PySide6.QtWidgets import QApplication, QWidget, QDoubleSpinBox, QSpinBox, QMenu, QPushButton
 from media import exposure_lut
 from model import locate
 from drag import ContinuousDrag
@@ -83,7 +83,8 @@ class Viewer(QWidget):
         self.rgb=None; self.image=None; self.ev=0; self.origin=None; self.base=0; self.position=0; self.loaded=False
         self.gpu_packet=None; self._cpu_preview=None
         self.zoom=1.0; self.pan=QPointF(0,0); self.angle=0.0; self.nav=None; self.controls=default_canvas()
-        self.scrub_pixels=4.0; self.flip_h=False; self.flip_v=False
+        from preferences import DEFAULT_SCRUB_PIXELS
+        self.scrub_pixels=DEFAULT_SCRUB_PIXELS; self.flip_h=False; self.flip_v=False
         from viewer_cursor import ViewerCursor
         self.cursor_guard=ViewerCursor(self)
         self.setCursor(Qt.CursorShape.OpenHandCursor)
@@ -237,10 +238,15 @@ class Viewer(QWidget):
                 icon.setPen(QPen(QColor('#27303b'),1)); icon.setBrush(QColor('#141a22')); icon.drawRoundedRect(QRectF(1,1,82,66),14,14)
                 icon.setBrush(ACCENT); icon.setPen(Qt.PenStyle.NoPen)
                 path=QPainterPath(); path.moveTo(33,18); path.lineTo(57,34); path.lineTo(33,50); path.closeSubpath(); icon.drawPath(path); icon.end()
-            p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-            p.drawImage(QRectF(cx-42,cy-55,84,68),self._welcome_icon)
             p.setPen(MUTED); p.setFont(QFont('Segoe UI',10))
-            p.drawText(QRectF(0,cy+30,self.width(),28),Qt.AlignmentFlag.AlignCenter,tr('Double-cliquez pour ouvrir une vidéo et commencer votre montage.'))
+            caption=tr('Double-cliquez pour ouvrir une vidéo et commencer votre montage.')
+            available=QRectF(5,cy+30,self.width()-10,self.height()-cy-33)
+            flags=Qt.AlignHCenter|Qt.AlignTop|Qt.TextWordWrap
+            caption_fits=p.boundingRect(available,flags,caption).height()<=available.height()
+            p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+            p.drawImage(QRectF(cx-42,cy-(55 if caption_fits else 34),84,68),self._welcome_icon)
+            if caption_fits:
+                p.drawText(available,flags,caption)
         if not sample and hasattr(self,'timecode_overlay'): self.timecode_overlay.paint(p)
     def sample_color(self,point):
         if self.image is None or not self.rect().contains(point.toPoint()): return None
@@ -373,7 +379,9 @@ class Timeline(TrackRows,QWidget):
     def set_document(self,state,media,fps):
         if self.clip_preview.phase=='land' and (state is not self.state or self.simple!=self._land_simple):
             self.clip_preview.clear()
-        self.state=state; self.setFixedHeight(52 if self.simple else self.media_height()); self.media=media; self.fps=float(fps); self.clamp_view(); self.update()
+        if not state or not state.selection or self.state is None or self.state.tracks!=state.tracks:
+            self.clip_anchor=None
+        self.state=state; self.setFixedHeight(42 if self.simple else self.media_height()); self.media=media; self.fps=float(fps); self.clamp_view(); self.update()
     def set_units(self,units):
         self.units=units; self.update(); self.unitsChanged.emit(units)
     def install_scrub_band(self,band):
@@ -401,13 +409,14 @@ class Timeline(TrackRows,QWidget):
         if event.type()==QEvent.Type.Resize and watched is self.window() and self.state and not self.simple:
             self.setFixedHeight(self.media_height())
         return super().eventFilter(watched,event)
-    def ruler_y(self): return 0 if self.simple else 44
     def track_rect(self,track):
         height=self.video_height(self.active_media)-6 if track=='video' else 19
         return QRectF(self.track_left(),self.track_y(track),self.track_width(),height)
-    def simple_track_rect(self): return QRectF(self.track_left(),27,self.track_width(),21)
+    def simple_track_rect(self): return QRectF(self.track_left(),self.media_top()+1,self.track_width(),17)
     def track_left(self): return min(163 if self.width()>1000 else 139 if self.width()>760 else 126, max(22,self.width()//3))
-    def track_right(self): return max(self.track_left()+1,self.width()-32)
+    def track_right(self):
+        margin=40 if self.units=='time' else 32
+        return max(self.track_left()+1,self.width()-margin)
     def track_width(self): return max(1,self.track_right()-self.track_left())
     def raw_frame(self,x):
         frame=self.view_start+(x-self.track_left())/self.track_width()*self.span()
@@ -452,7 +461,7 @@ class Timeline(TrackRows,QWidget):
         if not left<=x<=right: return
         width=max(3,self.x_for(frame+1)-x)
         bar=self.simple_track_rect()
-        y,h=(bar.top()-2,bar.height()+4) if getattr(self,'simple',False) else (70,self.height()-70)
+        y,h=(bar.top(),bar.height()) if self.simple else (self.media_top(),self.height()-self.media_top())
         p.save(); p.setClipRect(QRectF(left,y,right-left,h))
         if bar_path is not None: p.setClipPath(bar_path,Qt.ClipOperation.IntersectClip)
         p.fillRect(QRectF(x,y,width,h),QColor(255,255,255,125 if getattr(self,'simple',False) else 65)); p.restore()
@@ -463,7 +472,7 @@ class Timeline(TrackRows,QWidget):
         x1=max(left,self.x_for(frame)); x2=min(right,max(x1+1,self.x_for(frame+1)))
         if x2<=x1: return
         bar=self.simple_track_rect()
-        y,h=(bar.top(),bar.height()) if getattr(self,'simple',False) else (70,max(1,self.height()-70))
+        y,h=(bar.top(),bar.height()) if self.simple else (self.media_top(),max(1,self.height()-self.media_top()))
         p.save(); p.setClipRect(QRectF(left,y,right-left,h))
         if bar_path is not None: p.setClipPath(bar_path,Qt.ClipOperation.IntersectClip)
         p.fillRect(QRectF(x1,y,x2-x1,h),QColor(218,249,245,76)); p.restore()
@@ -493,7 +502,8 @@ class Timeline(TrackRows,QWidget):
     def paint_selection_label(self,p):
         if not self.state or not self.state.selection: return
         from timeline_skin import font, label
-        area=QRectF(4,self.ruler_y()+1,self.track_left()-8,24)
+        right=min(self.track_left(),getattr(self,'ruler_text_left',self.track_left()))
+        area=QRectF(4,self.ruler_y()+1,right-8,self.ruler_height()-2)
         p.save(); p.setPen(Qt.NoPen); p.setBrush(QColor('#244548')); p.drawRoundedRect(area,3,3)
         p.setFont(font(11,True))
         text=self.selection_label()
@@ -565,7 +575,7 @@ class Timeline(TrackRows,QWidget):
     def timeline_context_menu(self,pos):
         header=self.media_header_menu(pos)
         if header is not None: return header
-        if (self.drawing_track.contains(pos) or not self.simple and pos.y()<70) and self.state and self.state.length:
+        if (self.drawing_track.contains(pos) or not self.simple and pos.y()<self.media_top()) and self.state and self.state.length:
             return self.drawing_track.context_menu(pos.x())
         menu=QMenu(tr(self)); simple=getattr(self,'simple',False)
         self.add_units(menu); menu.addSeparator(); self.add_timeline_mode(menu)
@@ -666,11 +676,10 @@ class Timeline(TrackRows,QWidget):
     def keyReleaseEvent(self,e):
         if not self.range_key_event(e,False): super().keyReleaseEvent(e)
     def mousePressEvent(self,e):
-        if e.button()==Qt.MouseButton.LeftButton and e.modifiers()==Qt.KeyboardModifier.ControlModifier and self.state:
-            self._before_ctrl=self.state.selected_clips if self.state.selection else ()
-            if self.state.selection and not self._before_ctrl:
-                self._before_ctrl=((self.active_media.info.id,*self.state.selection),)
-            if self.simple and self.simple_track_rect().contains(e.position()):
+        self._ctrl_snapshot=None
+        if e.button()==Qt.LeftButton and self.state and e.modifiers() in (Qt.ControlModifier,Qt.ControlModifier|Qt.ShiftModifier):
+            self._ctrl_snapshot=(e.position(),e.modifiers(),self.selected_clip_spans())
+            if e.modifiers()&Qt.ShiftModifier and (self.simple_track_rect().contains(e.position()) if self.simple else self.media_row_at(e.position().y()) is not None):
                 e.accept(); return
         if self.toggle_media_selection(e): return
         if self.press_media_title(e): return
@@ -719,6 +728,10 @@ class Timeline(TrackRows,QWidget):
         if e.button() not in (Qt.MouseButton.LeftButton,Qt.MouseButton.MiddleButton): return
         if self.release_media_title(e): return
         drag=getattr(self,'_timeline_drag',None)
+        if getattr(self,'cross_origin',None) and not e.modifiers() & Qt.AltModifier:
+            if drag: drag.finish()
+            self.clear_clip_drag()
+            return
         if (drag and getattr(self,'cross_origin',None) and self.gesture in ('scrub','move','copy','transfer')
                 and drag.last!=e.globalPosition()):
             self.mouseMoveEvent(e)
@@ -747,10 +760,21 @@ class Timeline(TrackRows,QWidget):
 
     def mouseDoubleClickEvent(self,e):
         modifier=e.modifiers()
-        if e.button()!=Qt.MouseButton.LeftButton or modifier not in (Qt.NoModifier,Qt.ShiftModifier,Qt.ControlModifier):
+        if e.button()!=Qt.MouseButton.LeftButton or modifier not in (Qt.NoModifier,Qt.ShiftModifier,Qt.ControlModifier,Qt.ControlModifier|Qt.ShiftModifier):
             return super().mouseDoubleClickEvent(e)
+        self.clip_click(e,modifier)
+
+    def selected_clip_spans(self):
+        if not self.state or not self.state.selection: return ()
+        if self.state.selected_clips: return self.state.selected_clips
+        identities=getattr(self,'selected_media_ids',(self.active_media.info.id,))
+        return tuple((identity,*self.state.selection) for identity in identities)
+
+    def clip_click(self,e,modifier):
         if self.simple:
-            if not self.simple_track_rect().contains(e.position()): return
+            on_strip=self.simple_track_rect().contains(e.position())
+            on_title=e.position().x()<self.track_left() and self.media_top()<=e.position().y()<self.height()
+            if not on_strip and not (on_title and modifier==Qt.ShiftModifier): return
             media=self.active_media; track='video'
         else:
             media=self.media_row_at(e.position().y())
@@ -775,12 +799,57 @@ class Timeline(TrackRows,QWidget):
             else:
                 e.accept(); return
         key=(media.info.id,a,b)
-        ranges=list(getattr(self,'_before_ctrl',self.state.selected_clips)) if modifier==Qt.ControlModifier else []
-        if key in ranges: ranges.remove(key)
-        else: ranges.append(key)
+        spans=self.selected_clip_spans()
+        snapshot=getattr(self,'_ctrl_snapshot',None)
+        self._ctrl_snapshot=None
+        if snapshot and snapshot[1]==modifier and (snapshot[0]-e.position()).manhattanLength()<=QApplication.startDragDistance():
+            spans=snapshot[2]
+        ranges=list(spans) if modifier&Qt.ControlModifier else []
+        anchor=getattr(self,'clip_anchor',None)
+        if modifier==Qt.ControlModifier:
+            spans=sorted((left,right) for identity,left,right in ranges if identity==media.info.id)
+            covered=a
+            for left,right in spans:
+                if left>covered: break
+                covered=max(covered,right)
+            remaining=[]
+            for identity,left,right in ranges:
+                if identity!=media.info.id or right<=a or b<=left:
+                    remaining.append((identity,left,right))
+                else:
+                    if left<a: remaining.append((identity,left,a))
+                    if b<right: remaining.append((identity,b,right))
+            ranges=remaining
+            if covered<b:
+                ranges.append(key)
+                self.clip_anchor=(media.info.id,track,a)
+            elif anchor==(media.info.id,track,a): self.clip_anchor=None
+        elif modifier==(Qt.ControlModifier|Qt.ShiftModifier):
+            if anchor and anchor[:2]==(media.info.id,track):
+                origin=anchor[2]
+            else:
+                origin=next((start for identity,start,end in ranges if identity==media.info.id),self.state.position)
+                self.clip_anchor=(media.info.id,track,origin)
+            left,right=min(origin,a),max(origin+1,b)
+            at=0
+            for segment in (media.audio if track=='audio' else media.segments):
+                end=at+segment.length
+                if at>=right: break
+                if end>left and segment.media is not None: ranges.append((media.info.id,at,end))
+                at=end
+            merged=[]
+            for identity,start,end in sorted(set(ranges)):
+                if merged and merged[-1][0]==identity and start<merged[-1][2]:
+                    merged[-1]=(identity,merged[-1][1],max(end,merged[-1][2]))
+                else: merged.append((identity,start,end))
+            ranges=merged
+        else:
+            ranges.append(key)
+            self.clip_anchor=None if modifier==Qt.ShiftModifier else (media.info.id,track,a)
         if hasattr(self,'_timeline_drag'): self._timeline_drag.finish()
         self.media_title_drag=None; self.anchor=None; self.gesture=None; self.selection_track=track
         self.cross_origin=None; self.cross_target=None; self.move_span=None
         self.clipsPicked.emit(tuple(ranges),media.info.id,min(b-1,max(a,int(frame))))
         self.finish_range_drag(); self.update(); e.accept()
+        return True
 

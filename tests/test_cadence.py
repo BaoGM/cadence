@@ -771,7 +771,9 @@ def test_library_multiple_selection_and_locked_clean_layout(prepared,monkeypatch
             if isinstance(panel,QDockWidget): assert panel.features()==QDockWidget.DockWidgetFeature.NoDockWidgetFeatures and panel.titleBarWidget().height()==0
         assert win.timecode_overlay.parent() is win.viewer
         win.layout_action.trigger(); assert win.timeline_panel.features()&QDockWidget.DockWidgetFeature.DockWidgetMovable
-        win.timeline_panel.setFloating(True); win.layout_action.trigger(); app.processEvents(); assert not win.timeline_panel.isFloating()
+        win.timeline_panel.setFloating(True); win.layout_action.trigger(); app.processEvents(); assert win.timeline_panel.isFloating()
+        # Exercise the playlist and timeline scroll in their docked workspace.
+        win.layout_action.trigger(); win.timeline_panel.setFloating(False); win.layout_action.trigger(); app.processEvents()
         for listing in (win.playlist,win.media_list): assert listing.selectionMode()==QAbstractItemView.SelectionMode.ExtendedSelection
         win.playlist.item(0).setSelected(True); win.playlist.item(2).setSelected(True); before=d.state; count=len(d.undo_stack)
         class SelectionMenu(QMenu):
@@ -813,23 +815,24 @@ def test_volume_slider_mute_and_keyboard():
         assert v.value()==5 and v.readout.text()=='5 %'
     finally: v.close()
 
-def test_timeline_ruler_context_units():
+@pytest.mark.parametrize('simple',[False,True])
+def test_timeline_ruler_context_units(simple):
     from PySide6.QtWidgets import QApplication
     from PySide6.QtGui import QContextMenuEvent
     from PySide6.QtCore import QPoint,QTimer
     from widgets import Timeline
-    app=QApplication.instance() or QApplication([]); timeline=Timeline(); timeline.show()
+    app=QApplication.instance() or QApplication([]); timeline=Timeline(); timeline.simple=simple; timeline.show()
     try:
-        for label in ('Images','Code temporel'):
-            def choose(expected=label):
+        for unit in ('frames','time'):
+            def choose(expected=unit):
                 menu=app.activePopupWidget()
                 try:
-                    assert [a.text() for a in menu.actions()][:2]==['Code temporel','Images']
+                    assert [a.data() for a in menu.actions()][:2]==['units_time','units_frames']
                     assert any(a.data()=='timeline_simple' for a in menu.actions())
-                    next(a for a in menu.actions() if a.text()==expected).trigger()
+                    next(a for a in menu.actions() if a.data()=='units_'+expected).trigger()
                 finally: menu.close()
-            QTimer.singleShot(30,choose); point=QPoint(150,20); timeline.contextMenuEvent(QContextMenuEvent(QContextMenuEvent.Reason.Mouse,point,timeline.mapToGlobal(point)))
-            assert timeline.units==('frames' if label=='Images' else 'time')
+            QTimer.singleShot(30,choose); point=QPoint(timeline.track_left()+20,timeline.ruler_y()+10); timeline.contextMenuEvent(QContextMenuEvent(QContextMenuEvent.Reason.Mouse,point,timeline.mapToGlobal(point)))
+            assert timeline.units==unit
     finally: timeline.close()
 
 def test_compact_timeline_when_panels_hidden(prepared):
@@ -844,7 +847,7 @@ def test_compact_timeline_when_panels_hidden(prepared):
         win.resize(1600,1000); app.processEvents()
         assert win.viewer.height()>before
         assert win.timeline.height()==win.timeline.media_height() and win.timeline_panel.height()==timeline_height
-        assert abs(win.timeline_panel.height()-win.timeline.height()-win.studio.timeline_bar.height()-win.studio.foot.height())<=2
+        assert abs(win.timeline_panel.height()-win.timeline.height()-win.studio.timeline_bar.height())<=2
         for control in (win.copy_audio,win.leave_gap,win.link_tracks):
             assert win.header.isAncestorOf(control) and not win.timeline_panel.isAncestorOf(control)
         win.timeline.zoom=4; win.timeline.clamp_view(); app.processEvents()
@@ -1098,7 +1101,7 @@ def test_default_panels_match_requested_layout():
         for key in ('timeline','transport'): assert not win.panel_widgets()[key].isHidden() and win.panel_actions[key].isChecked()
         for key in ('header','comparison','drawing','timecode'): assert win.panel_widgets()[key].isHidden() and not win.panel_actions[key].isChecked()
         assert not {'inspector','meta','status'} & win.panel_widgets().keys()
-        assert win.library.isVisible() and win.library_action.isChecked()
+        assert win.library.isHidden() and not win.library_action.isChecked()
         assert not win.layout_editable and not win.layout_action.isChecked()
     finally: win.close(); app.processEvents()
 

@@ -31,10 +31,10 @@ def run(directory):
     win=MainWindow(); win.scrub_audio.set_enabled(False); win.show(); app.processEvents()
     assert win.playback_mode=='loop' and win.loop_btn.isChecked() and win.loop_btn.symbol=='loop'
     win.set_loop(False)
-    assert win.workspaces.mode=='read' and {k for k,p in win.workspaces.panels.items() if not p.isHidden()}=={'timeline','transport','library'}
+    assert win.workspaces.mode=='read' and {k for k,p in win.workspaces.panels.items() if not p.isHidden()}=={'timeline','transport'}
+    assert win.timecode_overlay.locked
     win.grab().save(str(output/'accueil.png')); win.workspaces.switch('edit'); app.processEvents()
-    assert {k for k,p in win.workspaces.panels.items() if not p.isHidden()}=={'timeline','transport','library','tools'}
-    for key in ('header','timecode','comparison','drawing'): win.set_panel(key,True)
+    assert all(not panel.isHidden() for panel in win.workspaces.panels.values())
     app.processEvents()
     check_navigation_shortcuts(win)
     from timeline_skin import font

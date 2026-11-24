@@ -49,7 +49,7 @@ def test_error_with_no_message_is_identified(application):
 def test_playback_settings_independent_of_media(window):
  from playback_preferences import save,load,path
  w=window;w.volume.setValue(37);w.volume.setMuted(True);w.timeline.set_units('frames');save(w)
- assert json.loads(path().read_text())==dict(volume=37,muted=True,units='frames',key_step=False,timecode_position=[.5,1.],timecode_locked=False,playback_mode='loop')
+ assert json.loads(path().read_text())==dict(volume=37,muted=True,units='frames',key_step=False,timecode_position=[.5,1.],timecode_locked=True,playback_mode='loop')
  w.volume.setValue(80);w.volume.setMuted(False);w.timeline.set_units('time');load(w)
  assert w.volume.value()==37 and w.volume.muted and w.timeline.units=='frames'
  assert w.transport.volume==0

@@ -21,6 +21,9 @@ _french={
     'Press shortcut':'Saisir un raccourci',
     'Afficher la timeline':'Afficher la timeline','Toute la timeline':'Toute la timeline',
     'Réinitialiser le canvas':'Réinitialiser la vue',
+    'Lasso / déplacement':'Lasso','Translation de la clé':'Translation',
+    'Recadrer le clip':'Recadrer','Transformer la sélection ou le clip':'Transformer la sélection',
+    'Réinitialiser le cadrage du clip':'Réinitialiser le cadrage',
 }
 _wording=[('du canvas','de la vue'),('le canvas','la vue'),('scrubber','faire défiler'),('Scrub vidéo','Défilement vidéo'),('scrub','défilement'),('canvas','vue'),('Canvas','Vue'),('time code','code temporel'),('Shift','Maj'),('Mute / Unmute','Couper / Réactiver le son'),('Overlay - transparence','Superposition'),('Overlay','Superposition')]
 _reverse={v:k for k,v in _pairs.items()}
@@ -31,6 +34,12 @@ _reverse.update({'Undo':'Annuler','Flip horizontally':'Flop - miroir horizontal'
 
 def language(): return _language
 def source(text): return _reverse.get(text,text)
+
+def interface_sources():
+    terms={tr(key):key for key in reversed((*_pairs,*_french))}
+    for key in ('Fichier','Édition','Lecture','Affichage','Comparaison','Dessin','Outils','Options','Options…','Pelure d’oignon'):
+        terms[tr(key)]=key
+    return terms
 
 def plain(text,lang):
     if lang=='fr':
@@ -78,18 +87,21 @@ def tr(text):
     return text
 
 def initialize_language():
-    global _language,_qt_translator
     from preferences import preference_path
     try:
         saved=json.loads(preference_path().read_text(encoding='utf-8'))
         wanted=saved.get('language','fr') if isinstance(saved,dict) else 'fr'
     except (OSError,ValueError,TypeError): wanted='fr'
-    _language=os.environ.get('CADENCE_LANGUAGE',wanted)
-    if _language not in ('fr','en'): _language='fr'
+    set_language(os.environ.get('CADENCE_LANGUAGE',wanted))
+
+def set_language(wanted):
+    global _language,_qt_translator
+    _language=wanted if wanted in ('fr','en') else 'fr'
     from PySide6.QtCore import QTranslator,Qt,QLocale
     from PySide6.QtWidgets import QApplication
     app=QApplication.instance(); app.setAttribute(Qt.ApplicationAttribute.AA_DontUseNativeDialogs,True)
     QLocale.setDefault(QLocale('fr_FR' if _language=='fr' else 'en_GB'))
-    if _qt_translator: app.removeTranslator(_qt_translator)
+    if _qt_translator:
+        app.removeTranslator(_qt_translator); _qt_translator.deleteLater()
     _qt_translator=QTranslator(app)
     if _language=='fr' and _qt_translator.load(str(_root/'qtbase_fr.qm')): app.installTranslator(_qt_translator)

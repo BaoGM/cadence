@@ -1,4 +1,4 @@
-Cadence 2.0.3 - Guide rapide
+Cadence 2.0.5 - Guide rapide
 
 Les raccourcis indiqués sont ceux par défaut. Leur liste complète figure à la fin du guide ; ils se personnalisent dans Fichier > Options > Raccourcis.
 
@@ -26,7 +26,7 @@ Glissez sur la timeline ou sur l’espace libre de son bandeau pour déplacer la
 
 Maj + glisser sélectionne une plage tout en affichant l'image courante. On peut appuyer sur Maj pendant un glissement déjà commencé. Relâchez la souris avant Maj pour garder la sélection ; l'ordre inverse repasse en déplacement de lecture.
 
-Double-cliquez sur un clip pour le sélectionner, ou sur le titre de piste pour déplier ou replier son audio. Maj + double-clic sur le titre ou un clip sélectionne toute la piste. Ctrl + double-clic ajoute ou retire un clip. La lecture enchaîne les portions sélectionnées dans leur ordre, en sautant les intervalles. Copier, couper et supprimer respectent ces portions. I et O posent les bornes au curseur. Échap efface la sélection.
+Double-cliquez sur un clip pour le sélectionner, ou sur le titre de piste pour déplier ou replier son audio. Maj + double-clic sur le titre ou un clip sélectionne toute la piste. Ctrl + double-clic ajoute ou retire un clip. Ctrl + Maj + double-clic ajoute les clips entre le dernier clip choisi et le clip sous le pointeur, bornes incluses. Sans sélection, la plage commence à la tête de lecture. La lecture enchaîne les portions sélectionnées dans leur ordre, en sautant les intervalles. Copier, couper et supprimer respectent ces portions. I et O posent les bornes au curseur. Échap efface la sélection.
 
 ----------------------------------------
 Modifier la timeline
@@ -35,7 +35,7 @@ Une piste média réunit une bande vidéo et une bande audio. Le bouton « + Pis
 
 Les pistes sont nommées Piste 1 et Piste 2. Cliquez sur un titre pour sélectionner une piste. Ctrl+clic ajoute ou retire une piste de la sélection, sur son titre comme dans sa timeline. Les modifications portent sur les pistes sélectionnées. Glissez un titre au-dessus ou au-dessous de l’autre pour changer leur ordre. Le clic droit sur le titre permet aussi de déplacer ou supprimer toute la piste. Ctrl+Z annule ces actions. Les bandes audio sont repliées au départ : cliquez sur le triangle près du titre pour les déployer.
 
-Cliquez sur le chevron près du titre, ou utilisez le clic droit, pour déployer ou replier la bande audio. Le clic droit permet aussi de désactiver ou réactiver tout son audio, y compris à l’export. En vue détaillée, glissez un média vers l’autre piste pour y déplacer sa vidéo et son audio ensemble. Les clips suivants se rapprochent sur la piste d’origine. Alt+Maj+glisser copie le média. En vue simplifiée, maintenez Alt et faites glisser le média sur le titre de piste à gauche. Le titre indique la piste de destination pendant le déplacement. Ajoutez Maj pour copier. Les marqueurs sont intégrés à la bande média. Les clés de dessin et leurs poignées occupent le bas de la règle de temps, sous les chiffres.
+Cliquez sur le chevron près du titre, ou utilisez le clic droit, pour déployer ou replier la bande audio. Le clic droit permet aussi de désactiver ou réactiver tout son audio, y compris à l’export. En vue détaillée, maintenez Alt et glissez un média vers l’autre piste pour y déplacer sa vidéo et son audio ensemble. Les clips suivants se rapprochent sur la piste d’origine. Alt+Maj+glisser copie le média. En vue simplifiée, maintenez Alt et faites glisser le média sur le titre de piste à gauche. Le titre indique la piste de destination pendant le déplacement. Ajoutez Maj pour copier. Les marqueurs sont intégrés à la bande média. Les clés de dessin et leurs poignées occupent le bas de la règle de temps, sous les chiffres.
 
 Les dessins, leurs clés et les marqueurs restent communs, au-dessus des deux pistes. Modifier une seule piste conserve les dessins à leur position ; avec les deux pistes sélectionnées, les dessins liés suivent les modifications.
 
@@ -104,13 +104,13 @@ Sur la vidéo, molette : zoom ; clic molette + glisser : déplacement ; Ctrl + c
 
 Zoom, déplacement et rotation de la vue ne modifient pas l'export. Les miroirs H et Maj+V sont exportés, ainsi que l'exposition si « Appliquer à l'export » est coché.
 
-Le code temporel reste ancré au panneau vidéo. Glissez-le pour le déplacer, verrouillez sa position au clic droit, affichez-le ou cachez-le avec Ctrl+6. Il n'est pas exporté.
+Le code temporel est verrouillé par défaut. Pour le déplacer dans le panneau vidéo, faites un clic droit dessus, décochez « Verrouiller la position du code temporel », puis faites-le glisser. Ctrl+6 affiche ou masque cet indicateur réservé à la lecture.
 
 Le menu Affichage et le clic droit sur le fond affichent ou cachent les panneaux. Les séparateurs restent redimensionnables en mode Lecture comme en mode Édition, même lorsque la disposition est verrouillée. « Modifier la disposition des panneaux » autorise leur déplacement et leur détachement. « Réinitialiser la disposition des panneaux » restaure le mode courant. La barre d’outils conserve la largeur de ses icônes lorsque les autres panneaux sont cachés.
 
 Lorsque les commandes de lecture sont masquées, survolez le bas de la zone vidéo, juste au-dessus de la timeline, pour retrouver uniquement la case Mode édition et son libellé dans un petit cadre transparent à gauche. Le cadre disparaît lorsque le pointeur le quitte et ne change pas les panneaux mémorisés pour le mode courant.
 
-Les modes Lecture et Édition sont entièrement personnalisables dans Affichage > Options des modes Lecture / Édition : choisissez les panneaux et la timeline allégée séparément pour chacun. Les boutons Lecture et Édition en haut de la fenêtre changent de mode. F10 ouvre le menu général. F1 ou la touche ? ouvre le guide rapide. Les raccourcis personnels sont prioritaires. Chaque mode conserve sa disposition. Fichier > Options > Préférences > Restaurer l'interface remet les deux modes à leur état initial.
+Par défaut, le mode Lecture affiche les commandes de lecture et la timeline simplifiée. Le mode Édition affiche tous les panneaux et la timeline détaillée. Les boutons Lecture et Édition en haut de la fenêtre changent de mode. Affichage > Options des modes Lecture / Édition permet de personnaliser les deux dispositions. Chaque mode conserve vos choix. F10 ouvre le menu général. F1 ou la touche ? ouvre le guide rapide. Les raccourcis personnels sont prioritaires. Fichier > Options > Préférences > Restaurer l'interface remet les deux modes à leur état initial.
 
 ----------------------------------------
 Synchroniser Blender ou Maya
@@ -142,7 +142,9 @@ Fichier > Options > Raccourcis regroupe les commandes par onglets. Cliquez dans 
 
 Vue et navigation règle les gestes, leurs axes, leur inversion et la précision du déplacement de lecture. Les champs numériques acceptent la saisie directe puis Entrée, ou un glissement horizontal ; Maj affine le réglage.
 
-Préférences règle la langue, l'affichage vidéo, les caches RAM et disque, le son pendant le déplacement de lecture et les infobulles. Enregistrez ces préférences ; langue et affichage vidéo prennent effet au prochain démarrage.
+Le bouton FR / en change immédiatement la langue. Les préférences règlent aussi l’affichage vidéo, les caches, le son du défilement et les infobulles. Le changement d’affichage vidéo prend effet au prochain démarrage.
+
+Options > Raccourcis propose les dispositions QWERTY (par défaut) et AZERTY français. Lors du premier passage en AZERTY, les raccourcis suivent la position des touches, y compris les combinaisons personnalisées. Ensuite, chaque disposition conserve ses réglages. Le défilement est réglé à 25 pixels par image et les infobulles sont désactivées par défaut.
 
 En cas d'erreur, Aide > Dossier des journaux ouvre les fichiers de diagnostic à joindre au signalement.
 
@@ -154,7 +156,11 @@ Dans Synchronisation 3D > Réglages, activez la liaison puis choisissez une cam�
 
 Blender 4.3 ou ultérieur : Grease Pencil crée des traits modifiables pour le pinceau, les flèches, rectangles et cercles. Une clé contenant du texte, de la gomme, un groupe ou une déformation non uniforme devient une image transparente. Images transparentes applique ce traitement à toutes les clés. Les textes, images et pelures restent visibles avec les superpositions de Blender désactivées. À l’envoi, les vues en mode Solide passent en couleur Texture pour les afficher. Ils apparaissent aussi au rendu. Les images sont intégrées au fichier .blend à sa sauvegarde.
 
+Dans Blender, la collection « Cadence Drawings » regroupe les dessins par caméra et par projet. Sa visibilité est conservée lors des envois suivants.
+
 Maya 2022 : Grease Pencil crée des images retouchables avec les outils natifs. Le transfert est progressif ; Annuler dans Cadence ou Échap dans Maya interrompt entre deux étapes et conserve les dessins précédents. La navigation dans Cadence est suspendue pendant l’import. Les proportions du dessin sont conservées.
+
+Dans Maya, le calque d’affichage « Cadence_Drawings » regroupe les plans des images transparentes et du Grease Pencil 2022. Dans les versions équipées de Blue Pencil, les dessins natifs se gèrent dans le calque Cadence de l’éditeur Blue Pencil.
 
 Maya 2023 ou ultérieur : Blue Pencil crée un calque animé dans la caméra choisie. Chaque image est aplatie : elle peut être retouchée avec les outils de peinture Blue Pencil, mais le texte et les formes ne restent pas des objets séparés. Ce mode sert à la vue et au playblast, pas au rendu final. Images transparentes crée un seul plan animé. Ses fichiers sont copiés dans sourceimages/Cadence du projet Maya, à conserver avec la scène.
 
@@ -169,7 +175,7 @@ Dans Maya, les images sont compensées pour la transformation de vue active lors
 ----------------------------------------
 Mises à jour
 
-Cette édition utilise son propre canal de mise à jour Windows 2.0. Cadence vérifie les nouvelles versions au démarrage, au plus une fois par jour. Fichier > Options > Préférences permet de désactiver cette vérification et d'inclure les préversions. Aide > Rechercher des mises à jour lance une vérification manuelle.
+Cette édition utilise son propre canal de mise à jour Windows 2.0. Cadence vérifie les nouvelles versions au démarrage, au plus une fois par jour. Les préversions sont incluses par défaut. Ces deux options sont réglables dans Fichier > Options > Préférences. Aide > Rechercher des mises à jour lance une vérification manuelle.
 
 Les mises à jour des copies par utilisateur et portables sont téléchargées en arrière-plan. Cadence vérifie la signature du manifeste et l’empreinte du paquet. La nouvelle version prend effet à la prochaine ouverture, ou via « Mise à jour prête · Redémarrer maintenant ». En cas d’échec au premier démarrage, la version précédente reprend la main. Une installation partagée reste gérée par l’administrateur.
 
@@ -180,7 +186,7 @@ Affichage > Afficher la liste de lecture (Ctrl+8) > Bibliothèque réunit les li
 
 Ajouter des vidéos ou déposer des fichiers dans la liste conserve leurs chemins dans une liste libre. Dans un dossier suivi, Cadence copie les fichiers extérieurs et conserve les originaux. Un nom déjà utilisé reçoit un suffixe, sans écrasement. Glissez les éléments pour modifier leur ordre. Le nom et l’ordre des listes sont conservés entre les sessions.
 
-Un clic simple sur une vidéo de la bibliothèque ouvre uniquement cette vidéo et lance sa lecture. Le montage précédent rejoint Temporaire pour la session. Ctrl+clic ou Maj+clic permet de sélectionner plusieurs fichiers sans les ouvrir ; le glisser-déposer conserve le réordonnancement des vidéos. Pour un seul fichier, la progression et le bouton Annuler apparaissent après une seconde si nécessaire. Pour plusieurs fichiers, ils apparaissent immédiatement.
+Un clic sur une vidéo de la bibliothèque la sélectionne. Un double-clic ouvre cette seule vidéo et lance sa lecture. Le montage précédent rejoint Temporaire pour la session. Ctrl+clic ajoute ou retire un fichier de la sélection. Maj+clic sélectionne une plage. Glissez les fichiers pour réordonner la liste ou les déposer sur la timeline. Pour un seul fichier, la progression et le bouton Annuler apparaissent après une seconde si nécessaire. Pour plusieurs fichiers, ils apparaissent immédiatement.
 
 Retirer de la liste ne supprime aucun fichier. Actualiser relit le dossier sélectionné et réaffiche les fichiers présents, y compris ceux retirés de la liste. Mettre à la corbeille est une action distincte du clic droit, avec confirmation. Remplacer le chemin… permet de retrouver une vidéo déplacée ; les autres listes et projets ne sont pas modifiés.
 
@@ -198,4 +204,4 @@ Cliquer sur l’aperçu indépendant ne ramène pas la fenêtre principale au pr
 
 Le volet affiche par défaut ses quatre pictogrammes et le nom de l’onglet actif. Le clic droit sur les onglets permet d’afficher tous les libellés. Dans Bibliothèque, un clic sur un dossier en affiche le contenu en arrière-plan. Dans Références, choisissez la source B et changez l’ordre avec les flèches ou par glisser-déposer.
 
-Dans Médias, le clic droit > Ajouter à la piste ajoute les sources sélectionnées à la fin de la piste choisie. Pour choisir leur position, faites-les glisser sur la piste. Le trait indique le point d’insertion, au bord d’un clip ou à l’image visée dans une zone vide.
+Dans Médias, le clic droit > Ajouter à la piste ajoute les sources sélectionnées à la fin de la piste choisie. Pour choisir leur position, faites-les glisser sur la piste. Le trait indique le point d’insertion, au bord d’un clip ou à l’image visée dans une zone vide. Depuis la Bibliothèque, vous pouvez aussi déposer des vidéos, des listes ou des dossiers sur la piste. Les vidéos des sous-dossiers sont incluses.

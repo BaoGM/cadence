@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from PySide6.QtCore import Qt, QRectF, QRect, QEvent, QTimer
 from PySide6.QtGui import QPainter, QColor, QShortcut, QKeySequence, QCursor, QIcon, QPixmap, QPen
-from PySide6.QtWidgets import QWidget, QDialog, QVBoxLayout, QHBoxLayout, QToolButton, QLabel, QSlider, QStyle, QMenu
+from PySide6.QtWidgets import QWidget, QDialog, QVBoxLayout, QHBoxLayout, QToolButton, QLabel, QSlider, QStyle, QStyleOptionSlider, QMenu
 
 from ui_text import tr
 
@@ -44,6 +44,20 @@ class MirrorCanvas(QWidget):
     def contextMenuEvent(self, event):
         menu = self.parentWidget().context_menu()
         menu.exec(event.globalPos()); menu.deleteLater()
+
+
+class OpacitySlider(QSlider):
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            option = QStyleOptionSlider()
+            self.initStyleOption(option)
+            handle = self.style().subControlRect(QStyle.CC_Slider, option, QStyle.SC_SliderHandle, self)
+            if not handle.contains(event.position().toPoint()):
+                groove = self.style().subControlRect(QStyle.CC_Slider, option, QStyle.SC_SliderGroove, self)
+                position = round(event.position().x()) - groove.left() - handle.width() // 2
+                span = max(1, groove.width() - handle.width())
+                self.setValue(QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), position, span, option.upsideDown))
+        super().mousePressEvent(event)
 
 
 class VideoMirror(QDialog):
@@ -90,7 +104,7 @@ class VideoMirror(QDialog):
         self.on_top.setIcon(QIcon(pin))
         self.on_top.toggled.connect(self.set_on_top)
         row.addWidget(self.on_top)
-        self.opacity = QSlider(Qt.Orientation.Horizontal)
+        self.opacity = OpacitySlider(Qt.Orientation.Horizontal)
         self.opacity.setRange(20, 100)
         self.opacity.setValue(100)
         self.opacity.setToolTip(tr('Opacité'))

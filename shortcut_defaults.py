@@ -1,5 +1,37 @@
 # SPDX-License-Identifier: GPL-3.0-only
+from PySide6.QtCore import QKeyCombination, Qt
 from PySide6.QtGui import QKeySequence
+
+
+KEYBOARD_LAYOUTS = ('QWERTY', 'AZERTY')
+# The two rows at each level describe the same physical keys on French and US keyboards.
+_ROWS = [
+    ('`1234567890-=', "²&é\"'(-è_çà)="),
+    ('QWERTYUIOP[]', 'AZERTYUIOP^$'),
+    ("ASDFGHJKL;'", 'QSDFGHJKLMù'),
+    ('ZXCVBNM,./', 'WXCVBN,;:!'),
+    ('\\', '*'),
+    ('!@#$%^&*()_', '1234567890°'),
+    ('{}|:"<>?', '¨£µM%./§'),
+]
+_AZERTY = {ord(a.upper()):ord(b.upper()) for us,fr in _ROWS for a,b in zip(us,fr)}
+
+
+def physical_shortcut(value, layout, source='QWERTY'):
+    if not value or layout == source:
+        return value
+    mapping = _AZERTY if layout == 'AZERTY' else {b:a for a,b in _AZERTY.items() if a != ord(':')}
+    sequence = QKeySequence(value, QKeySequence.SequenceFormat.PortableText)
+    chords = []
+    for index in range(sequence.count()):
+        chord = sequence[index]
+        key = chord.key()
+        mapped = mapping.get(key.value, key.value)
+        if layout == 'AZERTY' and key == Qt.Key.Key_Colon:
+            chords.append(QKeyCombination(chord.keyboardModifiers() | Qt.KeyboardModifier.ShiftModifier, Qt.Key.Key_M))
+        else:
+            chords.append(QKeyCombination(chord.keyboardModifiers(), Qt.Key(mapped)))
+    return QKeySequence(*chords).toString(QKeySequence.SequenceFormat.PortableText)
 
 
 REVISION=4
@@ -30,11 +62,11 @@ def migrate(supplied,registry,revision):
     return result
 
 
-def apply_aliases(registry):
+def apply_aliases(registry,layout='QWERTY'):
     assigned=[action.shortcut() for action,_ in registry.values() if not action.shortcut().isEmpty()]
     for key,alternate in (('Aide/Guide rapide','?'),('Édition/Rétablir','Ctrl+Shift+Z')):
         action,default=registry[key]
         primary=action.shortcut()
-        alias=QKeySequence(alternate)
-        if primary==QKeySequence(default) and not any(alias.matches(s)!=QKeySequence.NoMatch or s.matches(alias)!=QKeySequence.NoMatch for s in assigned):
+        alias=QKeySequence(physical_shortcut(alternate,layout))
+        if primary==QKeySequence(physical_shortcut(default,layout)) and not any(alias.matches(s)!=QKeySequence.NoMatch or s.matches(alias)!=QKeySequence.NoMatch for s in assigned):
             action.setShortcuts([primary,alias])

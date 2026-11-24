@@ -16,8 +16,8 @@ class WorkspaceModes(QObject):
         super().__init__(w); self.w=w; self.mode='read'; self.path=preference_path().with_name('workspaces.json')
         self.pending_compact_mode=None; self.fit_on_reveal=set(); w.installEventFilter(self)
         self.panels={**w.panel_widgets(),'library':w.library,'tools':w.edit_toolbar}
-        self.default_profiles={mode:{k:k in visible for k in self.panels} for mode,visible in (
-            ('read',('transport','timeline','library')),('edit',('transport','timeline','library','tools')))}
+        self.default_profiles={'read':{key:key in ('transport','timeline') for key in self.panels},
+                               'edit':dict.fromkeys(self.panels,True)}
         self.profiles={mode:dict(values) for mode,values in self.default_profiles.items()}
         self.simple={'read':True,'edit':False}; self.layouts={}; self.layout_versions={}; self.editable={'read':False,'edit':False}
         try:
@@ -104,7 +104,7 @@ class WorkspaceModes(QObject):
         w.resizeDocks([library,comparison],[max(library.minimumSizeHint().height(),total-height),height],Qt.Orientation.Vertical)
         w.layout().activate()
     def reset(self,all_modes=False):
-        self.w.timecode_overlay.set_locked(False)
+        self.w.timecode_overlay.set_locked(True)
         self.w.timecode_overlay.set_position([.5,1])
         if self.w.video_fullscreen: self.w.toggle_fullscreen()
         for mode in (('read','edit') if all_modes else (self.mode,)):

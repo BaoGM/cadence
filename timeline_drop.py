@@ -106,7 +106,7 @@ class ClipDragPreview:
             return
         painter.save()
         painter.setClipping(False)
-        margin_top = t.simple_track_rect().top() - 5 if t.simple else 44
+        margin_top = t.simple_track_rect().top() - 5 if t.simple else t.ruler_y()
         painter.setClipRect(QRectF(t.track_left(), margin_top, t.track_width(), t.height()-margin_top))
         accent = QColor('#72e6cf' if self.copying else '#ffb665')
         if self.phase == 'lift':

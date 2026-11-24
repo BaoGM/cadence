@@ -1,0 +1,24 @@
+Cadence 2.0.5 — Préversion Windows
+25 novembre 2026
+
+Bibliothèque
+• Un clic sélectionne une vidéo. Ctrl et Maj permettent une sélection multiple. Un double-clic ouvre et lit uniquement la vidéo visée.
+• La liste de lecture, les médias, la bibliothèque et les références affichent des vignettes et reprennent le liseré arrondi de la maquette.
+• Les vidéos et dossiers de la bibliothèque se déposent sur une piste, au bord du clip le plus proche du pointeur, en préservant le clip entier.
+
+Timeline
+• Ctrl + double-clic ajoute ou retire un clip de la sélection. Ctrl + Maj + double-clic étend la sélection jusqu’au clip pointé, inclus. Maj + double-clic sélectionne la piste entière.
+• Maintenir Alt jusqu’au dépôt déplace un clip entre pistes. Ajouter Maj le copie.
+• En vue simplifiée, la piste est plus basse d’environ 20 %. Comme en 1.18.x, un espace sombre sur toute la hauteur sépare les bords arrondis des clips à chaque coupe. Les graduations noires restent dans la bande et s’effacent à proximité des coupes. Les petites graduations passent de 1 à 0,75 pixel et les traits principaux occupent toute la hauteur du média.
+• Dans les deux vues, les nombres sont centrés sur leurs graduations. En vue détaillée, la rangée des clés de dessin est réduite d’un quart et les clés y sont centrées en hauteur.
+
+Panneaux et lecture
+• Les panneaux de lecture apparaissent en glissant depuis leur bord, avec un fondu. Les panneaux détachés restent en fenêtre indépendante après verrouillage de la disposition.
+• Le bouton à côté d’A/B ouvre Synchronisation 3D. En activant A/B sans source B, Cadence ouvre le panneau de comparaison. Avec une source B, le bouton bascule la comparaison et conserve la disposition des panneaux. Le bouton Comparer de la liste des références fonctionne également.
+• La disposition par défaut et sa restauration masquent la liste de lecture en mode Lecture et activent tous les panneaux en mode Édition. La position du timecode est verrouillée par défaut.
+• Le volume coupé grise toute la réglette. La réglette d’opacité de la vidéo dupliquée accepte le clic direct.
+
+Options et dessins
+• FR / en change la langue immédiatement. Les raccourcis proposent les profils physiques QWERTY et AZERTY, chacun avec ses personnalisations.
+• Un nouveau profil démarre avec un scrub de 25 pixels par image, les infobulles désactivées et les deux options de mise à jour activées.
+• Maya regroupe les images transparentes et le Grease Pencil 2022 dans le calque d’affichage Cadence_Drawings. Blue Pencil conserve son calque natif. Blender regroupe les dessins par caméra et projet dans la collection Cadence Drawings.

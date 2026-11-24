@@ -15,8 +15,11 @@ def check(window, output, media):
     identity=panel.store.create('Clips', [media['path'],str(chosen)])
     panel.rebuild((identity,None))
     w.library.show(); w.library_tabs.setCurrentWidget(panel); QApplication.processEvents()
-    QTest.mouseClick(panel.files.viewport(),Qt.LeftButton,Qt.NoModifier,
-                    panel.files.visualItemRect(panel.files.item(1)).center())
+    point=panel.files.visualItemRect(panel.files.item(1)).center()
+    QTest.mouseClick(panel.files.viewport(),Qt.LeftButton,Qt.NoModifier,point)
+    assert w.doc is previous and w.job is None and panel.files.selectedItems()==[panel.files.item(1)]
+    QTest.mouseDClick(panel.files.viewport(),Qt.LeftButton,Qt.NoModifier,point)
+    QTest.mouseRelease(panel.files.viewport(),Qt.LeftButton,Qt.NoModifier,point)
     deadline=time.monotonic()+30
     while time.monotonic()<deadline and (w.job or not w.transport.running):
         QTest.qWait(20)
@@ -29,7 +32,7 @@ def check(window, output, media):
         w.resize(width,height); QTest.qWait(100)
         assert panel.tree.mapToGlobal(panel.tree.rect().bottomLeft()).y()<panel.files.mapToGlobal(panel.files.rect().topLeft()).y()
         assert panel.files.parentWidget().rect().contains(panel.files.geometry())
-        w.grab().save(str(output/f'library-single-click-{width}.png'))
+        w.grab().save(str(output/f'library-double-click-{width}.png'))
     w.resize(1360,890)
     w.set_reference_sequence([next(iter(w.doc.media.values()))])
     w.library.show()
@@ -42,5 +45,5 @@ def check(window, output, media):
         if bar.compact:
             assert bar.tabRect(index).width()>=bar.fontMetrics().horizontalAdvance(bar.tabText(index))+20
         w.library_tabs.grab().save(str(output/f'panel-{name}.png'))
-    return dict(library_single_click_autoplay=True, only_chosen_video_opened=True,
+    return dict(library_single_click_selects=True, library_double_click_autoplay=True, only_chosen_video_opened=True,
                 previous_edit_preserved=True)

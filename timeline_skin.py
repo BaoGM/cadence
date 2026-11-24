@@ -4,7 +4,7 @@ from bisect import bisect_left, bisect_right
 from functools import lru_cache
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPolygonF
+from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPainterPath, QPen, QPolygonF
 
 from studio_icons import paint_icon
 from timeline_index import SegmentIndex
@@ -53,26 +53,26 @@ def headers(t, p):
     width = t.track_left()
     p.fillRect(QRectF(0, 0, width, t.height()), QColor(HEAD))
     ruler_y = t.ruler_y()
-    p.fillRect(QRectF(0, ruler_y, width, 26), QColor(RULER))
+    p.fillRect(QRectF(0, ruler_y, width, t.ruler_height()), QColor(RULER))
     if not t.state or not t.state.selection:
-        label(p, QRectF(10, ruler_y, width - 16, 25), tr('Temps'), MUTED, 11, True)
+        label(p, QRectF(10, ruler_y, width - 16, t.ruler_height()-1), tr('Temps'), MUTED, 11, True)
     if not t.simple:
-        for y, title in ((0, 'Marqueurs'), (22, 'Clés de dessin')):
+        for y, height, title in ((0, t.marker_lane_height, 'Marqueurs'), (t.marker_lane_height,t.drawing_lane_height,'Clés de dessin')):
             if y == 0:
                 flag(p, 10, 5)
             else:
-                paint_icon(p, QRectF(8,y+3,15,15), 'exposure', MUTED)
-            label(p, QRectF(29, y, width - 55, 22), tr(title), MUTED, 11)
+                paint_icon(p, QRectF(8,y+(height-15)/2,15,15), 'exposure', MUTED)
+            label(p, QRectF(29, y, width - 55, height), tr(title), MUTED, 11)
             tone = MUTED if t.can_add_at_cursor(y==0) else '#556472'
-            paint_icon(p, QRectF(width-23,y+3,15,15), 'plus', tone)
-            line(p, 0, y + 21.5, t.width(), y + 21.5, BORDER)
-    rows = [(t.active_media, 27, 25)] if t.simple else t.media_rows()
+            paint_icon(p, QRectF(width-23,y+(height-15)/2,15,15), 'plus', tone)
+            line(p, 0, y+height-.5, t.width(), y+height-.5, BORDER)
+    rows = [(t.active_media,t.media_top(),t.height()-t.media_top())] if t.simple else t.media_rows()
     for track, y, height in rows:
         if t.simple and getattr(t, 'cross_origin', None) and t.gesture in ('move', 'copy', 'transfer'):
             track = next((other for other in t.state.tracks if other.info.id != t.cross_origin[0]), track)
         chosen = track.info.id in getattr(t, 'selected_media_ids', (t.active_media.info.id,))
-        top = 26 if t.simple else y - 3
-        h = 26 if t.simple else t.video_height(track)
+        top = y if t.simple else y - 3
+        h = height if t.simple else t.video_height(track)
         if chosen or getattr(t, 'cross_target', None) == track.info.id:
             p.fillRect(QRectF(0, top, width, h), QColor('#223438'))
             p.fillRect(QRectF(0, top, 2, h), QColor(MINT))
@@ -90,16 +90,12 @@ def headers(t, p):
             paint_icon(p, QRectF(12,audio_y+4,13,13), 'wave', '#9cb5b2')
             label(p, QRectF(31, audio_y, width - 36, 22), tr('Audio'), MUTED, 11)
             line(p, 0, audio_y - .5, t.width(), audio_y - .5, BORDER)
-        line(p, 0, top + (26 if t.simple else height) - .5, t.width(), top + (26 if t.simple else height) - .5, BORDER)
+        if not t.simple:
+            line(p, 0, top+height-.5, t.width(), top+height-.5, BORDER)
     line(p, width - .5, 0, width - .5, t.height(), '#333f4c')
 
 
-def ruler(t, p):
-    left, top = t.track_left(), t.ruler_y()
-    p.fillRect(QRectF(left, top, t.width() - left, 26), QColor(RULER))
-    line(p, 0, top + 25.5, t.width(), top + 25.5, BORDER)
-    if not t.state or not t.state.length:
-        return
+def ruler_ticks(t):
     minor, major = t.ruler_steps()
     # In seconds mode use whole seconds for spacious graduations, including fractional rates.
     if t.units != 'frames' and t.span() / t.fps >= 4:
@@ -108,23 +104,43 @@ def ruler(t, p):
         major = sec * t.fps
         minor = major / 4
     end = min(t.state.length, t.view_start + t.span())
-    p.setFont(font(10, True))
-    metrics = p.fontMetrics()
     for index in range(max(0, math.ceil(t.view_start / minor)), math.floor(end / minor) + 1):
         frame = index * minor
-        large = abs(frame / major - round(frame / major)) < .00001
+        yield frame, major, abs(frame / major - round(frame / major)) < .00001
+
+
+def ruler(t, p):
+    left, top = t.track_left(), t.ruler_y()
+    p.fillRect(QRectF(left, top, t.width() - left, t.ruler_height()), QColor(RULER))
+    if not t.simple:
+        line(p, 0, top + 25.5, t.width(), top + 25.5, BORDER)
+    if not t.state or not t.state.length:
+        return
+    p.setFont(font(10, True))
+    metrics = p.fontMetrics()
+    labels=[]
+    for frame,major,large in ruler_ticks(t):
         x = t.x_for(frame) + .5
         if large:
-            line(p, x, top + 19, x, top + 25, '#788794')
-            if x > left + 1:
-                line(p, x, top + 26, x, t.height(), '#27313b')
-                if top: line(p, x, 0, x, top, '#2b3540')
+            if not t.simple:
+                line(p, x, top + 19, x, top + 25, '#788794')
+                if x > left + 1:
+                    line(p, x, top + 26, x, t.height(), '#27313b')
+                    line(p, x, 0, x, top, '#2b3540')
             text = str(round(frame)) if t.units == 'frames' else (f'{round(frame / t.fps):02d}s' if major >= t.fps else t.tick_label(round(frame)))
             label_width = metrics.horizontalAdvance(text) + 2
-            label_x = min(x + 3, t.width() - label_width - 2)
-            label(p, QRectF(label_x, top + 1, label_width, 16), text, '#9cabb9', 10, True)
-        else:
+            area=QRectF(x-label_width/2,top,label_width,15)
+            if area.left()<0 or area.right()>t.width(): continue
+            if labels and area.left()<labels[-1][0].right()+4:
+                if frame!=t.state.length or len(labels)<2: continue
+                labels.pop()
+            labels.append((area,text))
+        elif not t.simple:
             line(p, x, top + 22, x, top + 25, '#475561')
+    t.ruler_text_left=labels[0][0].left() if labels else left
+    for area,text in labels:
+        p.fillRect(area,QColor(RULER))
+        label(p,area,text,'#9cabb9',10,True,align=Qt.AlignCenter)
 
 
 def cover(p, dest, image):
@@ -218,15 +234,96 @@ def waveform(p, t, segment, media, y, x1, x2, enabled):
     p.drawPath(path)
 
 
+def simple_strip(t):
+    bar=t.simple_track_rect()
+    segments=t.active_media.segments
+    ratio=t.devicePixelRatioF()
+    span=t.span()
+    signature=(bar.width(),bar.height(),t.view_start,span,ratio)
+    cached=getattr(t,'_simple_strip',None)
+    if cached is not None and segments is cached[0] and signature==cached[1]:
+        return cached[2],cached[3]
+    image=QImage(math.ceil(bar.width()*ratio),math.ceil(bar.height()*ratio),QImage.Format_ARGB32_Premultiplied)
+    image.setDevicePixelRatio(ratio); image.fill(Qt.transparent)
+    ink=QPainter(image); ink.setRenderHint(QPainter.Antialiasing); ink.setPen(Qt.NoPen)
+    tick_spans=[]
+    gap_pixels=max(1,round(3*ratio))
+    pixel_width=bar.width()*ratio
+    for index,at,segment in t.track_indices['video'].visible(segments,t.view_start,t.view_start+span):
+        if segment.media is None: continue
+        start=(at-t.view_start)/span*pixel_width
+        end=(at+segment.length-t.view_start)/span*pixel_width
+        left_pixel,right_pixel=round(start),round(end)
+        available=right_pixel-left_pixel-1
+        if available<0: continue
+        # Reserve one physical pixel for the clip even when its two gutters would meet.
+        if index>0 and segments[index-1].media is not None:
+            after_cut=math.floor(start-gap_pixels/2+.5)+gap_pixels
+            left_pixel+=min(after_cut-left_pixel,available//2)
+        if index+1<len(segments) and segments[index+1].media is not None:
+            before_cut=math.floor(end-gap_pixels/2+.5)
+            right_pixel-=min(right_pixel-before_cut,available-available//2)
+        # Clip beyond the viewport so its edges cannot create false rounded cuts.
+        left=max(left_pixel/ratio,-8)
+        right=min(right_pixel/ratio,bar.width()+8)
+        if right<=left: continue
+        radius=min(4,(right-left)/2)
+        rect=QRectF(left,0,right-left,bar.height())
+        ink.setBrush(QColor('#303941' if segment.muted else '#2d4249'))
+        ink.drawRoundedRect(rect,radius,4)
+        if segment.muted:
+            shape=QPainterPath(); shape.addRoundedRect(rect,radius,4)
+            ink.save(); ink.setClipPath(shape)
+            for x in range(math.floor(left-bar.height()),math.ceil(right),9):
+                line(ink,x,bar.height(),x+bar.height(),0,'#46515a')
+            ink.restore()
+        if right-left>2*radius:
+            tick_spans.append((left+radius,right-radius))
+    ink.end()
+    t._simple_strip=(segments,signature,image,tick_spans)
+    return image,tick_spans
+
+
+def simple_media(t,p):
+    bar=t.simple_track_rect(); track=t.active_media
+    base,spans=simple_strip(t)
+    # SourceAtop applies selection and cursor highlights inside the cached silhouette.
+    surface=base.copy(); ink=QPainter(surface)
+    ink.setRenderHint(QPainter.Antialiasing)
+    ink.setCompositionMode(QPainter.CompositionMode_SourceAtop)
+    ink.translate(-bar.left(),-bar.top())
+    if track.info.id in getattr(t,'selected_media_ids',(track.info.id,)) and t.selection_track!='drawing':
+        for a,b in t.state.selection_ranges(track.info.id):
+            left=max(bar.left(),t.x_for(a)); right=min(bar.right(),t.x_for(b))
+            if right>left: ink.fillRect(QRectF(left,bar.top(),right-left,bar.height()),QColor(104,224,207,100))
+    t.paint_current_highlight(ink)
+    t.paint_hover_highlight(ink)
+    simple_ticks(t,ink,spans)
+    ink.end()
+    p.drawImage(bar.topLeft(),surface)
+
+
+def simple_ticks(t,p,spans):
+    bar=t.simple_track_rect(); index=0
+    for frame,_,major in ruler_ticks(t):
+        x=t.x_for(frame)-bar.left()+.5
+        width=2 if major else .75
+        while index<len(spans) and x+width/2>spans[index][1]:
+            index+=1
+        if index==len(spans): break
+        if x-width/2>=spans[index][0]:
+            half=bar.height()/2 if major else 5
+            line(p,bar.left()+x,bar.center().y()-half,bar.left()+x,bar.center().y()+half,'#000000',width)
+
+
 def tracks(t, p):
-    rows = [(t.active_media, 27, 26)] if t.simple else t.media_rows()
-    for track, y, height in rows:
+    for track, y, height in t.media_rows():
         lower = track.info.id != t.state.tracks[0].info.id
-        h = 21 if t.simple else t.video_height(track) - 6
+        h = t.video_height(track) - 6
         selected_tracks = getattr(t, 'selected_media_ids', (t.active_media.info.id,))
         ranges = t.state.selection_ranges(track.info.id) if track.info.id in selected_tracks and t.selection_track != 'drawing' else ()
         kinds = [('video', track.segments)]
-        if track.info.audio_expanded and not t.simple:
+        if track.info.audio_expanded:
             kinds.append(('audio', track.audio))
         for kind, segments in kinds:
             idx = (track.info.id, kind)
@@ -252,7 +349,7 @@ def tracks(t, p):
             right = min(t.track_right(), t.x_for(b))
             if right <= left:
                 continue
-            p.fillRect(QRectF(left, y, right - left, h + 1), QColor(104, 224, 207, 62))
+            p.fillRect(QRectF(left,y,right-left,h+1),QColor(104,224,207,62))
             line(p, left, y+1, right, y+1, MINT, 2)
             line(p, left, y+h-1, right, y+h-1, MINT, 2)
             line(p, left + 1, y, left + 1, y + h, MINT, 2)
@@ -263,7 +360,8 @@ def marker_areas(t, region=None):
     if not t.state or not t.state.frame_markers:
         return
     points = t.state.frame_markers
-    y, h = (27, 21) if t.simple else (0, 21)
+    bar=t.simple_track_rect()
+    y,h=(bar.top(),bar.height()) if t.simple else (0,t.marker_lane_height-1)
     if region is not None and not y <= region.y() <= y+h:
         return
     left, right = t.track_left(), t.track_right()
@@ -324,12 +422,13 @@ def markers(t, p):
         label(p, text_area, marker_label(t,i,frame), '#ffe0b9' if hover or selected else '#d8b795', 11, align=align)
     if drag.destination is not None:
         x=min(t.x_for(drag.destination)+1,t.track_right()-10)
-        y=27 if t.simple else 0
+        bar=t.simple_track_rect()
+        y,h=(bar.top(),bar.height()) if t.simple else (0,t.marker_lane_height-1)
         color='#ffe0b9' if drag.valid() else '#ff8b81'
-        line(p,x,y,x,y+21,color)
-        flag(p,x,y+4,12,color)
+        line(p,x,y,x,y+h,color)
+        flag(p,x,y+h/2-6,12,color)
         if drag.name:
-            label(p,QRectF(x+13,y,min(125,t.track_right()-x-14),21),drag.name,color,11)
+            label(p,QRectF(x+13,y,min(125,t.track_right()-x-14),h),drag.name,color,11)
 
 
 def paint(t, p):
@@ -339,29 +438,32 @@ def paint(t, p):
     headers(t, p)
     ruler(t, p)
     if not t.state or not t.state.length:
-        y = 26 if t.simple else 70
-        label(p, QRectF(t.track_left() + 8, y, t.track_width() - 16, t.height() - y), tr('Votre montage apparaîtra ici.'), MUTED, 11)
+        y=t.media_top()
+        height=t.height()-y if t.simple else min(t.height()-y,t.video_height(t.active_media))
+        label(p,QRectF(t.track_left()+8,y,t.track_width()-16,height),tr('Votre montage apparaîtra ici.'),MUTED,11,align=Qt.AlignCenter)
         return
     p.save()
     p.setClipRect(QRectF(t.track_left(), 0, t.track_width(), t.height()))
-    tracks(t, p)
-    t.paint_current_highlight(p)
-    t.paint_hover_highlight(p)
     if t.simple:
+        simple_media(t,p)
         t.drawing_track.paint_simple(p)
     else:
+        tracks(t,p)
+        t.paint_current_highlight(p)
+        t.paint_hover_highlight(p)
         t.drawing_track.paint(p)
-    markers(t, p)
     if t.state.loop_range:
         a, b = t.state.loop_range
         line(p, t.x_for(a), t.height()-2, t.x_for(b), t.height()-2, AMBER, 2)
     x = t.x_for(t.state.position) + .5
     if t.track_left() <= x <= t.track_right():
-        line(p, x, 0, x, t.height(), MINT, 1.5)
-        y = t.ruler_y()
+        y=t.media_top()-1 if t.simple else t.ruler_y()+16
+        if not t.simple: line(p,x,0,x,t.ruler_y(),MINT,1.5)
+        line(p, x, y, x, t.height(), MINT, 1.5)
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(MINT))
         p.drawPolygon(QPolygonF([QPointF(x-5, y), QPointF(x+5, y), QPointF(x+5, y+5), QPointF(x, y+10), QPointF(x-5, y+5)]))
+    markers(t, p)
     if t.frame_indicator() is not None:
         t.paint_frame_indicator(p)
     p.restore()

@@ -19,7 +19,7 @@ Cadence is a Windows video review and annotation application for animation. Its 
 
 ## Installation
 
-Windows 10 or 11, 64-bit. The unsigned [Cadence 2.0.3 preview](https://github.com/BaoGM/cadence/releases/tag/v2.0.3-windows-studio2) includes an installer, a portable archive, checksums and corresponding sources.
+Windows 10 or 11, 64-bit. The unsigned [Cadence 2.0.5 preview](https://github.com/BaoGM/cadence/releases/tag/v2.0.5-windows-studio2) includes an installer, a portable archive, checksums and corresponding sources.
 
 The default installation is per user. Cadence 2.0 installs alongside Windows 1.x and stores its preferences, library and cache in `%LOCALAPPDATA%/CadenceStudio-2`. For a portable copy, extract the complete archive and run `Cadence.exe`.
 

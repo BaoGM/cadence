@@ -96,7 +96,7 @@ def test_module_update_ignores_stale_bytecode(tmp_path, monkeypatch):
     sys.modules.pop('cadence_test_updated', None)
 
 
-def test_deferred_start_failure_cleans_up_and_can_retry(monkeypatch):
+def test_deferred_start_failure_cleans_up_and_can_retry(application, monkeypatch):
     from integrations import cadence_autostart as auto
     from PySide6.QtCore import QTimer
     auto.shutdown()

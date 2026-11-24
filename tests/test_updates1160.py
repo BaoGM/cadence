@@ -93,10 +93,10 @@ def gui():
 def test_preferences_round_trip(gui):
     from preferences import defaults, validate
     data=defaults({})
-    assert data['auto_update_check'] and not data['update_previews']
-    data.update(auto_update_check=False,update_previews=True)
+    assert data['auto_update_check'] and data['update_previews']
+    data.update(auto_update_check=False,update_previews=False)
     assert validate(data,{})['auto_update_check'] is False
-    assert validate(data,{})['update_previews'] is True
+    assert validate(data,{})['update_previews'] is False
 
 def fake_window(gui):
     from PySide6.QtCore import QSettings,QTimer

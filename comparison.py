@@ -115,6 +115,7 @@ class ComparisonMixin(ReferenceQueueMixin):
         col.addStretch()
         scroll=QScrollArea(); scroll.setFrameShape(QScrollArea.Shape.NoFrame); scroll.setWidget(body); scroll.setWidgetResizable(True); self.comparison_panel.setWidget(scroll); self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea,self.comparison_panel); self.comparison_panel.hide()
         self.compare_enabled.toggled.connect(self.comparison_changed); self.reference_combo.currentIndexChanged.connect(self.choose_reference)
+        self.compare_enabled.toggled.connect(self.prompt_for_comparison_source)
         self.compare_mode.currentIndexChanged.connect(self.comparison_visual_changed); self.compare_opacity.valueChanged.connect(self.comparison_visual_changed); self.compare_gain.valueChanged.connect(self.comparison_visual_changed); self.compare_offset.valueChanged.connect(self.comparison_changed)
         self.build_comparison_controls(); self.build_reference_list()
         self.refresh_reference_choices(); self.comparison_visual_changed()
@@ -203,13 +204,18 @@ class ComparisonMixin(ReferenceQueueMixin):
         self.viewer.compare_mode=self.compare_mode.currentData(); self.viewer.compare_opacity=self.compare_opacity.value()/100; self.viewer.compare_gain=self.compare_gain.value()
         self.viewer.apply_effect()
         self.sync_comparison_controls()
+    def prompt_for_comparison_source(self,enabled):
+        if enabled and not self.comparison_active():
+            if self.video_fullscreen:
+                self.toggle_fullscreen()
+            self.comparison_panel.show()
+            self.comparison_panel.raise_()
+
     def comparison_changed(self,*args):
         active=self.comparison_active(); self.viewer.comparing=active
         if hasattr(self,'ref_compare_button'): self.ref_compare_button.setChecked(self.compare_enabled.isChecked())
         if hasattr(self,'compare_action'):
             with QSignalBlocker(self.compare_action): self.compare_action.setChecked(self.compare_enabled.isChecked())
-        if self.compare_enabled.isChecked() and not self.compare_media:
-            self.comparison_panel.show()
         self.comparison_visual_changed(); self.request_frame()
     def swap_comparison(self):
         if self.editing_text(): return

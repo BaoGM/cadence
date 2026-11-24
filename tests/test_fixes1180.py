@@ -30,17 +30,23 @@ def test_media_readout_beyond_short_track(application, lengths):
         label.deleteLater()
 
 
-def test_empty_timeline_hint_stays_within_row(application):
+@pytest.mark.parametrize('simple',[False,True])
+def test_empty_timeline_hint_stays_within_row(application,simple):
     from model import State
     from widgets import Timeline
     timeline = Timeline()
     timeline.resize(700, 100)
+    timeline.simple=simple
     timeline.set_document(State(), {}, 24)
     image = timeline.grab().toImage()
-    background = image.pixelColor(690, 60)
-    ys = [y for y in range(45, image.height()) for x in range(110, 650)
-          if image.pixelColor(x, y) != background]
-    assert ys and min(ys) >= 47 and max(ys) < image.height() - 7
+    top=timeline.media_top()
+    left,right=timeline.track_left(),timeline.track_right()
+    ink=[(x,y) for y in range(top,image.height()) for x in range(left+1,right)
+         if image.pixelColor(x,y).lightness()>80]
+    xs,ys=zip(*ink)
+    assert min(ys)>top+2 and max(ys)<image.height()-2
+    assert abs((min(ys)+max(ys))/2-(top+image.height())/2)<3
+    assert abs((min(xs)+max(xs))/2-(left+right)/2)<=timeline.fontMetrics().averageCharWidth()
     timeline.deleteLater()
 
 

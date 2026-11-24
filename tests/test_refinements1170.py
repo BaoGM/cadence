@@ -98,6 +98,11 @@ def test_track_body_selection_doubleclick_drag_and_audio_menu(application,clips,
         event=QMouseEvent(QEvent.MouseMove,QPointF(x,lower),QPointF(timeline.mapToGlobal(QPoint(x,lower))),Qt.NoButton,Qt.LeftButton,Qt.NoModifier)
         QApplication.sendEvent(timeline,event)
         QTest.mouseRelease(timeline,Qt.LeftButton,Qt.NoModifier,QPoint(x,lower))
+        assert doc.state.tracks==original.tracks
+        QTest.mousePress(timeline,Qt.LeftButton,Qt.AltModifier,QPoint(x,upper))
+        event=QMouseEvent(QEvent.MouseMove,QPointF(x,lower),QPointF(timeline.mapToGlobal(QPoint(x,lower))),Qt.NoButton,Qt.LeftButton,Qt.AltModifier)
+        QApplication.sendEvent(timeline,event)
+        QTest.mouseRelease(timeline,Qt.LeftButton,Qt.AltModifier,QPoint(x,lower))
         assert all(s.media is None for s in doc.state.tracks[0].segments)
         assert doc.state.second_track.length==96
         assert doc.undo() and doc.state.tracks==original.tracks
@@ -108,7 +113,7 @@ def test_track_body_selection_doubleclick_drag_and_audio_menu(application,clips,
         menu.deleteLater()
         timeline.simple=True; timeline.set_document(doc.state,doc.media,doc.fps)
         assert 16<timeline.track_y('drawing')<timeline.simple_track_rect().top()-4
-        assert timeline.height()>=timeline.simple_track_rect().bottom()+4
+        assert timeline.height()>timeline.simple_track_rect().bottom()
     finally:
         doc.saved_signature=doc.signature(); window.close(); application.processEvents()
 

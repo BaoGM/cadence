@@ -123,6 +123,7 @@ class VolumeBars(QWidget):
             QSlider::sub-page:horizontal {background:#68e0cf; border-radius:2px;}
             QSlider::handle:horizontal {width:12px; margin:-4px 0; border-radius:6px; background:#68e0cf;}
             QSlider[muted="true"]::sub-page:horizontal, QSlider[muted="true"]::handle:horizontal {background:#8593a0;}
+            QSlider[muted="true"]::handle:horizontal {border:2px solid #8593a0;}
         """)
         self.refresh()
 
@@ -142,15 +143,18 @@ class VolumeBars(QWidget):
     def setMuted(self, muted):
         if self.muted != bool(muted):
             self.muted = bool(muted)
-            self.slider.setProperty('muted', self.muted)
-            self.slider.style().unpolish(self.slider)
-            self.slider.style().polish(self.slider)
             self.refresh()
             self.mutedChanged.emit(self.muted)
 
     def refresh(self):
+        silent = self.muted or self.value() == 0
+        if self.slider.property('muted') != silent:
+            self.slider.setProperty('muted', silent)
+            self.slider.style().unpolish(self.slider)
+            self.slider.style().polish(self.slider)
+            self.slider.update()
         self.readout.setText(f'{self.value()} %')
-        self.speaker.setIcon(icon('mute' if self.muted or self.value() == 0 else 'sound'))
+        self.speaker.setIcon(icon('mute' if silent else 'sound'))
         action = tr('Unmute' if self.muted else 'Mute')
         self.speaker.setAccessibleName(action)
         self.speaker.setToolTip(action)

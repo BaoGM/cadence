@@ -41,5 +41,8 @@
   "tests/test_timeline202.py",
   "tests/test_timeline203.py",
   "tests/test_transport_scrub203.py",
-  "tests/test_workspace_migration202.py"
+  "tests/test_workspace_migration202.py",
+  "tests/test_preferences204.py",
+  "tests/test_timeline205.py",
+  "tests/test_timeline_library204.py"
 ]

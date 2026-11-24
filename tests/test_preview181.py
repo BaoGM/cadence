@@ -113,7 +113,7 @@ def test_tooltip_preference_roundtrip(window,tmp_path,monkeypatch):
     from preferences import ShortcutDialog,defaults,validate,load_preferences
     monkeypatch.setenv('CADENCE_PREFS',str(tmp_path/'preferences.json'))
     registry=window.action_registry;data=defaults(registry)
-    assert data['tooltips'] and validate(dict(data,tooltips=False),registry)['tooltips'] is False
+    assert not data['tooltips'] and validate(dict(data,tooltips=True),registry)['tooltips'] is True
     dialog=ShortcutDialog(registry,data,window)
     try:
         dialog.tooltips.setChecked(False);dialog.accept()

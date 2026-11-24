@@ -1,18 +1,30 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QMenu
+from PySide6.QtWidgets import QMenu
 from model import MediaTrack,TrackInfo
 from ui_text import tr
 
 
 class TrackRows:
+    marker_lane_height=22
+    drawing_lane_height=17
+
+    def ruler_y(self):
+        return 0 if self.simple else self.marker_lane_height+self.drawing_lane_height
+
+    def ruler_height(self):
+        return 23 if self.simple else 26
+
+    def media_top(self):
+        return self.ruler_y()+self.ruler_height()
+
     @property
     def active_media(self):
         if self.state is None: return MediaTrack(TrackInfo())
         return next((t for t in self.state.tracks if t.info.id==getattr(self,'active_media_id',None)),self.state.tracks[0])
 
     def media_rows(self):
-        y=73
+        y=self.media_top()+3
         for track in self.state.tracks if self.state else ():
             height=self.video_height(track)+(22 if track.info.audio_expanded else 0)
             yield track,y,height
@@ -30,11 +42,11 @@ class TrackRows:
 
     def media_track_y(self,kind):
         if self.simple:
-            if kind=='drawing': return 19
+            if kind=='drawing': return 17
             row=self.simple_track_rect()
             return int(row.bottom() if kind=='audio' else row.top())
-        top=next((y for track,y,height in self.media_rows() if track.info.id==self.active_media.info.id),73)
-        return 31 if kind=='drawing' else top+self.video_height(self.active_media) if kind=='audio' else top
+        top=next((y for track,y,height in self.media_rows() if track.info.id==self.active_media.info.id),self.media_top()+3)
+        return self.marker_lane_height+self.drawing_lane_height//2 if kind=='drawing' else top+self.video_height(self.active_media) if kind=='audio' else top
 
     def media_height(self):
         return max((y+height-3 for track,y,height in self.media_rows()),default=116)
@@ -62,15 +74,17 @@ class TrackRows:
         if event.button()!=Qt.MouseButton.LeftButton or event.position().x()>=self.track_left(): return False
         x,y=event.position().x(),event.position().y()
         if self.simple:
-            if self.state and len(self.state.tracks)>1 and y>=26:
+            if self.state and y>=self.media_top() and event.modifiers()==Qt.ControlModifier:
+                self.mediaTrackSelected.emit(self.active_media.info.id,'toggle')
+            elif self.state and len(self.state.tracks)>1 and y>=self.media_top() and event.modifiers()==Qt.NoModifier:
                 other=next(track for track in self.state.tracks if track.info.id!=self.active_media.info.id)
                 self.active_media_id=other.info.id
                 self.mediaTrackSelected.emit(other.info.id,'replace')
                 self.update()
             event.accept()
             return True
-        if y<44 and x>=self.track_left()-30 and self.state and self.state.length:
-            marker=y<22
+        if y<self.ruler_y() and x>=self.track_left()-30 and self.state and self.state.length:
+            marker=y<self.marker_lane_height
             if self.can_add_at_cursor(marker):
                 if marker: self.markerAdded.emit(self.state.position)
                 else: self.drawingKeyAdded.emit()
@@ -90,27 +104,31 @@ class TrackRows:
         return True
 
     def toggle_media_selection(self,event):
-        if self.simple or event.button()!=Qt.MouseButton.LeftButton or not event.modifiers()&Qt.KeyboardModifier.ControlModifier: return False
-        track=self.media_row_at(event.position().y())
+        if event.button()!=Qt.LeftButton or event.modifiers()!=Qt.ControlModifier: return False
+        if self.simple:
+            track=self.active_media if self.state and self.simple_track_rect().contains(event.position()) else None
+        else: track=self.media_row_at(event.position().y())
         if track is None: return False
         self.mediaTrackSelected.emit(track.info.id,'toggle')
         event.accept(); return True
 
     def begin_cross_drag(self,event):
         self.cross_origin=None; self.cross_target=None; self.cross_copy=False
-        if self.state.second_track is None: return
-        if self.simple and (not event.modifiers()&Qt.AltModifier or not self.simple_track_rect().contains(event.position())): return
+        if self.state.second_track is None or not event.modifiers() & Qt.AltModifier: return
+        if self.simple and not self.simple_track_rect().contains(event.position()): return
         target=self.context_target(event.position().x(),event.position().y(),False)
         if target is None: return
         a,b,kind=target
         from model import locate
         if all(locate(segments,a)[0] is None for segments in (self.active_media.segments,self.active_media.audio)): return
         self.cross_origin=(self.active_media.info.id,a,b)
-        self.cross_press_y=event.position().y()
 
     def update_cross_drag(self,event,x):
         origin=getattr(self,'cross_origin',None)
-        if origin is None or self.gesture not in ('scrub','move','copy','transfer'): return False
+        if origin is None or self.gesture not in ('move','copy','transfer'): return False
+        if not event.modifiers() & Qt.AltModifier:
+            self.clear_clip_drag()
+            return True
         pos=event.position()
         if self.simple:
             in_title=(0<=pos.x()<self.track_left() and self.simple_track_rect().top()<=pos.y()<self.height())
@@ -121,14 +139,10 @@ class TrackRows:
             self.cross_target=None
             if self.gesture=='transfer': self.update(); return True
             return False
-        if self.gesture=='scrub' and abs(pos.y()-self.cross_press_y)<QApplication.startDragDistance(): return False
         self.cross_target=target.info.id
         if self.gesture!='transfer':
             self.cross_copy=self.gesture=='copy'
-            if self.move_span: self.cross_origin=(origin[0],self.move_span[0],self.move_span[1])
-            else:
-                self.move_span=(origin[1],origin[2],'video')
-                self.grab_offset=self.x_for(self.drag_frame)-self.x_for(origin[1])
+            self.cross_origin=(origin[0],self.move_span[0],self.move_span[1])
             self.gesture='transfer'; self.finish_range_drag()
         if self.simple: x=self.x_for(origin[1])+self.grab_offset
         frame=max(0,min(self.state.length,round(self.raw_frame(x-self.grab_offset)))); at=0

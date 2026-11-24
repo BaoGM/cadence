@@ -31,7 +31,7 @@ def test_four_digit_graduation_visible_at_end(timeline, monkeypatch, width, leng
     widget.grab()
     area, natural_width = labels[str(last_tick)]
     assert area.width() >= natural_width
-    assert widget.x_for(last_tick) <= area.left() < area.right() < widget.width()
+    assert abs(area.center().x()-widget.x_for(last_tick))<=1 and area.right()<widget.width()
     assert widget.frame_for(widget.track_right()) == length - 1
 
 
@@ -163,7 +163,7 @@ def test_drag_between_tracks_in_either_direction(window, application, clips):
                     rows = list(t.media_rows())
                     start = QPoint(x, rows[source_index][1] + 8)
                     end = QPoint(x, rows[1 - source_index][1] + 8)
-                    keys = Qt.NoModifier
+                    keys = Qt.AltModifier
                 QTest.mousePress(t, Qt.LeftButton, keys, start)
                 move_pointer(t, end, keys)
                 assert t.cross_target == target.info.id and t.drop_frame == 0

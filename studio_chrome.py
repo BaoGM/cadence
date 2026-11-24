@@ -1,12 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-only
-import math
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject, QPoint, QSignalBlocker, QSize, Qt
+from PySide6.QtCore import QEvent, QObject, QPoint, QSize, Qt
 from shiboken6 import isValid
 from PySide6.QtGui import QColor, QKeySequence, QShortcut
-from PySide6.QtWidgets import (QCheckBox, QColorDialog, QFrame, QHBoxLayout, QLabel,
-                               QMenu, QScrollArea, QSizePolicy, QSlider, QToolBar,
+from PySide6.QtWidgets import (QCheckBox, QColorDialog, QFrame, QHBoxLayout, QLabel, QLayout,
+                               QMenu, QScrollArea, QSizePolicy, QToolBar,
                                QToolButton, QVBoxLayout, QWidget)
 
 from studio_icons import icon
@@ -179,6 +178,8 @@ class StudioChrome(QObject):
     def __init__(self, window):
         super().__init__(window)
         self.w = window
+        self.drawing_panel_width = window.drawing.panel.minimumWidth()
+        window.drawing.panel.layout().setSizeConstraint(QLayout.SetNoConstraint)
         self.build_top()
         self.build_viewer()
         self.build_rail()
@@ -245,9 +246,9 @@ class StudioChrome(QObject):
         row.addWidget(control('Options…', 'settings', action=w.action_registry['Fichier/Options…'][0]))
         row.addWidget(control('Guide rapide', 'help', action=w.action_registry['Aide/Guide rapide'][0]))
         row.addWidget(divider())
-        lang = control('Langue', caption='FR / en' if language() == 'fr' else 'EN / fr')
-        lang.clicked.connect(lambda:w.edit_shortcuts(language_focus=True))
-        row.addWidget(lang)
+        self.language_button = control('Langue', caption='FR / en' if language() == 'fr' else 'EN / fr')
+        self.language_button.clicked.connect(w.toggle_language)
+        row.addWidget(self.language_button)
         self.top_slot=QWidget()
         self.top_slot.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Fixed)
         top_layout=QVBoxLayout(self.top_slot)
@@ -262,14 +263,21 @@ class StudioChrome(QObject):
     def open_menu(self):
         if self.w.video_fullscreen: self.w.toggle_fullscreen()
         if self.headers.read: self.headers.show_reader()
+        if entrance := getattr(self.top,'entrance',None):
+            entrance.finish()
         self.menu.popup(self.menu_button.mapToGlobal(self.menu_button.rect().bottomLeft()))
 
     def center_modes(self):
         width=self.top.width()
         size=self.mode_group.sizeHint()
-        self.mode_group.setGeometry((width-size.width())//2,(self.top.height()-size.height())//2,size.width(),size.height())
+        left=(width-size.width())//2
+        if getattr(getattr(self, 'headers', None), 'read', False):
+            center=self.top.mapFromGlobal(self.w.mapToGlobal(self.w.rect().center())).x()
+            gap=8 if self.project.isHidden() else 20
+            left=max(self.menu_button.geometry().right()+gap, min(center-size.width()//2, width-155-size.width()))
+        self.mode_group.setGeometry(left,(self.top.height()-size.height())//2,size.width(),size.height())
         if self.project.isHidden(): return
-        available=max(0,(width-size.width())//2-270)
+        available=max(0,left-270)
         wanted=self.project.fontMetrics().horizontalAdvance(self.project.value)+2
         self.project.setFixedWidth(min(220,available,wanted))
         self.breadcrumb.setFixedWidth(min(135,max(0,available-self.project.width()-8),self.breadcrumb.fontMetrics().horizontalAdvance(self.breadcrumb.value)+1))
@@ -300,9 +308,13 @@ class StudioChrome(QObject):
         self.format = QLabel()
         self.format.setObjectName('studioDetails')
         row.addWidget(self.format)
-        row.addWidget(divider())
+        self.format_divider=divider()
+        row.addWidget(self.format_divider)
         self.compare_button = control('Activer la comparaison', 'ab', 'A/B', w.compare_action)
         row.addWidget(self.compare_button)
+        sync_settings = w.action_registry['Synchronisation 3D/Réglages de synchronisation…'][0]
+        self.sync_button = control('Réglages de synchronisation…', 'sync-3d', action=sync_settings)
+        row.addWidget(self.sync_button)
         self.right_button = control('Panneau droit','dock-right')
         self.right_button.clicked.connect(lambda:self.toggle_side('right'))
         row.addWidget(self.right_button)
@@ -339,7 +351,12 @@ class StudioChrome(QObject):
             for name in shown: docks[name].hide()
         else:
             wanted=[name for name in self.side_history.get(key,()) if name in docks]
-            for name in wanted or list(docks)[:1]: docks[name].show()
+            for name in wanted or list(docks)[:1]:
+                dock=docks[name]
+                dock.show()
+                if self.w.workspaces.mode=='read':
+                    from studio_hover import slide_in
+                    slide_in(dock.widget(),QPoint(-20 if side=='left' else 20,0))
         self.align_workspace()
 
     def build_rail(self):
@@ -451,30 +468,7 @@ class StudioChrome(QObject):
             choices.addWidget(b)
             self.units.append(b)
         row.addWidget(units)
-        row.addWidget(divider())
-        for symbol, label, factor in [('minus','Dézoomer',1/1.3), ('plus','Zoomer',1.3)]:
-            if symbol == 'plus':
-                self.zoom = QSlider(Qt.Orientation.Horizontal)
-                self.zoom.setFixedWidth(56)
-                self.zoom.setRange(0, 1000)
-                self.zoom.setAccessibleName(tr('Zoom de la timeline'))
-                self.zoom.setToolTip(tr('Zoom de la timeline'))
-                self.zoom.valueChanged.connect(lambda value:self.zoom_timeline(self.zoom_limit()**(value/1000)))
-                row.addWidget(self.zoom)
-            b = control(label, symbol, size=13)
-            b.setFixedSize(24, 23)
-            b.clicked.connect(lambda checked=False,f=factor:self.zoom_timeline(w.timeline.zoom*f))
-            row.addWidget(b)
-        self.foot, foot = strip('studioTimelineFoot', 25, 12)
-        self.hint = FileLabel('studioDetails')
-        self.hint.set_value(tr('Glisser pour défiler · Alt + glisser pour déplacer un média'))
-        foot.addWidget(self.hint, 1)
-        self.total = QLabel()
-        self.total.setObjectName('studioDetails')
-        foot.addWidget(self.total)
-        panel.addWidget(self.foot)
         w.timeline.unitsChanged.connect(self.sync_units)
-        w.timeline.viewportChanged.connect(self.sync_zoom)
         self.sync_units(w.timeline.units)
         panel.insertWidget(0, self.timeline_bar)
         w.timeline.install_scrub_band(self.timeline_bar)
@@ -484,29 +478,8 @@ class StudioChrome(QObject):
         self.collapsed = not self.collapsed
         self.fold.setIcon(icon('right' if self.collapsed else 'down', size=13))
         self.w.timeline.setVisible(not self.collapsed)
-        self.foot.setVisible(not self.collapsed)
         self.headers.configure(self.headers.read, self.w.timeline.simple and not self.collapsed)
         self.w.sync_timeline_scroll()
-
-    def zoom_limit(self):
-        return max(1, self.w.doc.state.length / 2)
-
-    def zoom_timeline(self, amount):
-        t = self.w.timeline
-        if not t.state or not t.state.length:
-            self.sync_zoom()
-            return
-        anchor = min(max(t.state.position, t.view_start), t.view_start + t.span())
-        fraction = (anchor - t.view_start) / t.span()
-        t.zoom = max(1, min(self.zoom_limit(), amount))
-        t.view_start = anchor - fraction * t.span()
-        t.clamp_view()
-        t.update()
-
-    def sync_zoom(self):
-        limit = self.zoom_limit()
-        with QSignalBlocker(self.zoom):
-            self.zoom.setValue(round(1000 * math.log(max(1,self.w.timeline.zoom), limit)) if limit > 1 else 0)
 
     def build_transport(self):
         w = self.w
@@ -549,9 +522,6 @@ class StudioChrome(QObject):
         self.breadcrumb.setVisible(bool(folder) and self.w.width() > 1000)
         self.center_modes()
         self.track_count.setText(tr('2 pistes média') if self.w.doc.state.second_track else tr('1 piste média'))
-        fps = float(self.w.doc.fps)
-        self.total.setText(f'{fps:.3f}'.rstrip('0').rstrip('.') + ' ' + tr('i/s') + '   ·   ' +
-                           tr('Durée') + ' ' + frame_clock(self.w.doc.state.length, self.w.doc.fps))
 
     def update_media(self, media, info):
         self.media.set_value(media['name'] if media else tr('Aperçu'))
@@ -591,34 +561,49 @@ class StudioChrome(QObject):
         wanted = 208 if self.w.width() <= 760 else 226 if self.w.width() <= 1000 else 262
         self.w.resizeDocks([dock], [wanted], Qt.Orientation.Horizontal)
 
+    def stage_padding(self,read):
+        if read or self.w.video_fullscreen: return (0,0,0,0)
+        x,y=(4,4) if self.w.width()<=760 else (17,9)
+        if self.w.height()<=440: y=0
+        return (x,y,x,y)
+
     def responsive(self):
         small = self.w.width() <= 1000
         narrow = self.w.width() <= 760
         low = self.w.height() <= 620
+        short = self.w.height() <= 440
+        self.w.drawing.panel.setMinimumWidth(200 if narrow else self.drawing_panel_width)
         self.format.setVisible(not small)
+        self.format_divider.setVisible(not narrow)
+        self.view_divider.setVisible(not narrow)
+        self.viewer_row.setContentsMargins(2 if narrow else 10,0,2 if narrow else 10,0)
+        self.viewer_row.setSpacing(2 if narrow else 7)
+        self.compare_button.setToolButtonStyle(Qt.ToolButtonTextOnly if narrow else Qt.ToolButtonTextBesideIcon)
         self.project_icon.setVisible(not narrow)
         self.project.setVisible(not narrow)
         self.breadcrumb.setVisible(not small and bool(self.breadcrumb.value))
         self.track_count.setVisible(not narrow)
-        self.total.setVisible(not narrow)
-        self.top.setFixedHeight(42 if low else 53)
+        self.top.setFixedHeight(36 if short else 42 if low else 53)
+        edit_strip = self.w.header.widget()
+        strip_height = 36 if short else 44
+        if edit_strip.minimumHeight() != strip_height:
+            edit_strip.setFixedHeight(strip_height)
+            self.w.compact_playback_panels()
         self.view.setFixedHeight(34 if low else 42)
         self.rail_items.setContentsMargins(0, 3 if low else 9, 0, 3 if low else 5)
         self.rail_items.setSpacing(0 if low else 3)
-        self.foot.setFixedHeight(20 if self.w.height() <= 440 else 25)
         geometry_band = (small, narrow)
         if hasattr(self, 'last_band') and self.last_band != geometry_band:
             self.fit_sidebar()
         self.last_band = geometry_band
         if hasattr(self.w, 'workspaces'):
             read = self.w.workspaces.mode == 'read'
-            self.timeline_bar.setFixedHeight(30 if self.w.height() <= 440 else 34 if read else 39)
+            self.timeline_bar.setFixedHeight(30 if short else 34 if read else 39)
         self.w.sync_timeline_scroll()
-        if not self.w.video_fullscreen and not self.headers.read:
-            self.stage_layout.setContentsMargins(*(4, 4, 4, 4) if narrow else (17, 9, 17, 9))
+        self.stage_layout.setContentsMargins(*self.stage_padding(self.headers.read))
         self.center_modes()
         condensed = self.w.width() < 1480
-        self.w.viewer.setMinimumHeight(38 if self.w.height() <= 440 else 90)
+        self.w.viewer.setMinimumHeight(70 if short else 90)
         self.w.editing_flags.setVisible(not condensed)
         self.w.editing_overflow.setVisible(condensed)
         self.w.apply_export.setVisible(not narrow)

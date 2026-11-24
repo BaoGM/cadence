@@ -97,7 +97,7 @@ def test_exposure_handle_does_not_select_clip_range(timeline):
         bar=widget.simple_track_rect()
         assert 16<y<bar.top()-3
         assert not widget.drawing_track.contains(point(widget,24))
-        assert widget.height()==52
+        assert widget.height()==42
     p=QPoint(round(widget.x_for(key.end)),y)
     q=QPoint(round(widget.x_for(key.end+7)),y)
     QTest.mousePress(widget,Qt.LeftButton,Qt.NoModifier,p)

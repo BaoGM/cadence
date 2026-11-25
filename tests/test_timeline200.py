@@ -2,7 +2,7 @@
 import pytest
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
 from PySide6.QtGui import QMouseEvent
-from PySide6.QtTest import QTest
+from PySide6.QtTest import QSignalSpy, QTest
 from PySide6.QtWidgets import QApplication
 
 from drawing import DrawingKey, Mark
@@ -62,14 +62,16 @@ def test_animated_drop_snap_and_one_undo(timeline,copy):
     move_pointer(widget,end,mods)
     assert widget.clip_preview.phase=='lift' and widget.clip_preview.copying==copy
     assert widget.drop_frame==96
+    finished = QSignalSpy(widget.clip_preview.motion.finished)
     QTest.mouseRelease(widget,Qt.LeftButton,mods,end)
     assert widget.clip_preview.phase=='land' and widget.clip_preview.destination==doc.state.position
+    assert 0 < widget.clip_preview.motion.duration() <= 200
     assert [s.media for s in doc.state.segments]==(['a','b','c','a'] if copy else ['b','c','a'])
     assert doc.state.segments==doc.state.audio
     assert doc.undo() and doc.state==original
     assert doc.redo() and doc.state!=original
-    QTest.qWait(210)
-    assert widget.clip_preview.phase is None
+    assert finished.count() or finished.wait(2000)
+    assert finished.count() == 1 and widget.clip_preview.phase is None
 
 
 @pytest.mark.parametrize('stop',['escape','focus','click'])

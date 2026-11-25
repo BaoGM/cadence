@@ -3,7 +3,7 @@ import math
 from bisect import bisect_left, bisect_right
 from functools import lru_cache
 
-from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtCore import QLineF, QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPainterPath, QPen, QPolygonF
 
 from studio_icons import paint_icon
@@ -109,6 +109,13 @@ def ruler_ticks(t):
         yield frame, major, abs(frame / major - round(frame / major)) < .00001
 
 
+def compact_tick_center(x, width, ratio):
+    # On the raster strip, odd pixel widths are sharp at a pixel centre, even ones at an edge.
+    columns = max(1, math.floor(width * ratio + .5))
+    phase = .5 if columns % 2 else 0.
+    return (math.floor(x * ratio - phase + .5) + phase) / ratio
+
+
 def ruler(t, p):
     left, top = t.track_left(), t.ruler_y()
     p.fillRect(QRectF(left, top, t.width() - left, t.ruler_height()), QColor(RULER))
@@ -119,8 +126,11 @@ def ruler(t, p):
     p.setFont(font(10, True))
     metrics = p.fontMetrics()
     labels=[]
+    ratio=t.devicePixelRatioF()
     for frame,major,large in ruler_ticks(t):
-        x = t.x_for(frame) + .5
+        if t.simple and not large: continue
+        x = t.x_for(frame)
+        x = left + compact_tick_center(x-left, 2, ratio) if t.simple else x+.5
         if large:
             if not t.simple:
                 line(p, x, top + 19, x, top + 25, '#788794')
@@ -304,16 +314,24 @@ def simple_media(t,p):
 
 
 def simple_ticks(t,p,spans):
-    bar=t.simple_track_rect(); index=0
+    bar=t.simple_track_rect(); index=0; ratio=p.device().devicePixelRatioF()
+    centre_y=bar.center().y()
+    span=t.span(); track_width=t.track_width()
+    major_lines,minor_lines=[],[]
     for frame,_,major in ruler_ticks(t):
-        x=t.x_for(frame)-bar.left()+.5
         width=2 if major else .75
+        x=compact_tick_center((frame-t.view_start)/span*track_width,width,ratio)
         while index<len(spans) and x+width/2>spans[index][1]:
             index+=1
         if index==len(spans): break
         if x-width/2>=spans[index][0]:
             half=bar.height()/2 if major else 5
-            line(p,bar.left()+x,bar.center().y()-half,bar.left()+x,bar.center().y()+half,'#000000',width)
+            centre_x=bar.left()+x
+            (major_lines if major else minor_lines).append(QLineF(centre_x,centre_y-half,centre_x,centre_y+half))
+    for lines,width in ((minor_lines,.75),(major_lines,2)):
+        if lines:
+            p.setPen(QPen(Qt.black,width,Qt.SolidLine,Qt.FlatCap))
+            p.drawLines(lines)
 
 
 def tracks(t, p):

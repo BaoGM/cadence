@@ -72,6 +72,7 @@ docs/release-notes-1.18.3.txt
 docs/release-notes-1.18.4.txt
 docs/release-notes-1.18.5.txt
 docs/release-notes-2.0.5.txt
+docs/release-notes-2.0.6.txt
 drag.py
 draw_fonts.py
 draw_selection.py

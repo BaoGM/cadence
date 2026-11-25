@@ -242,12 +242,14 @@ class ShortcutDialog(QDialog):
             keys=sorted((key for key in self.registry if key.split('/',1)[0]==category),key=lambda key:alphabetical(self.registry[key][0].text()))
             table=QTableWidget(len(keys),4); self.key_tables[category]=table; self.key_tabs.addTab(table,tr(category))
             table.setHorizontalHeaderLabels(tr(['Commande','Raccourci','',''])); table.verticalHeader().hide()
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
             table.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeMode.Stretch)
-            table.setColumnWidth(1,200); table.setColumnWidth(2,100); table.setColumnWidth(3,120)
+            table.verticalHeader().setMinimumSectionSize(40)
+            table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
             for row,key in enumerate(keys):
                 item=QTableWidgetItem(self.registry[key][0].text().replace('&','')); item.setFlags(item.flags()&~Qt.ItemFlag.ItemIsEditable); table.setItem(row,0,item)
                 edit=ShortcutEdit(); self._editors[key]=edit; table.setCellWidget(row,1,edit)
-                reset=QPushButton('&'+tr('Réinitialiser')); reset.clicked.connect(lambda checked=False,k=key:self.reset_key(k)); table.setCellWidget(row,3,reset); table.setRowHeight(row,42)
+                reset=QPushButton('&'+tr('Réinitialiser')); reset.clicked.connect(lambda checked=False,k=key:self.reset_key(k)); table.setCellWidget(row,3,reset)
                 clear=QPushButton('&'+tr('Effacer')); clear.clicked.connect(lambda checked=False,k=key:self.set_key(k,'')); table.setCellWidget(row,2,clear)
         self.table=next(iter(self.key_tables.values()))
         for key,edit in self._editors.items():
@@ -350,7 +352,7 @@ class ShortcutDialog(QDialog):
             QMessageBox.warning(self,tr('Raccourcis invalides'),tr(str(error))); return
         self.live_data=updated; self._key_values=dict(updated['shortcuts'])
         for other in conflicts:
-            with QSignalBlocker(self.editors[other]): self.editors[other].clear()
+            with QSignalBlocker(self.editors[other]): self.editors[other].setKeySequence(QKeySequence())
         self.shortcutsChanged.emit(updated)
     def update_cache_label(self):
         import threading

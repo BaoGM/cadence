@@ -46,14 +46,12 @@ def test_read_headers_and_transport_keep_hover(window, application, clips):
     w.resize(1280, 800)
     application.processEvents()
     headers = w.studio.headers
-    first, second, bar = headers.geometries()
+    first, bar = headers.geometries()
     away = w.viewer.mapToGlobal(w.viewer.rect().center())
     headers.update_hover(away)
     assert not headers.top.isVisible() and not headers.ruler.isVisible()
     headers.update_hover(first.center())
-    assert headers.top.isVisible() and headers.view.isVisible()
-    headers.update_hover(second.center())
-    assert headers.top.isVisible() and headers.view.isVisible()
+    assert headers.top.isVisible() and w.studio.view.window() is headers.top
 
     play = w.play_btn.mapToGlobal(w.play_btn.rect().center())
     assert not bar.contains(play)
@@ -70,7 +68,7 @@ def test_read_headers_and_transport_keep_hover(window, application, clips):
     assert not headers.ruler.isVisible()
     w.transport_widget.hide()
     application.processEvents()
-    bar = headers.geometries()[2]
+    bar = headers.geometries()[1]
     headers.update_hover(QPoint(bar.center().x(), bar.top() - 8))
     assert headers.ruler.isVisible()
 

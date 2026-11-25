@@ -44,7 +44,7 @@ def test_simplified_ruler_ticks_stay_inside_separate_clips(application):
     top,cy,bottom=int(bar.top()),int(bar.center().y()),int(bar.bottom())-1
     assert t.height()==42 and bar.height()==17
     def tone(x,y): return image.pixelColor(x,y).lightness()
-    ticks=[(round(t.x_for(f)),major) for f,_,major in ruler_ticks(t) if 4<f<110]
+    ticks=[(math.floor(t.x_for(f)),major) for f,_,major in ruler_ticks(t) if 4<f<110]
     major=next(x for x,big in ticks if big)
     minor=next(x for x,big in ticks if not big)
     assert all(tone(major,y)<48 for y in range(top,bottom+1))
@@ -144,10 +144,34 @@ def test_ticks_center_with_visible_separated_labels(application,monkeypatch,simp
     monkeypatch.setattr(timeline_skin,'label',read)
     for offset in (0,length-t.span()):
         t.view_start=offset; captured.clear(); t.grab()
-        centers=[t.x_for(frame)+.5 for frame,_,large in ruler_ticks(t) if large]
+        centers=[t.x_for(frame)+(0 if simple else .5) for frame,_,large in ruler_ticks(t) if large]
+        tolerance=.5/t.devicePixelRatioF()+.01 if simple else .01
         assert captured
         for i,(area,text) in enumerate(captured):
-            assert min(abs(area.center().x()-x) for x in centers)<.01
+            assert min(abs(area.center().x()-x) for x in centers)<=tolerance
             assert 0<=area.left() and area.right()<width
             if i: assert area.left()>=captured[i-1][0].right()+3
+    t.deleteLater()
+
+
+def test_fractional_zoom_keeps_compact_ticks_uniform(application):
+    t=Timeline(); t.simple=True; t.resize(900,42); t.set_units('frames')
+    cuts=(0,99,201,341,404,421,493,666,800,935,1000)
+    clips=tuple(Segment('a',0,b-a,cut_before=True) for a,b in zip(cuts,cuts[1:]))
+    t.set_document(State(clips),{},24)
+    profiles={False:set(),True:set()}; ratio=t.devicePixelRatioF()
+    for zoom in (1.,1.3,1.69,2.197,3.71293,5.72):
+        t.zoom=zoom; t.view_start=(1000-t.span())*.37
+        bar=t.simple_track_rect(); y=math.floor(bar.center().y()*ratio)
+        image=t.grab().toImage()
+        for frame,_,major in ruler_ticks(t):
+            x=t.x_for(frame)
+            if min(x-bar.left(),bar.right()-x)<10 or any(abs(t.x_for(c)-x)<10 for c in cuts): continue
+            centre=round(x*ratio); radius=math.ceil(4*ratio)
+            pixels=[image.pixelColor(i,y).red() for i in range(centre-radius,centre+radius+1)]
+            profiles[major].add(tuple(value for value in pixels if value<45))
+    for major,items in profiles.items():
+        assert len(items)==1
+        ink,=items
+        assert sum((45-value)/45 for value in ink)==pytest.approx((2 if major else .75)*ratio,abs=.07)
     t.deleteLater()

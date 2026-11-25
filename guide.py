@@ -5,21 +5,25 @@ import sys
 from ui_text import language,tr
 
 def shortcut_lines(registry,layout='QWERTY'):
-    from shortcut_defaults import physical_shortcut
-    french=language()=='fr'
-    lines=['Raccourcis clavier par défaut' if french else 'Default keyboard shortcuts','']
+    from PySide6.QtGui import QKeySequence
     from menu_layout import alphabetical
-    for category in ('Fichier','Édition','Lecture','Affichage','Comparaison','Dessin','Outils','Synchronisation 3D','Aide'):
-        entries=[(action,key) for path,(action,key) in registry.items() if path.startswith(category+'/') and key]
-        if not entries: continue
+    french=language()=='fr'
+    title='Raccourcis actifs' if french else 'Active shortcuts'
+    lines=[f'{title} ({layout})']
+    categories={}
+    for path,(action,_) in registry.items():
+        if action.shortcuts():
+            categories.setdefault(path.split('/',1)[0],[]).append(action)
+    for category,actions in categories.items():
         lines+=['',tr(category)]
-        for action,default in sorted(entries,key=lambda item:alphabetical(item[0].text())):
-            keys=physical_shortcut(default,layout)
-            if french:
-                for a,b in [('Shift','Maj'),('Delete','Suppr'),('Space','Espace'),('Escape','Échap'),('Left','Gauche'),('Right','Droite'),('Home','Début'),('End','Fin')]: keys=keys.replace(a,b)
-            if keys==',': keys='Virgule' if french else 'Comma'
-            if keys=='.': keys='Point' if french else 'Period'
-            lines.append(keys+' : '+action.text())
+        for action in sorted(actions,key=lambda a:alphabetical(a.text())):
+            bindings=[]
+            for sequence in action.shortcuts():
+                keys=sequence.toString(QKeySequence.SequenceFormat.NativeText)
+                if keys==',': keys='Virgule' if french else 'Comma'
+                elif keys=='.': keys='Point' if french else 'Period'
+                bindings.append(keys)
+            lines.append(' / '.join(bindings)+(' : ' if french else ': ')+action.text())
     return '\n'.join(lines)
 
 def guide_text(registry,layout='QWERTY'):

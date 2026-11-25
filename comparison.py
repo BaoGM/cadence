@@ -115,7 +115,7 @@ class ComparisonMixin(ReferenceQueueMixin):
         col.addStretch()
         scroll=QScrollArea(); scroll.setFrameShape(QScrollArea.Shape.NoFrame); scroll.setWidget(body); scroll.setWidgetResizable(True); self.comparison_panel.setWidget(scroll); self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea,self.comparison_panel); self.comparison_panel.hide()
         self.compare_enabled.toggled.connect(self.comparison_changed); self.reference_combo.currentIndexChanged.connect(self.choose_reference)
-        self.compare_enabled.toggled.connect(self.prompt_for_comparison_source)
+        self.compare_enabled.toggled.connect(self.update_comparison_panel)
         self.compare_mode.currentIndexChanged.connect(self.comparison_visual_changed); self.compare_opacity.valueChanged.connect(self.comparison_visual_changed); self.compare_gain.valueChanged.connect(self.comparison_visual_changed); self.compare_offset.valueChanged.connect(self.comparison_changed)
         self.build_comparison_controls(); self.build_reference_list()
         self.refresh_reference_choices(); self.comparison_visual_changed()
@@ -163,7 +163,7 @@ class ComparisonMixin(ReferenceQueueMixin):
         self.reference_signature=signature; selected='__sequence__' if len(self.reference_order)>1 else self.compare_media['id'] if self.compare_media else None
         with QSignalBlocker(self.reference_combo):
             self.reference_combo.clear(); self.reference_combo.addItem(tr('Choisir une référence…'),None)
-            for key,name in tracks: self.reference_combo.addItem(tr('Piste')+' : '+tr(name),'track:'+key)
+            for key,name in tracks: self.reference_combo.addItem(tr('Piste : {name}').format(name=tr(name)),'track:'+key)
             if len(self.reference_order)>1: self.reference_combo.addItem(tr('Liste de références')+f' ({len(self.reference_order)})','__sequence__')
             for key,m in sources.items():
                 if m.get('has_video',True): self.reference_combo.addItem(m['name'],key)
@@ -204,8 +204,14 @@ class ComparisonMixin(ReferenceQueueMixin):
         self.viewer.compare_mode=self.compare_mode.currentData(); self.viewer.compare_opacity=self.compare_opacity.value()/100; self.viewer.compare_gain=self.compare_gain.value()
         self.viewer.apply_effect()
         self.sync_comparison_controls()
-    def prompt_for_comparison_source(self,enabled):
-        if enabled and not self.comparison_active():
+    def update_comparison_panel(self,enabled):
+        if not enabled:
+            self.comparison_panel.hide()
+            if self.video_fullscreen:
+                self.before_fullscreen['comparison']=False
+                with QSignalBlocker(self.panel_actions['comparison']):
+                    self.panel_actions['comparison'].setChecked(False)
+        elif not self.comparison_active():
             if self.video_fullscreen:
                 self.toggle_fullscreen()
             self.comparison_panel.show()

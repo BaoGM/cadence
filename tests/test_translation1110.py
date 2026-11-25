@@ -18,6 +18,7 @@ def restore_language():
 
 @pytest.mark.parametrize('original,expected',[
     ('Ouvrir','Open'),
+    ('Piste : {name}','Track: {name}'),
     ('Nom','Name'),
     ('Supprimer le marqueur','Delete frame marker'),
     ('Détacher','Float panel'),
@@ -94,6 +95,10 @@ def test_runtime_ui_options_and_context_menus(tmp_path,monkeypatch,lang):
     dialogs=[]
     try:
         options=ShortcutDialog(window.action_registry,window.preferences,window); options.ensure_keys(); dialogs.append(options)
+        options.tabs.setCurrentIndex(1); options.resize(640,400); options.show(); qt.processEvents()
+        table=options.key_tables['Fichier']
+        assert table.columnWidth(0)>=120 and table.horizontalScrollBar().maximum()==0
+        assert options.editors['Fichier/Options…'].line.placeholderText()==('Non attribué' if lang=='fr' else 'Unassigned')
         conflict=ConflictDialog(window,['Édition/Annuler','Outils/Curseur']); dialogs.append(conflict)
         popup=window.createPopupMenu(); dialogs.append(popup)
         browser=QFileDialog(window); dialogs.append(browser)

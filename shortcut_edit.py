@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from PySide6.QtCore import Qt,QTimer
 from PySide6.QtGui import QShortcut,QKeySequence
-from PySide6.QtWidgets import QKeySequenceEdit,QDialog,QVBoxLayout,QHBoxLayout,QLabel,QPushButton
+from PySide6.QtWidgets import QKeySequenceEdit,QDialog,QVBoxLayout,QHBoxLayout,QLabel,QLineEdit,QPushButton
 from dialogs import ButtonStyle
 from ui_text import tr
 
@@ -9,8 +9,16 @@ from ui_text import tr
 class ShortcutEdit(QKeySequenceEdit):
     def __init__(self):
         super().__init__(); self.setMaximumSequenceLength(1); self.blink=True
+        self.line=self.findChild(QLineEdit)
+        self.editingFinished.connect(self.show_unassigned)
+        self.show_unassigned()
         self.caret=QLabel('_',self); self.caret.setStyleSheet('background:transparent;color:#68e0cf;font-weight:bold;'); self.caret.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents); self.caret.resize(14,20); self.caret.hide()
         self.blink_timer=QTimer(self); self.blink_timer.setInterval(500); self.blink_timer.timeout.connect(self.flash)
+    def show_unassigned(self):
+        self.line.setPlaceholderText(tr('Non attribué'))
+    def setKeySequence(self,sequence):
+        super().setKeySequence(sequence)
+        self.show_unassigned()
     def flash(self): self.blink=not self.blink; self.caret.setVisible(self.hasFocus() and self.blink)
     def focusInEvent(self,event):
         super().focusInEvent(event); self.blink=True; self.blink_timer.start(); self.setStyleSheet('QLineEdit {background:#243e46;border:1px solid #68e0cf;}'); self.caret.move(self.width()-25,(self.height()-20)//2); self.caret.raise_(); self.caret.show()

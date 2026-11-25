@@ -724,6 +724,8 @@ Attendez la fin de la tâche en cours avant d’installer la mise à jour. => Wa
 L’installateur n’a pas été lancé. Cadence reste ouvert. => The installer did not start. Cadence remains open.
 
 Piste 1 => Track 1
+Piste : {name} => Track: {name}
+Non attribué => Unassigned
 Piste 2 => Track 2
 + Piste média => + Media track
 Piste média => Media track

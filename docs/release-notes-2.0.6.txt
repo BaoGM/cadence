@@ -1,0 +1,15 @@
+Cadence 2.0.6 — Préversion Windows
+25 novembre 2026
+
+Lecture et comparaison
+• Le bandeau supérieur de lecture réunit les commandes sur une seule rangée.
+• Survoler la timeline révèle les commandes de lecture du bas. Elles restent accessibles pendant le passage de la timeline aux boutons et se masquent à la sortie de ces deux zones.
+• Décocher A/B ferme le panneau Comparaison, même détaché. Fermer le panneau à la main conserve le mode de comparaison actif.
+
+Timeline simplifiée
+• Pendant le zoom et le dézoom, les grandes et les petites graduations gardent chacune une épaisseur et un contraste réguliers. Les coupes arrondies restent dégagées.
+• Le dessin des traits est regroupé pour accélérer le rafraîchissement de la timeline pendant la lecture et le zoom.
+
+Guide et raccourcis
+• Les guides français et anglais suivent les gestes de la version 2.0.6. Leur liste des raccourcis tient compte du clavier actif, des personnalisations et des touches alternatives.
+• L’intitulé de la piste utilisée comme source B est traduit en anglais.

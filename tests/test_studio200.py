@@ -29,8 +29,8 @@ def test_native_menus_modes_timeline_and_clock(window, application):
     assert not hasattr(chrome,'clock')
     chrome.headers.update_hover(QPoint(-100,-100))
     assert not chrome.top.isVisible() and not chrome.view.isVisible()
-    first,second,_=chrome.headers.geometries()
-    chrome.headers.update_hover(QPoint(second.center().x(),first.top()+3))
+    first,_=chrome.headers.geometries()
+    chrome.headers.update_hover(QPoint(first.center().x(),first.top()+3))
     assert chrome.top.isVisible() and chrome.view.isVisible()
     assert abs(chrome.mode_group.mapToGlobal(chrome.mode_group.rect().center()).x()-w.mapToGlobal(w.rect().center()).x())<=2
     w.toggle_fullscreen()
@@ -60,7 +60,7 @@ def test_menu_key_respects_custom_action(window, application):
     assert spy.count() == 1 and not w.studio.menu.isVisible()
 
 
-def test_comparison_buttons_preserve_panel_with_reference(window, application):
+def test_comparison_buttons_close_panel_when_disabled(window, application):
     w=window
     w.request_frame=lambda:None
     w.studio.compare_button.click()
@@ -74,8 +74,7 @@ def test_comparison_buttons_preserve_panel_with_reference(window, application):
     assert w.compare_enabled.isChecked() and w.comparison_panel.isVisible()
     w.set_reference_sequence([w.doc.media['a']])
     w.studio.compare_button.click()
-    assert not w.compare_enabled.isChecked() and w.comparison_panel.isVisible()
-    w.comparison_panel.hide()
+    assert not w.compare_enabled.isChecked() and w.comparison_panel.isHidden()
     w.ref_compare_button.click()
     assert w.compare_enabled.isChecked() and w.comparison_panel.isHidden()
     w.use_track_reference(w.doc.active_track_id)
@@ -84,6 +83,16 @@ def test_comparison_buttons_preserve_panel_with_reference(window, application):
     w.studio.compare_button.click()
     w.studio.compare_button.click()
     assert w.viewer.comparing and w.comparison_panel.isHidden()
+    w.comparison_panel.setFloating(True)
+    w.comparison_panel.show()
+    w.comparison_panel.close()
+    assert w.viewer.comparing
+    w.comparison_panel.show()
+    w.compare_action.trigger()
+    assert not w.viewer.comparing and w.comparison_panel.isHidden()
+    w.compare_action.trigger()
+    assert w.viewer.comparing and w.comparison_panel.isHidden()
+    w.comparison_panel.show()
     w.toggle_fullscreen()
     w.compare_action.trigger()
     w.compare_action.trigger()
@@ -122,7 +131,6 @@ def test_compact_read_headers_preserve_tools_and_timeline(window, application):
     application.processEvents()
     for dock in (w.library,w.edit_toolbar,w.drawing.panel):
         assert not bounds(headers.top).intersects(bounds(dock))
-        assert not bounds(headers.view).intersects(bounds(dock))
     headers.update_hover(w.timeline.mapToGlobal(w.timeline.rect().center()))
     headers.timer.stop()
     application.processEvents()
@@ -151,7 +159,7 @@ def test_reader_panels_slide_in_their_own_direction(window, application):
         motion.setCurrentTime(motion.duration())
         assert widget.pos()==motion.origin and widget.entrance is None
     check(c.top,QPoint(0,-18))
-    check(c.view,QPoint(0,-18))
+    assert c.view.window() is c.top.window()
     c.headers.show_ruler()
     check(c.timeline_bar,QPoint(0,18))
     c.dock_button.click()
@@ -159,3 +167,43 @@ def test_reader_panels_slide_in_their_own_direction(window, application):
     c.right_button.click()
     check(w.drawing.panel.widget(),QPoint(20,0))
     assert application.focusWidget() is focus
+
+
+def test_read_header_is_one_row_and_timeline_enter_needs_no_poll(window,application):
+    from PySide6.QtCore import QCoreApplication,QPointF,QRect
+    from PySide6.QtGui import QEnterEvent
+    w=window
+    w.workspaces.switch('read')
+    c=w.studio
+    for width,height in ((1280,800),(640,400)):
+        w.resize(width,height)
+        application.processEvents()
+        c.headers.show_reader()
+        if motion:=getattr(c.top,'entrance',None): motion.setCurrentTime(motion.duration())
+        controls=[c.menu_button,c.dock_button,c.language_button,*c.mode_buttons.values(),c.compare_button,
+                  c.sync_button,c.right_button,c.options_button]
+        rectangles=[QRect(b.mapToGlobal(QPoint()),b.size()) for b in controls]
+        for i,(button,rect) in enumerate(zip(controls,rectangles)):
+            assert button.isVisible() and button.window() is c.headers.top
+            assert abs(rect.center().y()-c.headers.top.geometry().center().y())<=2
+            assert c.headers.top.geometry().contains(rect)
+            for previous,other in zip(controls[:i],rectangles[:i]):
+                assert not rect.intersects(other), str((width,c.top.geometry().getRect(),c.view.geometry().getRect(),
+                    [(b.text(),b.mapTo(c.top,QPoint()).x(),b.width()) for b in controls]))
+    for simple in (True,False):
+        w.workspaces.set_timeline_simple(simple)
+        application.processEvents()
+        away=w.viewer.mapToGlobal(w.viewer.rect().center())
+        c.headers.update_hover(away)
+        c.headers.timer.stop()
+        assert not c.timeline_bar.isVisible()
+        visible=QRect(w.timeline_panel.mapToGlobal(QPoint()),w.timeline_panel.size())
+        cursor=visible.intersected(QRect(w.timeline.mapToGlobal(QPoint()),w.timeline.size())).center()
+        here=w.timeline.mapFromGlobal(cursor)
+        event=QEnterEvent(QPointF(here),QPointF(w.mapFromGlobal(cursor)),QPointF(cursor))
+        QCoreApplication.sendEvent(w.timeline,event)
+        assert c.timeline_bar.isVisible()
+        c.headers.update_hover(c.timeline_bar.mapToGlobal(c.timeline_bar.rect().center()))
+        assert c.timeline_bar.isVisible()
+        c.headers.update_hover(away)
+        assert not c.timeline_bar.isVisible()

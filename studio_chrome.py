@@ -243,9 +243,11 @@ class StudioChrome(QObject):
         group.setParent(frame)
         self.mode_group = group
         row.addSpacing(4)
-        row.addWidget(control('Options…', 'settings', action=w.action_registry['Fichier/Options…'][0]))
+        self.options_button=control('Options…','settings',action=w.action_registry['Fichier/Options…'][0])
+        row.addWidget(self.options_button)
         row.addWidget(control('Guide rapide', 'help', action=w.action_registry['Aide/Guide rapide'][0]))
-        row.addWidget(divider())
+        self.language_divider=divider()
+        row.addWidget(self.language_divider)
         self.language_button = control('Langue', caption='FR / en' if language() == 'fr' else 'EN / fr')
         self.language_button.clicked.connect(w.toggle_language)
         row.addWidget(self.language_button)
@@ -271,11 +273,21 @@ class StudioChrome(QObject):
         width=self.top.width()
         size=self.mode_group.sizeHint()
         left=(width-size.width())//2
-        if getattr(getattr(self, 'headers', None), 'read', False):
+        row=self.top.layout()
+        view_index=row.indexOf(self.view) if getattr(getattr(self,'headers',None),'read',False) else -1
+        if view_index>=0:
+            self.brand.setVisible(width>=840)
+            self.format.setVisible(width>=1250)
+            self.format_divider.setVisible(not self.format.isHidden())
+            self.view.setFixedWidth(self.viewer_row.sizeHint().width())
+            row.activate()
             center=self.top.mapFromGlobal(self.w.mapToGlobal(self.w.rect().center())).x()
-            gap=8 if self.project.isHidden() else 20
-            left=max(self.menu_button.geometry().right()+gap, min(center-size.width()//2, width-155-size.width()))
-        self.mode_group.setGeometry(left,(self.top.height()-size.height())//2,size.width(),size.height())
+            left=max(self.language_button.geometry().right()+4,
+                     min(center-size.width()//2,self.view.x()-row.spacing()-size.width()))
+            available=max(0,left-self.language_button.geometry().right()-13)
+            self.media.setFixedWidth(min(300,available,self.media.fontMetrics().horizontalAdvance(self.media.value)+2))
+        height=self.mode_group.height()
+        self.mode_group.setGeometry(left,(self.top.height()-height)//2,size.width(),height)
         if self.project.isHidden(): return
         available=max(0,left-270)
         wanted=self.project.fontMetrics().horizontalAdvance(self.project.value)+2
@@ -335,6 +347,28 @@ class StudioChrome(QObject):
         self.stage_layout.addWidget(w.viewer)
         central.addWidget(self.stage, 1)
         central.insertWidget(0, self.view)
+
+    def combine_reader_header(self, read):
+        row=self.top.layout()
+        if read:
+            for field in (self.dock_button,self.language_button,self.media):
+                row.insertWidget(row.indexOf(self.project_icon),field)
+            row.insertWidget(row.indexOf(self.options_button),self.view)
+        else:
+            self.viewer_row.insertWidget(0,self.dock_button)
+            self.viewer_row.insertWidget(self.viewer_row.indexOf(self.format),self.media,1)
+            row.addWidget(self.language_button)
+            self.view.setMinimumWidth(0)
+            self.view.setMaximumWidth(16777215)
+            self.media.setMaximumWidth(16777215)
+            self.media.setMinimumWidth(0)
+            self.w.viewer_workspace.content.layout().insertWidget(0,self.view)
+        for widget in (self.view,self.dock_button,self.media,self.language_button):
+            widget.show()
+        self.language_divider.setVisible(not read)
+        row.setSpacing(4 if read else 8)
+        row.setContentsMargins(6 if read else 16,0,6 if read else 16,0)
+        self.responsive()
 
     def side_docks(self, side):
         area=Qt.LeftDockWidgetArea if side=='left' else Qt.RightDockWidgetArea
@@ -519,7 +553,7 @@ class StudioChrome(QObject):
         folder = '/ ' + project.parent.name if project and project.parent.name else ''
         self.breadcrumb.setFixedWidth(min(135, self.breadcrumb.fontMetrics().horizontalAdvance(folder) + 1))
         self.breadcrumb.set_value(folder)
-        self.breadcrumb.setVisible(bool(folder) and self.w.width() > 1000)
+        self.breadcrumb.setVisible(bool(folder) and self.w.width()>1000 and not self.headers.read)
         self.center_modes()
         self.track_count.setText(tr('2 pistes média') if self.w.doc.state.second_track else tr('1 piste média'))
 
@@ -573,15 +607,18 @@ class StudioChrome(QObject):
         low = self.w.height() <= 620
         short = self.w.height() <= 440
         self.w.drawing.panel.setMinimumWidth(200 if narrow else self.drawing_panel_width)
-        self.format.setVisible(not small)
-        self.format_divider.setVisible(not narrow)
-        self.view_divider.setVisible(not narrow)
+        read=self.headers.read
+        if not read:
+            self.brand.show()
+            self.format.setVisible(not small)
+            self.format_divider.setVisible(not small)
+        self.view_divider.setVisible(not narrow and not read)
         self.viewer_row.setContentsMargins(2 if narrow else 10,0,2 if narrow else 10,0)
         self.viewer_row.setSpacing(2 if narrow else 7)
         self.compare_button.setToolButtonStyle(Qt.ToolButtonTextOnly if narrow else Qt.ToolButtonTextBesideIcon)
-        self.project_icon.setVisible(not narrow)
-        self.project.setVisible(not narrow)
-        self.breadcrumb.setVisible(not small and bool(self.breadcrumb.value))
+        self.project_icon.setVisible(not narrow and not read)
+        self.project.setVisible(not narrow and not read)
+        self.breadcrumb.setVisible(not small and bool(self.breadcrumb.value) and not read)
         self.track_count.setVisible(not narrow)
         self.top.setFixedHeight(36 if short else 42 if low else 53)
         edit_strip = self.w.header.widget()

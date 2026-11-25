@@ -3,7 +3,7 @@ from __future__ import annotations
 import time as _startup_time
 _STARTUP=_startup_time.perf_counter()
 import sys
-VERSION='2.0.5'
+VERSION='2.0.6'
 if __name__=='__main__' and getattr(sys,'frozen',False) and not any(arg.startswith('--self-test') for arg in sys.argv):
     from pathlib import Path
     from update_store import base_executable,dispatch

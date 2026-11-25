@@ -69,3 +69,23 @@ def test_aliases_yield_to_custom_bindings_and_existing_preferences(window,applic
     w.apply_preferences(dict(w.preferences,shortcuts=supplied))
     assert w.action_registry[guide][0].shortcuts()==[QKeySequence('Ctrl+F1')]
     assert w.redo_action.shortcuts()==[QKeySequence('Ctrl+F2')]
+
+
+def test_guide_lists_current_bindings_aliases_and_customized_unbound_actions(window):
+    from guide import shortcut_lines
+    from preferences import switch_keyboard_layout
+    w=window
+    guide='Aide/Guide rapide'; redo='Édition/Rétablir'
+    options='Fichier/Options…'; pointer='Outils/Curseur'
+    bindings=dict(w.preferences['shortcuts'])
+    bindings.update({options:'F12',pointer:''})
+    w.apply_preferences(dict(w.preferences,shortcuts=bindings))
+    for layout in ('QWERTY','AZERTY'):
+        w.apply_preferences(switch_keyboard_layout(w.preferences,layout,w.action_registry))
+        lines=shortcut_lines(w.action_registry,layout).splitlines()
+        assert layout in lines[0]
+        for key in (guide,redo,options):
+            action=w.action_registry[key][0]
+            line=next(row for row in lines if row.endswith(' : '+action.text()))
+            assert all(sequence.toString(QKeySequence.NativeText) in line for sequence in action.shortcuts())
+        assert not any(row.endswith(' : '+w.action_registry[pointer][0].text()) for row in lines)

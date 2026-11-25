@@ -19,7 +19,7 @@ Cadence is a Windows video review and annotation application for animation. Its 
 
 ## Installation
 
-Windows 10 or 11, 64-bit. The unsigned [Cadence 2.0.5 preview](https://github.com/BaoGM/cadence/releases/tag/v2.0.5-windows-studio2) includes an installer, a portable archive, checksums and corresponding sources.
+Windows 10 or 11, 64-bit. The unsigned [Cadence 2.0.6 preview](https://github.com/BaoGM/cadence/releases/tag/v2.0.6-windows-studio2) includes an installer, a portable archive, checksums and corresponding sources.
 
 The default installation is per user. Cadence 2.0 installs alongside Windows 1.x and stores its preferences, library and cache in `%LOCALAPPDATA%/CadenceStudio-2`. For a portable copy, extract the complete archive and run `Cadence.exe`.
 
@@ -30,6 +30,17 @@ The default installation is per user. Cadence 2.0 installs alongside Windows 1.x
 Double-click the empty viewer to open media. Use Help > Quick guide for controls. Playback and Editing modes can each have their own panel layout and timeline style. Settings also allow keyboard and mouse bindings to be changed.
 
 The [French guide](assets/guide_fr.txt) and [English guide](assets/guide_en.txt) are included in the application.
+
+## Source map
+
+| Looking for | Start here |
+| --- | --- |
+| Application startup and editing state | [app.py](app.py), [model.py](model.py) |
+| Video decoding, playback and GPU drawing | [media.py](media.py), [engine.py](engine.py), [native/](native/) |
+| Timeline and workspaces | [widgets.py](widgets.py), [timeline_skin.py](timeline_skin.py), [workspace_modes.py](workspace_modes.py) |
+| Shortcuts, language and user guides | [shortcut_defaults.py](shortcut_defaults.py), [ui_text.py](ui_text.py), [assets/](assets/) |
+| Blender and Maya connectors | [integrations/](integrations/), [sync3d.py](sync3d.py) |
+| Tests, build and distribution | [tests/](tests/), [packaging/](packaging/), [docs/BUILD.md](docs/BUILD.md) |
 
 ## Development
 

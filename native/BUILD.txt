@@ -1,8 +1,8 @@
 Cadence - Module graphique C++
 
 Environnement de compilation
-Windows x64, MSVC 14.44.35207, Windows SDK 10.0.26100.0, Qt 6.12.0 MSVC 2022 x64.
-Le module utilise les DLL Qt déjà fournies par PySide6 6.12.0. Ne pas ajouter une autre copie de Qt au dossier de livraison.
+Windows x64, MSVC 14.44.35207, Windows SDK 10.0.26100.0, Qt 6.12.1 MSVC 2022 x64.
+Le module utilise les DLL Qt 6.12.1 des roues Qt for Python épinglées dans requirements.txt.
 
 Depuis un terminal développeur MSVC, avec CMake installé et Qt dans CMAKE_PREFIX_PATH :
 cmake -S native -B native/build -DCMAKE_BUILD_TYPE=Release

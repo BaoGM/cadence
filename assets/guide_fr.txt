@@ -1,4 +1,4 @@
-Cadence 2.0.6 - Guide rapide
+Cadence 2.0.12 - Guide rapide
 
 Les exemples de touches correspondent au profil QWERTY d’origine. Les raccourcis actifs de votre disposition, y compris vos personnalisations, figurent à la fin du guide.
 
@@ -9,29 +9,29 @@ Fichier > Ouvrir des médias ajoute des vidéos ou des pistes WAV et MP3 à la s
 
 Ctrl+S enregistre le montage, les dessins et les références dans un projet .cadence. Conservez les fichiers médias à leur emplacement. Enregistrer sous crée un autre projet. Ctrl+N démarre un montage vide.
 
-Ctrl+E exporte en MP4, MOV, GIF, WAV ou MP3. WAV (48 kHz, 16 bits, stéréo) et MP3 (192 kbit/s) reproduisent le mixage des pistes. Le GIF est muet. Cochez « Inclure les dessins à l’export » pour exporter les dessins et les pelures actives.
+Ctrl+E exporte en MP4, MOV, GIF, WAV ou MP3. WAV (48 kHz, 16 bits, stéréo) et MP3 (192 kbit/s) reproduisent le mixage des pistes. Le GIF est muet. Si une source est supprimée du disque pendant que le montage est ouvert, Cadence peut encore utiliser le fichier ouvert ou son aperçu en cache. Cochez « Inclure les dessins à l’export » pour exporter les dessins et les pelures actives.
 
 ----------------------------------------
 Lecture, affichage et panneaux
 
-Espace lance ou suspend la lecture. Gauche et Droite avancent d’une image dans chaque sens. Virgule et Point parcourent les clés de dessin et les marqueurs. K bascule ces deux raccourcis entre clés et images. Les boutons Clé précédente et Clé suivante parcourent toujours les clés et les marqueurs. Le bouton de boucle mémorise votre choix. Ctrl + molette règle le volume par pas de 5 %.
+Espace lance ou suspend la lecture. Gauche et Droite avancent d’une image dans chaque sens. Virgule et Point parcourent les clés de dessin et les marqueurs. K bascule ces deux raccourcis entre clés et images. Les boutons Clé précédente et Clé suivante parcourent toujours les clés et les marqueurs. Le bouton de boucle mémorise votre choix. Haut et Bas, ou Ctrl + molette, règlent le volume par pas de 5 %. Dans une liste ou un menu, les flèches restent disponibles pour naviguer.
 
 Pour faire défiler les images, glissez sur la timeline, dans l’espace libre de son bandeau ou des commandes de lecture, ou sur la vidéo avec l’outil Curseur. Dans la vidéo, Maj affine le déplacement. Sur la timeline, Maj + glisser sélectionne une plage et affiche sa durée. Relâchez la souris avant Maj pour conserver la plage. I et O placent ses bornes. Échap efface la sélection.
 
-En mode Lecture, survolez le haut de la vidéo pour retrouver le bandeau supérieur. Le survol de la timeline fait apparaître le bandeau inférieur. Vous pouvez rejoindre ses commandes avant qu’il se masque. En Édition, tous les panneaux sont activés par défaut. Affichage > Options des modes Lecture / Édition personnalise chaque mode. F10 ouvre le menu général lorsque cette touche est libre.
+En mode Lecture, survolez le haut de la vidéo pour retrouver le bandeau supérieur. Survolez la bande juste au-dessus des graduations pour afficher les commandes du bas. En Édition, tous les panneaux sont activés par défaut. Affichage > Options des modes Lecture / Édition personnalise chaque mode. F10 ouvre le menu général lorsque cette touche est libre.
 
 Redimensionnez les panneaux par leurs séparateurs. Affichage > Modifier la disposition des panneaux permet de les déplacer ou détacher. Réinitialiser la disposition restaure le mode courant. Fichier > Options > Préférences > Restaurer l’interface réinitialise les deux modes.
 
-La molette zoome dans la vidéo. Glissez avec le bouton central pour déplacer la vue, avec Ctrl pour zoomer horizontalement, avec Maj pour la rotation. 0 réinitialise la vue et ses miroirs. F11 ou un double-clic passe en plein écran. Échap en sort. Le zoom, le déplacement et la rotation de la vue concernent l’aperçu. Les miroirs H et Maj+V s’appliquent à l’export, ainsi que l’exposition si « Appliquer à l’export » est coché.
+La molette zoome dans la vidéo. Glissez avec le bouton central pour déplacer la vue, avec Ctrl pour zoomer horizontalement, avec Maj pour la rotation. 0 réinitialise la vue et ses miroirs. F11 ou un double-clic passe en plein écran. Échap en sort. Le zoom, le déplacement et la rotation de la vue concernent l’aperçu. Les miroirs H et Maj+V s’appliquent à l’export. Cliquez sur Exposition pour alterner entre la correction des pistes sélectionnées et 0 EV. Le réglage affiché est celui de l’export.
 
-Le code temporel est verrouillé par défaut. Son clic droit permet de le déverrouiller pour le déplacer. Affichage > Dupliquer l’image vidéo ouvre une fenêtre indépendante synchronisée, également accessible au clic droit sur la vidéo. Glissez l’image pour déplacer la fenêtre et ses bords pour la redimensionner. Survolez le bas au centre pour régler la lecture, le premier plan ou l’opacité. Espace commande la lecture, Tab révèle les commandes et Échap ferme la fenêtre.
+La timeline affiche les numéros d’images par défaut. La position du code temporel superposé est verrouillée par défaut. Son clic droit permet de le déverrouiller pour le déplacer. Affichage > Dupliquer l’image vidéo ouvre une fenêtre indépendante synchronisée, également accessible au clic droit sur la vidéo. Glissez l’image pour déplacer la fenêtre et ses bords pour la redimensionner. Survolez le bas au centre pour régler la lecture, le premier plan ou l’opacité. Espace commande la lecture, Tab révèle les commandes et Échap ferme la fenêtre.
 
 ----------------------------------------
 Bibliothèque, médias et références
 
 La Bibliothèque réunit les listes libres et les dossiers suivis. Nouveau… crée une liste vide, une liste depuis des fichiers ou suit un dossier. Cliquez sur un dossier pour afficher ses vidéos directes. Un double-clic ouvre ses vidéos à la suite ou déplie ses sous-dossiers lorsqu’il ne contient aucune vidéo directe.
 
-Un clic sélectionne un fichier, Ctrl+clic ajoute ou retire un fichier et Maj+clic sélectionne une plage. Un double-clic lit uniquement la vidéo visée. Ouvrir une liste remplace la timeline et conserve le montage précédent, avec ses pistes, dessins, marqueurs et annulations, dans Temporaire. Un montage temporaire se restaure, se renomme ou se retire par clic droit. Enregistrez-le pour le conserver après la fermeture.
+Un clic sélectionne un fichier, Ctrl+clic ajoute ou retire un fichier et Maj+clic sélectionne une plage. Un double-clic lit la vidéo choisie. Si plusieurs vidéos sont sélectionnées, double-cliquez sur l’une d’elles pour les ajouter à la fin de la piste active, dans l’ordre de la liste, et lancer leur lecture. Suppr retire les fichiers ou dossiers sélectionnés de la bibliothèque et conserve les originaux sur disque. Actualiser le dossier parent réaffiche les sous-dossiers retirés. Ouvrir une liste remplace la timeline et conserve le montage précédent dans Temporaire, avec ses pistes, dessins, marqueurs et annulations. Enregistrez les montages temporaires à conserver après la fermeture.
 
 Ajouter des vidéos ou les déposer dans une liste libre conserve leurs chemins. Dans un dossier suivi, les fichiers extérieurs sont copiés. Les doublons reçoivent un suffixe. Glissez pour réordonner. Un clic droit renomme aussi les sous-listes sans renommer les dossiers sur disque. Retirer de la liste conserve le fichier. Actualiser relit le dossier. Mettre à la corbeille demande confirmation. Remplacer le chemin retrouve un fichier déplacé pour cette liste.
 
@@ -40,13 +40,13 @@ Dans Médias, le clic droit ajoute les sources à la fin d’une piste. Pour cho
 ----------------------------------------
 Monter sur la timeline
 
-Chaque piste média réunit vidéo et audio. Ajoutez une seconde piste avec « + Piste média ». Glissez leurs titres pour les réordonner. La piste supérieure apparaît devant l’autre. Leurs sons sont mixés. Cliquez sur le titre pour choisir une piste. Ctrl+clic ajoute ou retire une piste sur son titre ou sa bande. Les modifications portent sur les pistes sélectionnées.
+Chaque piste média réunit vidéo et audio. Ajoutez une seconde piste avec « + Piste média ». Glissez leurs titres pour les réordonner. La piste supérieure apparaît devant l’autre. Leurs sons sont mixés. Cliquez sur le titre pour choisir une piste. Ctrl+clic ajoute ou retire une piste sur son titre ou sa bande. Au moins une piste reste sélectionnée. Les modifications portent sur les pistes sélectionnées.
 
 Double-cliquez sur un titre pour déployer ou replier son audio, ou sur un clip pour sélectionner sa durée. Maj + double-clic sélectionne toute la piste. Ctrl + double-clic ajoute ou retire un clip. Ctrl + Maj + double-clic étend la sélection depuis le dernier clip choisi jusqu’au clip visé, inclus. Sans sélection préalable, la plage part de la tête de lecture. La lecture et les commandes de montage respectent les sélections discontinues.
 
 Maintenez Alt pendant tout le glissement pour déplacer un clip ou une plage. Ajoutez Maj pour copier. En vue détaillée, déposez sur la piste cible. En vue simplifiée, sur le titre de piste à gauche pour changer de piste. Les clips suivants de la piste d’origine se rapprochent lors du transfert entre pistes. Échap annule le geste. Sur une même piste, « Laisser un vide » conserve la place quittée. Un dépôt dans un vide remplit cet espace avant de décaler la suite.
 
-Ctrl+C, Ctrl+X et Ctrl+V copient, coupent et collent la plage ou l’image courante. Suppr retire la plage. « Copier/coller le son » et les liaisons audio/vidéo et dessins/vidéo règlent les éléments qui suivent. Les dessins et marqueurs sont communs aux pistes. Les dessins liés suivent le montage lorsque les deux pistes sont sélectionnées.
+Sur la timeline, Ctrl+C ou Ctrl+X copie ou coupe la sélection, y compris les clips discontinus. Sans sélection, la commande prend l’image courante. Ctrl+V colle la dernière copie au curseur. Suppr retire la plage. « Copier/coller le son » et les liaisons audio/vidéo et dessins/vidéo règlent les éléments qui suivent. Les dessins et marqueurs sont communs aux pistes. Les dessins liés suivent le montage lorsque les deux pistes sont sélectionnées.
 
 Le clic droit permet de scinder, dupliquer ou désactiver un clip, retirer uniquement la vidéo ou l’audio, ou supprimer le média et refermer le vide. Sur le titre, il permet de couper le son de toute la piste, y compris à l’export, de réordonner ou de supprimer la piste. Ctrl+Z annule.
 
@@ -61,11 +61,11 @@ Choisissez un outil dans la barre ou le menu Outils. Q revient au curseur. Le de
 
 Après avoir commencé une forme, Maj contraint les proportions ou l’angle, Ctrl dessine depuis le centre, Alt déplace et Alt+Ctrl fait tourner. Avec Texte, tracez un cadre puis écrivez dedans. Entrée ou un clic extérieur valide, Maj+Entrée ajoute une ligne et Échap annule. Double-cliquez sur un texte pour le modifier.
 
-Le lasso sélectionne et déplace des objets. Changer leur couleur ou opacité s’applique à toute la clé. Suppr efface en priorité la sélection du lasso. T déplace tous les objets de la clé courante. Ctrl+T transforme la sélection ou le clip. Alt+C le recadre. Tirez une poignée pour redimensionner, faites glisser à l’extérieur d’un coin pour pivoter. Maj conserve les proportions ou impose des pas de 15°, Ctrl part du centre et Alt déplace. Entrée valide, Échap annule. Le cadrage du clip s’applique à l’export.
+Dans l’aperçu, le lasso sélectionne et déplace des objets. Ctrl+C ou Ctrl+X copie ou coupe ces objets, Ctrl+V les colle sur la clé au curseur. Suppr efface les objets sélectionnés. Changer leur couleur ou opacité s’applique à toute la clé. T déplace tous les objets de la clé courante. Ctrl+T transforme la sélection ou le clip. Alt+C le recadre. Tirez une poignée pour redimensionner, faites glisser à l’extérieur d’un coin pour pivoter. Maj conserve les proportions ou impose des pas de 15°, Ctrl part du centre et Alt déplace. Entrée valide, Échap annule. Le cadrage du clip s’applique à l’export.
 
 Glissez le corps d’une clé pour la déplacer ou ses poignées pour régler son exposition. Maj + glisser sélectionne plusieurs clés. Alt + glisser déplace la plage de clés. C copie, X coupe, V colle, D supprime et Maj+K duplique au curseur. Au clavier, atteignez la timeline avec Tab, puis Entrée active la clé. Maj+Tab et Tab passent du corps aux poignées. Gauche et Droite déplacent la partie active d’une image. Entrée ou Échap quitte cet ajustement.
 
-S ajoute ou retire un marqueur. Glissez son drapeau pour le déplacer. Clic droit > Renommer le marqueur… modifie son nom. Un nom vide affiche le drapeau seul. Afficher le calque de dessins règle sa visibilité. La pelure d’oignon prolonge les dessins de part et d’autre de leur clé avec une opacité décroissante. Une portée de 0 désactive le côté concerné.
+S ajoute ou retire un marqueur à l’image courante. Sur une sélection, S ou le bouton + Marqueur place un marqueur couvrant chaque plage sélectionnée. Survolez un drapeau pour lire son commentaire ; la molette fait défiler les textes longs. Cette option se règle dans Préférences > Interface. Glissez son drapeau pour le déplacer. Clic droit > Renommer le marqueur… modifie son nom. Un nom vide affiche le drapeau seul. Afficher le calque de dessins règle sa visibilité. Gamma applique un voile sous les dessins, du noir opaque à −10 au blanc opaque à +10. À 0, la vidéo retrouve ses couleurs. Cliquez sur Gamma pour suspendre ou rétablir le voile. L’export reprend le réglage affiché. La pelure d’oignon prolonge les dessins de part et d’autre de leur clé avec une opacité décroissante. Une portée de 0 désactive le côté concerné.
 
 ----------------------------------------
 Comparer A et B
@@ -81,7 +81,9 @@ Synchroniser avec Blender ou Maya
 
 Le bouton de synchronisation voisin d’A/B ouvre les réglages 3D. Activez la liaison, choisissez le logiciel et redémarrez-le après la première installation du connecteur. Si Maya demande l’autorisation d’exécuter son script de démarrage, vérifiez le connecteur Cadence avant de l’autoriser. Instance synchronisée identifie le processus par version, scène et PID. Une déconnexion met la liaison en attente. Sélectionnez une autre instance pour changer de cible.
 
-Choisissez le sens des échanges. Par défaut, le début de la plage 3D correspond à l’image 0 de Cadence. Un décalage de +10 le place à l’image 10. Les positions sont converties selon les cadences, jusqu’à 30 mises à jour par seconde. Adapter la cadence agit sur le média courant ou tous les médias en conservant leur durée. L’opération est annulable. La liaison démarre désactivée.
+Choisissez le sens des échanges. Par défaut, le début de la plage 3D correspond à l’image 0 de Cadence. Un décalage de +10 le place à l’image 10. Cadence convertit les positions selon les cadences et les arrondit à l’image entière la plus proche dans Maya. Adapter la cadence agit sur le média courant ou tous les médias en conservant leur durée. L’opération est annulable. La liaison démarre désactivée.
+
+En studio, réservez les droits d’écriture sur les dossiers de scripts de Maya et Blender à l’artiste et aux administrateurs responsables des outils.
 
 Dans les réglages 3D, choisissez la caméra puis Envoyer les dessins. L’envoi est manuel. Il remplace le transfert précédent du même projet vers cette caméra, y compris ses retouches. Les distances temporelles dépendent de la cadence et du décalage. Une clé plus courte qu’une image 3D peut disparaître. Inclure les pelures reprend les réglages actifs dans Cadence.
 
@@ -100,6 +102,17 @@ Fichier > Options regroupe les préférences, les raccourcis et les gestes de na
 
 Le profil de raccourcis est QWERTY par défaut. Au premier passage en AZERTY, les commandes suivent la position physique des touches. Chaque profil conserve ensuite ses réglages. Cliquez dans une case pour réattribuer la touche. Importer, Exporter et Réinitialiser gèrent ces réglages. Le défilement vidéo est réglé à 25 pixels par image, les infobulles sont désactivées par défaut. Dans un champ numérique, glissez horizontalement. Maj affine le réglage.
 
-La branche Windows 2.0 vérifie ses mises à jour au démarrage, au plus une fois par jour. Les préversions sont incluses par défaut. Les deux options se règlent dans Préférences. Utilisez Aide > Rechercher des mises à jour pour une vérification immédiate. Les copies portables et par utilisateur téléchargent en arrière-plan et vérifient la signature du manifeste et l’empreinte du paquet. Redémarrez pour appliquer la mise à jour. Si le premier démarrage échoue, la version précédente reprend la main. Les installations partagées relèvent de l’administrateur.
+Cadence recherche les mises à jour Windows 2.0 au démarrage et chaque jour si vous laissez l’application ouverte. Les préversions sont incluses par défaut. Ces deux options se règlent dans Préférences. Aide > Rechercher des mises à jour lance une vérification immédiate. Les copies portables et par utilisateur téléchargent et vérifient la mise à jour en arrière-plan. Choisissez Redémarrer maintenant ou Plus tard. Au redémarrage, la nouvelle version remplace l’exécutable au même emplacement et conserve les associations de fichiers. Si elle ne démarre pas, Cadence restaure la version précédente. Pour une installation partagée dans Program Files\Cadence 2.0, activez la maintenance dans l’installateur ou choisissez Aide > Rechercher des mises à jour > Activer les mises à jour… depuis Cadence déjà installé. Windows demande une autorisation administrateur à l’activation. Les utilisateurs reçoivent ensuite la même invitation à redémarrer. Fermez les autres instances de Cadence avant d’appliquer la mise à jour.
+
+Commentaires de revue
+Dans le panneau droit, ouvrez Commentaires. Cliquez sur un marqueur ou parcourez la liste avec ↑ et ↓ pour aller à son image. Suppr ou le menu contextuel supprime le marqueur et sélectionne le suivant en gardant la tête de lecture en place. En cas de chevauchement, le panneau affiche le dernier marqueur commencé.
+
+Vous pouvez écrire un commentaire avant de créer son marqueur. Sélectionnez une plage sur la timeline ou saisissez-la dans le panneau, puis validez avec Entrée. Un clic droit sur Image ou Durée (images) propose Plages d’images. Saisissez 52-320 pour inclure les deux bornes, ou 5, 8, 10-20, 9 pour placer le commentaire à plusieurs endroits. Au survol du marqueur, vous pouvez cocher les cases et sélectionner du texte pour le copier avec Ctrl+C.
+
+Après un export vidéo ou audio, Cadence propose d’enregistrer les marqueurs du montage en CSV ou en OpenTimelineIO dans le dossier du rendu. Le fichier OpenTimelineIO référence directement le média exporté.
+
+Le CSV Cadence conserve texte, nom, durée et cadence. Dans Keyframe Pro 2, importez-le comme notes CSV avec les colonnes Frame et Notes (première image = 1). Cadence lit aussi les notes CSV de SyncSketch et de xSTUDIO. À l’import, indiquez la première image ou le timecode de départ de la source et sa position dans le montage. Pour xSTUDIO, exportez les notes du média à synchroniser.
+
+Pour Open RV, exportez les marqueurs OpenTimelineIO et choisissez le dossier de destination. Dans le champ Vidéo de la fenêtre d’enregistrement, cliquez sur Parcourir pour choisir la vidéo rendue du montage. Le fichier .otio référence cette vidéo. Gardez-la accessible au destinataire. Cadence importe les marqueurs OTIO des pistes vidéo et des clips de montages linéaires, en tenant compte des coupes et de la cadence.
 
 Aide > Dossier des journaux ouvre les diagnostics à joindre à un signalement.

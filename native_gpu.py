@@ -40,9 +40,9 @@ def _library():
 
 
 @lru_cache(maxsize=16)
-def _table(ev, mode, opacity, gain, swapped):
+def _table(ev, mode, opacity, gain, swapped, gamma=0.):
     from native_render import _table as reference_table
-    values = reference_table(ev, mode, opacity, gain, swapped)
+    values = reference_table(ev, mode, opacity, gain, swapped, gamma=gamma)
     rgba = np.empty((*values.shape, 4), np.uint8)
     rgba[..., :3] = values[..., None]
     rgba[..., 3] = 255
@@ -50,18 +50,22 @@ def _table(ev, mode, opacity, gain, swapped):
 
 
 def prepare(a, b=None, *, ev=0., mode='single', opacity=.5, gain=1., swapped=False,
-            flip_h=False, flip_v=False, wipe=.5):
+            flip_h=False, flip_v=False, wipe=.5, gamma=0.):
     if os.environ.get('CADENCE_GPU_COMPOSITION', '1') == '0':
         return None
-    if mode not in ('single', 'overlay', 'difference', *LAYOUTS) or not all(np.isfinite(x) for x in (ev, opacity, gain)):
+    if mode not in ('single', 'overlay', 'difference', *LAYOUTS) or not all(np.isfinite(x) for x in (ev, opacity, gain, gamma)) or abs(gamma)>10:
         return None
     arrays = (a,) if mode == 'single' else (a, b)
     if any(not isinstance(value, np.ndarray) or value.dtype != np.uint8 or value.ndim != 3
            or value.shape[2] != 3 or not value.size for value in arrays):
         return None
     fitted=len(arrays)==2 and a.shape!=b.shape and mode in ('overlay','difference')
+    if fitted and gamma:
+        from comparison import fit_reference
+        arrays=(a,fit_reference(b,a.shape[1],a.shape[0]))
+        fitted=False
     arrays = tuple(np.ascontiguousarray(value) for value in arrays)
-    packet=FramePacket((arrays, _table(ev, 'single' if mode in LAYOUTS or fitted else mode, opacity, gain, swapped if mode not in LAYOUTS and not fitted else False), bool(flip_h), bool(flip_v), (mode == 'single' or mode in LAYOUTS or fitted) and not ev), mode, swapped, wipe)
+    packet=FramePacket((arrays, _table(ev, 'single' if mode in LAYOUTS or fitted else mode, opacity, gain, swapped if mode not in LAYOUTS and not fitted else False, gamma), bool(flip_h), bool(flip_v), (mode == 'single' or mode in LAYOUTS or fitted) and not ev and gamma==0), mode, swapped, wipe)
     if fitted: packet.layout=5 if mode=='overlay' else 6
     packet.opacity=float(max(0,min(1,opacity))); packet.gain=float(max(0,gain))
     return packet

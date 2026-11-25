@@ -33,6 +33,7 @@ class CaptureFeedback(QWidget):
         return bool(fn(int(self.winId()),0x11))
     def present(self,screen,title,subtitle,timeout=0):
         self.hide_timer.stop(); self.title=title; self.subtitle=subtitle
+        self.setScreen(screen)
         area=screen.availableGeometry(); self.move(area.center().x()-self.width()//2,area.top()+24)
         self.excluded=self.exclude_from_capture()
         self.show(); self.raise_(); self.update()
@@ -55,6 +56,7 @@ class RegionOutline(CaptureFeedback):
         super().__init__(); self.setMinimumSize(0,0); self.setMaximumSize(16777215,16777215); self.full_screen=False
     def display(self,screen,region):
         if screen is None: self.hide(); return
+        self.setScreen(screen)
         self.full_screen=region is None
         area=screen.geometry() if self.full_screen else region.translated(screen.geometry().topLeft()).adjusted(-3,-3,3,3)
         self.setGeometry(area); self.excluded=self.exclude_from_capture(); self.show(); self.raise_(); self.update()

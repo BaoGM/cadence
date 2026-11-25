@@ -142,3 +142,41 @@ def test_fullscreen_checkpoint_restores_normal_panels(window,application):
         assert doc.state.position==21
         assert data['view']['panels']==before['panels'] and data['view']['layout']==before['layout']
     finally: w.toggle_fullscreen()
+
+
+def test_project_file_budget_keeps_existing_file(tmp_path,monkeypatch):
+    import project_io
+    doc=Document()
+    path=tmp_path/'edit.cadence'
+    doc.save(path)
+    original=path.read_bytes()
+    assert Document.load(path).state==doc.state
+    monkeypatch.setattr(project_io,'PROJECT_BYTES',len(original)-1)
+    with pytest.raises(ValueError,match='projet trop volumineux'):
+        doc.save(path)
+    assert path.read_bytes()==original
+    with pytest.raises(ValueError,match='projet trop volumineux'):
+        Document.load(path)
+
+
+def test_snapshot_budget_preserves_previous_recovery(window,monkeypatch,caplog):
+    import project_io
+    w=window
+    recovery=w.session
+    recovery.checkpoint(wait=True)
+    original=recovery.path.read_bytes()
+    monkeypatch.setattr(project_io,'PROJECT_BYTES',len(original)+256)
+    w.doc.commit('mark',replace(w.doc.state,frame_markers=(0,)))
+    w.doc.set_marker_note(0,1,'é'*256)
+    recovery.checkpoint(wait=True)
+    assert recovery.path.read_bytes()==original
+    assert 'Fichier de session trop volumineux.' in caplog.text
+    recovery.checkpoint(wait=True)
+    w.doc.set_marker_note(0,1,'é'*640)
+    recovery.checkpoint(wait=True)
+    assert caplog.text.count('Session recovery write refused')==1
+    assert read_session(recovery.path)[1].state.frame_markers==()
+    w.doc.set_marker_note(0,1,'é')
+    recovery.checkpoint(wait=True)
+    assert read_session(recovery.path)[1].state.marker_notes==((0,1,'é'),)
+    assert not recovery.over_budget

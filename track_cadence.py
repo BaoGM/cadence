@@ -30,5 +30,7 @@ def build_tracks(state,media,fps,plans,target,mode,pitch,quality,progress,cancel
     combined=replace(combined,position=min(changed.position,combined.length),selection=changed.selection,loop_range=changed.loop_range,
                      drawings=changed.drawings if all_selected else state.drawings,
                      marker_names=changed.marker_names if all_selected else state.marker_names,
+                     marker_styles=changed.marker_styles if all_selected else state.marker_styles,
+                     marker_notes=changed.marker_notes if all_selected else state.marker_notes,
                      frame_markers=changed.frame_markers if all_selected else state.frame_markers)
     return combined,updated

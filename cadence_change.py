@@ -141,4 +141,21 @@ def build_change(state,media,fps,ranges,target,mode,preserve_pitch,quality,progr
         dest=min(length-1,warp(frame))
         if dest>=0:
             names.setdefault(dest,[]).append(name)
-    return replace(new,marker_names=tuple((f,' / '.join(dict.fromkeys(labels))) for f,labels in sorted(names.items()))),updated
+    from review_format import text_units
+    styles=dict(state.marker_styles)
+    warped_styles={}
+    notes={}
+    for frame,duration,text in state.marker_notes:
+        dest=min(length-1,warp(frame))
+        if dest<0: continue
+        end=min(length,max(dest+1,warp(frame+duration)))
+        previous,texts=notes.get(dest,(1,[]))
+        if text and text not in texts:
+            if frame in styles:
+                offset=sum(text_units(value)+2 for value in texts)
+                warped_styles.setdefault(dest,[]).extend((a+offset,b+offset,mask) for a,b,mask in styles[frame])
+            texts.append(text)
+        notes[dest]=(max(previous,end-dest),texts)
+    return replace(new,marker_names=tuple((f,' / '.join(dict.fromkeys(labels))) for f,labels in sorted(names.items())),
+                   marker_styles=tuple((f,tuple(runs)) for f,runs in sorted(warped_styles.items())),
+                   marker_notes=tuple((f,d,'\n\n'.join(texts)) for f,(d,texts) in sorted(notes.items()))),updated

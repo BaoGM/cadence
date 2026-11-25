@@ -26,15 +26,17 @@ def test_audio_flag_is_independent_persistent_and_undoable(tmp_path):
     doc.save(path); assert not Document.load(path).state.track_info.audio_enabled
 
 
-def test_track_names_migrate_and_zero_selection_is_respected():
+def test_track_names_migrate_and_last_selected_track_stays_active():
     doc,first,second=two_tracks()
     assert [t.info.name for t in doc.state.tracks]==['Piste 1','Piste 2']
     data=doc.to_data(); data['state']['track_info']['name']='Média 1'
     assert Document.from_data(data).state.track_info.name=='Piste 1'
     doc.select_track(second,extend=True)
-    assert doc.selected_track_ids==()
+    assert doc.selected_track_ids==(second,)
     old=doc.state; doc.select(0,5); doc.delete()
-    assert doc.state.tracks==old.tracks
+    assert doc.state.tracks[0]==old.tracks[0] and doc.state.tracks[1].length==old.tracks[1].length-5
+    doc.select_track(first,extend=True); assert doc.selected_track_ids==(first,second)
+    doc.select_track(second,extend=True); assert doc.selected_track_ids==(first,)
     doc.select_track(first,extend=True); assert doc.selected_track_ids==(first,)
 
 

@@ -3,11 +3,28 @@ from __future__ import annotations
 import time as _startup_time
 _STARTUP=_startup_time.perf_counter()
 import sys
-VERSION='2.0.6'
+VERSION='2.0.12'
 if __name__=='__main__' and getattr(sys,'frozen',False) and not any(arg.startswith('--self-test') for arg in sys.argv):
     from pathlib import Path
-    from update_store import base_executable,dispatch
-    if base_executable()==Path(sys.executable).resolve():
+    from maintenance_identity import identify_installed_process
+    try: identify_installed_process()
+    except OSError:
+        import logging
+        logging.warning('Maintenance identity could not be registered',exc_info=True)
+    from update_store import base_executable,dispatch,startup_ready as update_ready
+    installed_exe=base_executable()
+    running_exe=Path(sys.executable).resolve()
+    if running_exe!=installed_exe and running_exe.parent.name==VERSION:
+        from update_install import run_worker
+        from update_store import shared_install
+        if not shared_install(installed_exe):
+            # The old launcher keeps its executable and a lock open until the staged child acknowledges it.
+            update_ready(VERSION)
+            arguments=sys.argv[1:]
+            if arguments[:1]==['--apply-in-place']: arguments=arguments[1:]
+            run_worker(installed_exe,VERSION,arguments)
+            raise SystemExit(0)
+    if installed_exe==running_exe:
         try:
             if dispatch(base_executable(),VERSION,sys.argv[1:]): raise SystemExit(0)
         except (ValueError,OSError):
@@ -23,6 +40,15 @@ if __name__=='__main__' and '--register-associations' in sys.argv:
 if __name__=='__main__' and not any(arg.startswith('--self-test') for arg in sys.argv):
     from diagnostics import initialize
     initialize()
+    import os
+    if os.environ.get('CADENCE_TRIAL_READY') or os.environ.get('CADENCE_MACHINE_TRIAL')=='1':
+        try:
+            from PySide6 import QtCore,QtGui,QtWidgets,QtMultimedia
+            import av,numpy
+        except (ImportError,OSError):
+            import logging
+            logging.exception('The updated runtime could not start; restoring the previous version')
+            raise SystemExit(1)
 from ui_text import tr
 import logging, sys, json
 from dataclasses import replace
@@ -150,6 +176,18 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         from diagnostics import StartupTimer
         startup=StartupTimer()
         super().__init__(); self.doc=Document(); self.token=0; self.job=None; self.dialog=None
+        self.task_worker=Task(parent=self)
+        self.task_worker.progress.connect(self.task_progress)
+        self.task_worker.result.connect(self.task_result)
+        self.task_worker.failed.connect(self.task_failed)
+        self.task_worker.cancelled.connect(self.task_cancelled)
+        self.task_worker.finished.connect(self.finish_task)
+        self.task_progress_timer=QTimer(self)
+        self.task_progress_timer.setSingleShot(True)
+        self.task_progress_timer.setTimerType(Qt.TimerType.PreciseTimer)
+        self.task_progress_timer.timeout.connect(self.show_task_progress)
+        from cache_access import CacheAccess
+        self.cache_access=CacheAccess()
         from ui_text import initialize_language
         initialize_language()
         from PySide6.QtCore import QLocale
@@ -165,6 +203,8 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         self.setWindowTitle('Cadence 2.0'); self.resize(1360,890); self.setMinimumSize(640,400)
         from cache_ram import FrameCache
         self.frame_cache=FrameCache()
+        from export_sources import SessionVideoSources
+        self.export_sources=SessionVideoSources()
         self.transport=Transport(self); self.decoder=Decoder(self,warm_codecs=True); self.decoder.ready.connect(self.frame_ready); self.decoder.failed.connect(self.frame_failed); self.decoder.start()
         from scrub_audio import ScrubAudio
         self.scrub_audio=ScrubAudio(self)
@@ -175,7 +215,8 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         self.timer=QTimer(self); self.timer.setInterval(10); self.timer.setTimerType(Qt.TimerType.PreciseTimer); self.timer.timeout.connect(self.tick)
         self.exp_timer=QTimer(self); self.exp_timer.setSingleShot(True); self.exp_timer.setInterval(300); self.exp_timer.timeout.connect(self.commit_exposure)
         startup.checkpoint('audio and decoder initialization')
-        self.clipboard_kind='media'; self.action_registry={}; self.build_ui(); startup.checkpoint('panels')
+        self.clipboard_kind=None; self.clipboard_token=None; self.action_registry={}; self.build_ui(); startup.checkpoint('panels')
+        QApplication.clipboard().dataChanged.connect(self.check_clipboard_owner)
         self.build_menus()
         from studio_chrome import StudioChrome
         self.studio=StudioChrome(self)
@@ -249,7 +290,21 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         self.viewer.scrubActiveChanged.connect(lambda active:None if active else self.end_scrub())
         self.timeline.scrubStarted.connect(self.begin_scrub); self.timeline.scrubFinished.connect(self.end_scrub)
         self.timeline.drawingMoved.connect(lambda a,b,d:self.edit_drawing_timeline('move',a,b,d)); self.timeline.drawingResized.connect(lambda a,b,c:self.edit_drawing_timeline('resize',a,b,c)); self.timeline.drawingDelete.connect(lambda a,b:self.edit_drawing_timeline('delete',a,b))
-        self.timeline_scroll=QScrollBar(Qt.Orientation.Horizontal); self.timeline_scroll.hide(); self.timeline_scroll.valueChanged.connect(self.scroll_timeline); self.timeline.viewportChanged.connect(self.sync_timeline_scroll); lower_layout.addWidget(self.timeline_scroll)
+        self.timeline_scroll_slot=QWidget()
+        self.timeline_scroll_slot.setObjectName('timelineScrollSlot')
+        from timeline_skin import BASE as timeline_background
+        self.timeline_scroll_slot.setStyleSheet(f'#timelineScrollSlot {{background:{timeline_background};}}')
+        scroll_row=QHBoxLayout(self.timeline_scroll_slot)
+        scroll_row.setContentsMargins(0,0,0,0)
+        self.timeline_scroll=QScrollBar(Qt.Orientation.Horizontal)
+        policy=self.timeline_scroll.sizePolicy()
+        policy.setRetainSizeWhenHidden(True)
+        self.timeline_scroll.setSizePolicy(policy)
+        self.timeline_scroll.hide()
+        self.timeline_scroll.valueChanged.connect(self.scroll_timeline)
+        self.timeline.viewportChanged.connect(self.sync_timeline_scroll)
+        scroll_row.addWidget(self.timeline_scroll)
+        lower_layout.addWidget(self.timeline_scroll_slot)
         self.timeline_panel=lower
         self.build_library(); self.make_panels_movable(); self.build_comparison(); self.drawing=DrawController(self)
         from clip_geometry import GeometryTools
@@ -276,6 +331,8 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         edit.removeAction(self.action_registry['Édition/Insérer un vide…'][0])
         playback=self.menuBar().addMenu(tr('Lecture'))
         for text,fn,key in [('Lecture / pause',self.toggle_play,'Space'),('Image précédente',lambda:self.step(-1),'Left'),('Image suivante',lambda:self.step(1),'Right'),('Début',lambda:self.seek(0),'Home'),('Fin',lambda:self.seek(self.doc.state.length),'End'),('Marquer entrée',self.mark_in,'I'),('Marquer sortie',self.mark_out,'O')]: self.action(playback,text,fn,key)
+        self.action(playback,'Augmenter le volume',lambda: self.volume_shortcut.adjust(1),'Up')
+        self.action(playback,'Diminuer le volume',lambda: self.volume_shortcut.adjust(-1),'Down')
         for title in ('Marquer entrée','Marquer sortie'): playback.removeAction(self.action_registry['Lecture/'+title][0])
         self.action(playback,'Clé précédente',lambda:self.step_key(-1),','); self.action(playback,'Clé suivante',lambda:self.step_key(1),'.')
         view=self.menuBar().addMenu(tr('Affichage'))
@@ -337,6 +394,7 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         self.preferences=data
         from ui_style import set_tooltips_enabled
         set_tooltips_enabled(data.get('tooltips',False))
+        self.timeline.marker_hover.set_enabled(data.get('marker_comments_hover',True))
         from cache_ram import default_cache_mb,MIB
         self.frame_cache.set_budget(data.get('ram_cache_mb',default_cache_mb())*MIB)
         for key,(action,default) in self.action_registry.items(): action.setShortcut(QKeySequence(data['shortcuts'].get(key,default)))
@@ -550,7 +608,8 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         t=self.timeline; maximum=max(0,round((t.state.length if t.state else 0)-t.span()))
         with QSignalBlocker(self.timeline_scroll):
             self.timeline_scroll.setRange(0,maximum); self.timeline_scroll.setPageStep(max(1,round(t.span()))); self.timeline_scroll.setValue(round(t.view_start))
-        self.timeline_scroll.setVisible(maximum>0 and not getattr(getattr(self,'studio',None),'collapsed',False))
+        self.timeline_scroll_slot.setVisible(not getattr(getattr(self,'studio',None),'collapsed',False))
+        self.timeline_scroll.setVisible(maximum>0)
         # The tracks have fixed drawing coordinates: extra height belongs to the viewer.
         panel=self.timeline_panel.widget() if isinstance(self.timeline_panel,QDockWidget) else self.timeline_panel
         panel.layout().invalidate()
@@ -689,12 +748,20 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         if self.video_fullscreen: self.toggle_fullscreen()
         else: self.clear_selection()
     def toggle_fullscreen(self):
-        self.setUpdatesEnabled(False)
-        try:
+        returning_maximized=self.video_fullscreen and self.was_maximized and self.screen()==self.normal_screen
+        target = self.normal_geometry.size() if returning_maximized else None
+        if not self.video_fullscreen and self.screen():
+            target = self.screen().geometry().size()
+        with self.studio.change_video_layout(target):
             if not self.video_fullscreen:
                 self.before_fullscreen={k:not w.isHidden() for k,w in self.panel_widgets().items()}
                 self.normal_dock_state=self.saveState(); self.normal_geometry=self.geometry()
+                self.normal_screen=self.screen()
                 self.library_was_visible=self.library.isVisible(); self.was_maximized=self.isMaximized()
+                self.maximized_return=None
+                if self.was_maximized and QApplication.platformName()=='windows':
+                    from fullscreen_win import MaximizedReturn
+                    self.maximized_return=MaximizedReturn(self)
                 self.video_fullscreen=True; self.library.hide()
                 self.studio.headers.update_hover()
                 for key,widget in self.panel_widgets().items():
@@ -703,16 +770,19 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
                 self.studio.bar.hide(); self.studio.view.hide(); self.studio.stage_layout.setContentsMargins(0,0,0,0)
                 self.showFullScreen()
             else:
-                self.showMaximized() if self.was_maximized else self.showNormal()
+                if returning_maximized and self.maximized_return:
+                    self.maximized_return.restore(self)
+                elif self.was_maximized:
+                    self.showMaximized()
+                else:
+                    self.showNormal()
+                self.maximized_return=None
                 if not self.was_maximized: self.setGeometry(self.normal_geometry)
                 self.restoreState(self.normal_dock_state)
                 self.studio.view.show(); self.library.setVisible(self.library_was_visible)
                 for key,widget in self.panel_widgets().items(): widget.setVisible(self.before_fullscreen[key] if key!='timecode' else not widget.isHidden())
                 self.video_fullscreen=False; self.sync_library_action(self.library_was_visible)
                 self.studio.headers.configure(self.workspaces.mode=='read',self.timeline.simple and not self.studio.collapsed)
-            self.layout().activate()
-        finally:
-            self.setUpdatesEnabled(True); self.update()
     def drop_paths(self,paths):
         if len(paths)==1 and paths[0].lower().endswith('.cadence'): self.open_project(paths[0])
         else: self.append_paths(paths)
@@ -763,50 +833,49 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
     def begin_media_open(self, paths, title, prepare, success, on_error=None):
         self.begin_task(title, prepare, success, progress_delay_ms=1000 if len(paths)==1 else 0, on_error=on_error)
 
-    def begin_task(self,title,fn,success,*,progress_delay_ms=0,on_error=None):
+    def begin_task(self,title,fn,success,*,progress_delay_ms=0,on_error=None,on_finished=None):
         if self.job: return
         self.pause()
         self._task_progress_value=0.
         self._task_progress_message=title
-        task=Task(fn,self); self.job=task
-        timer=QTimer(task)
-        timer.setSingleShot(True)
-        timer.setTimerType(Qt.TimerType.PreciseTimer)
-        def show_progress():
-            if self.job is not task or task.isFinished() or task.cancel.is_set(): return
-            dialog=QProgressDialog(tr(self._task_progress_message),tr('Annuler'),0,100,self)
-            self.dialog=dialog
-            dialog.setWindowTitle(tr('Cadence'))
-            dialog.setWindowModality(Qt.WindowModality.WindowModal)
-            dialog.setAutoClose(False)
-            dialog.setAutoReset(False)
-            dialog.canceled.connect(task.cancel.set)
-            dialog.setValue(int(self._task_progress_value*100))
-            dialog.show()
-        def dismiss_progress():
-            timer.stop()
-            dialog,self.dialog=self.dialog,None
-            if dialog is not None:
-                dialog.reset()
-                dialog.hide()
-                dialog.deleteLater()
-        task.progress.connect(self.task_progress)
-        def result(value):
-            dismiss_progress()
-            success(value)
-        def failed(text):
-            dismiss_progress()
-            (on_error or self.error)(text)
-        def cancelled():
-            dismiss_progress()
-            self.notify('Opération annulée.')
-        task.result.connect(result); task.failed.connect(failed); task.cancelled.connect(cancelled)
+        self._task_success=success
+        self._task_error=on_error or self.error
+        self._task_finished=on_finished
+        self.job=self.task_worker
+        self.job.start_work(fn)
         if progress_delay_ms:
-            timer.timeout.connect(show_progress)
-            timer.start(progress_delay_ms)
+            self.task_progress_timer.start(progress_delay_ms)
         else:
-            show_progress()
-        task.finished.connect(lambda:self.finish_task(task)); task.start()
+            self.show_task_progress()
+    def show_task_progress(self):
+        if not self.job or self.job.isFinished() or self.job.cancel.is_set(): return
+        dialog=QProgressDialog(tr(self._task_progress_message),tr('Annuler'),0,100,self)
+        self.dialog=dialog
+        dialog.setWindowTitle(tr('Cadence'))
+        dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        dialog.setAutoClose(False)
+        dialog.setAutoReset(False)
+        dialog.canceled.connect(self.job.cancel.set)
+        dialog.setValue(int(self._task_progress_value*100))
+        dialog.show()
+    def dismiss_task_progress(self):
+        self.task_progress_timer.stop()
+        dialog,self.dialog=self.dialog,None
+        if dialog is not None:
+            dialog.reset()
+            dialog.hide()
+            dialog.deleteLater()
+    def task_result(self,value):
+        success=self._task_success
+        self.dismiss_task_progress()
+        success(value)
+    def task_failed(self,text):
+        on_error=self._task_error
+        self.dismiss_task_progress()
+        on_error(text)
+    def task_cancelled(self):
+        self.dismiss_task_progress()
+        self.notify('Opération annulée.')
     def task_progress(self,p,m):
         dialog = self.dialog
         from progress_values import bounded_progress
@@ -820,8 +889,12 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         # A modal setValue() processes events: completion may clear self.dialog.
         # Keep this last and never touch the dialog after event processing.
         dialog.setValue(percent)
-    def finish_task(self,task):
-        self.job=None; task.deleteLater(); self.refresh()
+    def finish_task(self):
+        self.task_worker.wait()
+        callback=self._task_finished
+        self.job=self._task_success=self._task_error=self._task_finished=None
+        self.refresh()
+        if callback: callback()
 
     def new_project(self):
         if not self.job and self.confirm_discard():
@@ -830,7 +903,7 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         if self.job: return
         if getattr(self,'capture_dialog',None):
             d=self.capture_dialog
-            if d.proc or d.countdown: d.stop()
+            if d.armed or d.proc or d.countdown: d.stop()
             else: d.begin()
             return
         self.pause()
@@ -853,9 +926,15 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         quality=self.preferences.get('preview_quality','native')
         self.begin_media_open([path], 'Préparation du média',lambda p,c:prepare_media(path,progress=p,cancel=c,quality=quality,defer_audio=True),success)
     def install_doc(self,doc):
+        self.export_sources.retain(doc.media.values())
         self.scrub_audio.close()
-        self.drawing.cancel(); self.timeline.selection_track='video'; self.clipboard_kind='media'
+        self.drawing.cancel(); self.timeline.selection_track='video'
         changing_doc=doc is not self.doc
+        if changing_doc:
+            self.decoder.release_sources()
+            self.reference_decoder.release_sources()
+            doc.clear_clipboard()
+            if self.clipboard_kind != 'objects': self.release_clipboard()
         self.pause(); self.doc=doc; self.follow_position=None; self.token+=1; self.display_frame=-1; self.viewer.clear(); self.timeline.wave={}
         for key,m in doc.media.items():
             try:
@@ -912,9 +991,15 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
                 self.start_export(dialog.selectedFiles()[0])
         finally: dialog.deleteLater()
     def start_export(self,path):
-        state=self.doc.state if self.drawing.export.isChecked() else replace(self.doc.state,drawings=()); media=dict(self.doc.media); fps=self.doc.fps; use_ev=self.apply_export.isChecked()
+        self.commit_exposure()
+        self.drawing.commit_gamma()
+        state=self.doc.state if self.drawing.export.isChecked() else replace(self.doc.state,drawings=()); media=dict(self.doc.media); fps=self.doc.fps
         onion=(self.drawing.before.value(),self.drawing.after.value(),self.drawing.ghost.value()/100) if self.drawing.onion.isChecked() else None
-        self.begin_task('Export du montage',lambda p,c:export_video(state,media,fps,path,use_ev,p,c,onion),lambda out:self.export_done(out))
+        def completed(output):
+            from review_panel import offer_rendered_markers
+            offer_rendered_markers(self,output,state,fps)
+            self.export_done(output)
+        self.begin_task('Export du montage',lambda p,c:export_video(state,media,fps,path,True,p,c,onion,self.export_sources),completed)
     def export_done(self,path):
         self.notify(f'Export terminé : {path}')
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(path).resolve().parent)))
@@ -934,11 +1019,12 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         frame=max(0,min(st.position,max(0,n-1)))
         self.timecode_overlay.set_frame(st.position,n,self.doc.fps)
         self.update_media_info(frame)
-        for b in (self.export_btn,self.play_btn,self.exp_spin): b.setEnabled(n>0)
+        for b in (self.export_btn,self.play_btn,self.exp_spin,self.exposure_button): b.setEnabled(n>0)
         self.sync_loop_button()
         for obj in (self.undo_action,): obj.setEnabled(bool(self.doc.undo_stack))
         for obj in (self.redo_action,): obj.setEnabled(bool(self.doc.redo_stack))
         with QSignalBlocker(self.exp_spin): self.exp_spin.setValue(self.doc.active_track.exposure)
+        self.exposure_button.setChecked(self.doc.active_track_id not in dict(st.bypassed_exposures))
         self.viewer.flip_h=st.flip_h if st.second_track is None else False; self.viewer.flip_v=st.flip_v if st.second_track is None else False
         self.hflip_action.setChecked(self.doc.active_track.flip_h); self.vflip_action.setChecked(self.doc.active_track.flip_v)
         self.clip_tools.sync(); self.viewer.set_exposure(st.exposure if st.second_track is None else 0)
@@ -1021,7 +1107,13 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         n=self.doc.state.length
         if n:
             pos=self.doc.state.position
-            self.seek((pos+amount)%n if pos<n else (0 if amount>0 else n-1),audition=True)
+            self.navigate_to((pos+amount)%n if pos<n else (0 if amount>0 else n-1))
+    def navigate_to(self,index):
+        state=self.doc.state
+        if state.selection and not any(start<=index<end for start,end in state.selection_ranges()):
+            self.doc.state=replace(state,selection=None,selected_clips=())
+            self.selection_anchor=None
+        self.seek(index,audition=True)
     def step_key(self,amount):
         if self.key_step: self.step(amount)
         else: self.drawing.navigate(amount)
@@ -1037,6 +1129,7 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
 
     def select(self,a,b,position=None):
         self.pause(stop_scrub=position is None); self.play_completed=False; self.doc.select(a,b); self.doc.state=replace(self.doc.state,position=a if position is None else position,loop_range=None); self.refresh_position(); self.request_frame()
+        self.drawing.comments.refresh()
         if position is not None: self.scrub_audio.request(self.doc.state,self.doc.media,self.doc.fps,position)
     def select_all(self):
         if self.editing_text(): return
@@ -1057,28 +1150,60 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
             self.pause(); self.doc.state=replace(self.doc.state,loop_range=self.doc.state.selection,position=self.doc.state.selection[0]); self.refresh(); self.request_frame(); self.notify('Plage de lecture définie en orange.')
     def clear_loop_range(self): self.pause(); self.doc.state=replace(self.doc.state,loop_range=None); self.refresh()
 
+    def claim_clipboard(self,kind):
+        from PySide6.QtCore import QMimeData, QUuid
+        self.clipboard_kind=kind
+        if kind=='objects':
+            self.doc.clear_clipboard()
+            self.timeline.drawing_clipboard_length=0
+        else:
+            self.drawing.object_clipboard=()
+        self.clipboard_token=QUuid.createUuid().toRfc4122()
+        mime=QMimeData()
+        mime.setData('application/x-cadence-edit',self.clipboard_token)
+        QApplication.clipboard().setMimeData(mime)
+
+    def check_clipboard_owner(self):
+        if self.clipboard_token is None: return
+        mime=QApplication.clipboard().mimeData()
+        if mime is not None and mime.data('application/x-cadence-edit')==self.clipboard_token: return
+        self.clipboard_kind=None; self.clipboard_token=None
+        self.doc.clear_clipboard()
+        self.drawing.object_clipboard=()
+        self.timeline.drawing_clipboard_length=0
+
+    def release_clipboard(self):
+        self.check_clipboard_owner()
+        if self.clipboard_token is not None: QApplication.clipboard().clear()
+
     def cut_selection(self):
-        if self.editing_text() or self.job: return
-        self.pause(); self.drawing.finish(); self.commit_exposure()
-        if self.timeline.selection_track=='drawing':
-            self.drawing.edit_clipboard('cut'); return
-        self.clipboard_kind='media'
-        count=self.doc.cut(self.copy_audio.isChecked())
-        if count:
-            self.refresh(); self.request_frame()
-            self.notify(f'{count} images coupées ; Ctrl+V pour coller.'+(' Son conservé dans le presse-papiers.' if self.copy_audio.isChecked() else ' Collage sans son selon l’option Copier/coller le son.'))
+        self.copy_or_cut('cut')
 
     def copy_selection(self):
+        self.copy_or_cut('copy')
+
+    def copy_or_cut(self,operation):
         if self.editing_text() or self.job: return
+        if operation=='cut':
+            self.pause(); self.drawing.finish(); self.commit_exposure()
+        if self.viewer.hasFocus() and self.drawing.edit_objects(operation): return
         if self.timeline.selection_track=='drawing':
-            self.drawing.edit_clipboard('copy'); return
-        self.clipboard_kind='media'
-        count=self.doc.copy(self.copy_audio.isChecked()); self.refresh(); self.notify(f'{count} images copiées'+(' avec leur audio.' if self.copy_audio.isChecked() else ' sans audio.'))
+            self.drawing.edit_clipboard(operation); return
+        audio=self.copy_audio.isChecked()
+        count=self.doc.cut(audio) if operation=='cut' else self.doc.copy(audio)
+        if not count: return
+        self.claim_clipboard('media'); self.refresh()
+        if operation=='cut':
+            self.request_frame()
+            self.notify(f'{count} images coupées ; Ctrl+V pour coller.'+(' Son conservé dans le presse-papiers.' if audio else ' Collage sans son selon l’option Copier/coller le son.'))
+        else:
+            self.notify(f'{count} images copiées'+(' avec leur audio.' if audio else ' sans audio.'))
     def delete_selection(self):
         if self.editing_text() or self.job: return
         focus=QApplication.focusWidget()
         if focus is self.playlists_panel or (focus and self.playlists_panel.isAncestorOf(focus)):
             if focus is self.playlists_panel.files: self.playlists_panel.remove_files()
+            elif focus is self.playlists_panel.tree: self.playlists_panel.remove_selected_entries()
             return
         if self.drawing.edit_objects('delete'): return
         self.pause(); self.commit_exposure()
@@ -1086,7 +1211,12 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         if self.doc.delete(): self.refresh(); self.request_frame(); self.notify('Plage supprimée ; vidéo et audio raccordés.')
     def paste_selection(self):
         if self.editing_text() or self.job: return
+        self.check_clipboard_owner()
+        if not self.clipboard_kind: return
         self.pause(); self.commit_exposure()
+        if self.clipboard_kind=='objects':
+            self.drawing.edit_objects('paste')
+            return
         if self.clipboard_kind=='drawing':
             self.drawing.edit_clipboard('paste')
             return
@@ -1109,12 +1239,18 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         else: self.exp_timer.stop()
     def commit_exposure(self):
         self.exp_timer.stop()
-        if hasattr(self,'exp_spin') and self.doc.media and getattr(self,'exp_dirty',False) and any(self.exp_pending!=t.exposure for t in self.doc.editable_tracks()):
+        if hasattr(self,'exp_spin') and self.doc.media and getattr(self,'exp_dirty',False):
             self.doc.exposure(self.exp_pending); self.viewer.layer_exposures=None; self.refresh()
             if self.doc.state.second_track is not None: self.request_frame()
         self.viewer.layer_exposures=None
         self.exp_dirty=False
     def set_exposure(self,value): self.exp_pending=value; self.exp_dirty=True; self.commit_exposure()
+    def toggle_exposure(self, enabled):
+        self.commit_exposure()
+        if self.doc.exposure(enabled=enabled):
+            self.exp_pending=self.doc.active_track.exposure
+            self.refresh()
+            if self.doc.state.second_track is not None: self.request_frame()
     def sync_loop_button(self):
         with QSignalBlocker(self.loop_btn): self.loop_btn.setChecked(self.playback_mode=='loop')
         self.loop_btn.setSymbol('loop' if self.playback_mode=='loop' else 'once')
@@ -1189,6 +1325,7 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         if self.job:
             self.job.cancel.set(); self.notify('Annulation en cours ; fermez la fenêtre une fois terminée.'); e.ignore(); return
         if not getattr(self,'_update_close_approved',False) and not self.confirm_discard(): e.ignore(); return
+        self.release_clipboard()
         if hasattr(self,'update_manager'): self.update_manager.stop()
         self.hover_transport.close()
         if getattr(self,'video_mirror',None): self.video_mirror.close()
@@ -1207,10 +1344,12 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         self.drawing.raster_cache.clear(); self.drawing.cache=None
         if self.viewer.surface is not None: self.viewer.surface.compositor.close()
         self.scrub_audio.close()
+        self.export_sources.close()
         if self.preferences.get('clear_cache_on_exit'):
-            from cache_tools import clear_cache
-            try: clear_cache()
+            try: self.cache_access.clean(closing=True)
             except OSError as error: logging.warning('Cache cleanup: %s',error)
+        else:
+            self.cache_access.close()
         e.accept()
 
 
@@ -1241,7 +1380,12 @@ if __name__=='__main__':
         if sys.argv[1]=='--self-test-updates': run=run_updates
         elif sys.argv[1]=='--self-test-gpu': run=run_gpu
         elif sys.argv[1]=='--self-test-d3d': run=lambda directory:run_gpu(directory,'direct3d')
-        try: run(sys.argv[2])
+        try:
+            from PySide6.QtMultimedia import QAudioSink
+            from unittest.mock import patch
+            set_sink_volume = QAudioSink.setVolume
+            with patch.object(QAudioSink, 'setVolume', lambda sink, volume: set_sink_volume(sink, 0.)):
+                run(sys.argv[2])
         except Exception:
             import traceback
             Path(sys.argv[2]).mkdir(parents=True,exist_ok=True)

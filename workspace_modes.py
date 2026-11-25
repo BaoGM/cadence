@@ -19,6 +19,7 @@ class WorkspaceModes(QObject):
         self.default_profiles={'read':{key:key in ('transport','timeline') for key in self.panels},
                                'edit':dict.fromkeys(self.panels,True)}
         self.profiles={mode:dict(values) for mode,values in self.default_profiles.items()}
+        self.inspector_page={'read':'drawing','edit':'drawing'}
         self.simple={'read':True,'edit':False}; self.layouts={}; self.layout_versions={}; self.editable={'read':False,'edit':False}
         try:
             data=json.loads(self.path.read_text(encoding='utf-8'))
@@ -27,6 +28,7 @@ class WorkspaceModes(QObject):
                 w.studio.side_history={k:[n for n in v if n in ('library','drawing','comparison')]
                     for k,v in sides.items() if k in ('read/left','read/right','edit/left','edit/right') and isinstance(v,list)}
             for m in self.profiles:
+                if data.get('inspector_page',{}).get(m)=='comments': self.inspector_page[m]='comments'
                 for k in self.panels:
                     if type(data.get('profiles',{}).get(m,{}).get(k)) is bool: self.profiles[m][k]=data['profiles'][m][k]
                 if type(data.get('simple',{}).get(m)) is bool: self.simple[m]=data['simple'][m]
@@ -44,10 +46,12 @@ class WorkspaceModes(QObject):
         self.apply(initial if initial in self.profiles else 'read')
     def capture(self):
         self.profiles[self.mode]={k:not p.isHidden() for k,p in self.panels.items()}
+        drawing=self.w.drawing
+        self.inspector_page[self.mode]='comments' if drawing.inspector_tabs.currentWidget() is drawing.comments else 'drawing'
         self.layouts[self.mode]=encoded(self.w.saveState()); self.editable[self.mode]=self.w.layout_editable
         self.layout_versions[self.mode]=2
     def save(self):
-        write_file(self.path,dict(profiles=self.profiles,simple=self.simple,mode=self.mode,layouts=self.layouts,layout_versions=self.layout_versions,editable=self.editable,geometry=encoded(self.w.saveGeometry()),side_history=self.w.studio.side_history))
+        write_file(self.path,dict(profiles=self.profiles,simple=self.simple,mode=self.mode,layouts=self.layouts,layout_versions=self.layout_versions,editable=self.editable,geometry=encoded(self.w.saveGeometry()),side_history=self.w.studio.side_history,inspector_page=self.inspector_page))
     def switch(self,mode):
         if mode==self.mode: return
         if self.w.video_fullscreen: self.w.toggle_fullscreen()
@@ -65,6 +69,8 @@ class WorkspaceModes(QObject):
             w.restoreState(state if not state.isEmpty() else w.initial_dock_state)
             with QSignalBlocker(w.layout_action): w.layout_action.setChecked(self.editable[mode])
             w.set_layout_editable(self.editable[mode])
+            tabs=w.drawing.inspector_tabs
+            tabs.setCurrentIndex(tabs.indexOf(w.drawing.comments) if self.inspector_page[mode]=='comments' else 0)
             for k,p in self.panels.items(): p.setVisible(self.profiles[mode][k])
             if state.isEmpty() or self.layout_versions.get(mode,0)<2:
                 if not self.profiles[mode]['comparison']: self.fit_on_reveal.add(mode)
@@ -104,6 +110,7 @@ class WorkspaceModes(QObject):
         w.resizeDocks([library,comparison],[max(library.minimumSizeHint().height(),total-height),height],Qt.Orientation.Vertical)
         w.layout().activate()
     def reset(self,all_modes=False):
+        self.capture()
         self.w.timecode_overlay.set_locked(True)
         self.w.timecode_overlay.set_position([.5,1])
         if self.w.video_fullscreen: self.w.toggle_fullscreen()

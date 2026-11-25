@@ -45,7 +45,12 @@ def test_first_open_modes_reset_and_persist(application,tmp_path):
     w.workspaces.switch('edit'); w.header.hide()
     from preferences import ShortcutDialog,validate
     dialog=ShortcutDialog(w.action_registry,w.preferences,w)
+    from cache_ram import default_cache_mb
+    dialog.ram_cache.setValue(256)
+    dialog.clear_on_exit.setChecked(False)
     next(b for b in dialog.findChildren(QPushButton) if b.text()=='Restaurer l’interface').click()
+    assert dialog.collect()['ram_cache_mb']==default_cache_mb()
+    assert dialog.collect()['clear_cache_on_exit']
     assert w.workspaces.mode=='read' and visible(w)=={'timeline','transport'}
     w.workspaces.switch('edit'); assert visible(w)==set(w.workspaces.panels)
     dialog.reject(); w.close()

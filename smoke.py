@@ -5,6 +5,25 @@ from pathlib import Path
 from fractions import Fraction
 from dataclasses import replace
 
+def loaded_runtime():
+    import ssl,sys
+    from PySide6.QtCore import qVersion
+    paths={}
+    if sys.platform=='win32':
+        import ctypes
+        from ctypes import wintypes
+        kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+        kernel.GetModuleHandleW.argtypes=(wintypes.LPCWSTR,)
+        kernel.GetModuleHandleW.restype=wintypes.HMODULE
+        kernel.GetModuleFileNameW.argtypes=(wintypes.HMODULE,wintypes.LPWSTR,wintypes.DWORD)
+        for name in ('Qt6Core.dll','libssl-3-x64.dll','libcrypto-3-x64.dll'):
+            handle=kernel.GetModuleHandleW(name)
+            filename=ctypes.create_unicode_buffer(32768)
+            if not handle or not 0<kernel.GetModuleFileNameW(handle,filename,len(filename))<len(filename):
+                raise ctypes.WinError(ctypes.get_last_error())
+            paths[name]=filename.value
+    return dict(qt=qVersion(),tls=ssl.OPENSSL_VERSION,loaded_libraries=paths)
+
 def run(directory):
     output=Path(directory).resolve(); output.mkdir(parents=True,exist_ok=True)
     os.environ['QT_QPA_PLATFORM']='offscreen'
@@ -224,7 +243,8 @@ def run(directory):
         shortcuts=ShortcutDialog(win.action_registry,win.preferences,win); shortcuts.show(); app.processEvents()
         sections=shortcuts.findChildren(QToolButton,'optionsSection')
         assert [b.text() for b in sections]==tr(['Préférences','Raccourcis','Vue et navigation'])
-        assert shortcuts.language.currentData()=='fr' and not shortcuts.clear_on_exit.isChecked()
+        assert shortcuts.language.currentData()=='fr' and shortcuts.clear_on_exit.isChecked()
+        assert shortcuts.ram_cache.value()==2048
         assert 'Fichier/Options…' in win.action_registry and 'Édition/Raccourcis et navigation…' not in win.action_registry
         shortcuts.grab().save(str(output/'options-preferences.png'))
         sections[1].click(); app.processEvents(); assert shortcuts.tabs.currentIndex()==1
@@ -334,7 +354,7 @@ def run(directory):
             path=output/f'exposure-{ev}.cadence'; doc.save(path); assert Document.load(path).state.exposure==ev
         win.set_exposure(0)
         result={'system_microphone_mix':True,'wasapi_bundled':True,'trimmed_panels':True,'context_workspace_mode':True,'organized_menus':True,'panel_context_menu':True,'reset_mirrors':True,'comparison_buttons':True,'compact_playback_layout':True,'clip_geometry':True,'workspace_modes':True,'text_auto_fit':True,'linked_drawings':True,'drawing_resize':True,'lasso':True,'text_move':True,'cut_paste':True,'draw_over':True,'drawing_save_export':True,'duplicate_media':True,'comparison_modes':len(MODES),'dual_preview':True,'loop_toggle':True,'status':'passed' ,'frozen':bool(getattr(sys,'frozen',False)),'import_frames':media['frames'],'export_frames':count,'undo_redo':True,'exposure_export':True,'preview_rendered':True,'ffmpeg_bundled':Path(ffmpeg()).exists()}
-        result.update(drawing_clipboard_menu=True,drawing_clipboard_undo=True)
+        result.update(loaded_runtime(),certificate_verification=True,drawing_clipboard_menu=True,drawing_clipboard_undo=True)
         result.update(default_loop_playback=True)
         result.update(comparison_cycle_shortcut=True,key_step_toggle=True)
         result.update(reference_sequence=True,reference_project_format=15,simple_media_boundaries=True)
@@ -727,6 +747,14 @@ def run_gpu(directory,renderer='opengl'):
         image=capture_surface(surface); color=image.pixelColor(image.width()//2,image.height()//2)
         image.save(str(output/'gpu-drawing.png'))
         assert color.green()>220 and color.red()<30,(image.size(),color.getRgb())
+        win.drawing.gamma.setValue(5)
+        QTest.qWait(75)
+        bright=capture_surface(surface)
+        paper=bright.pixelColor(bright.width()//3,bright.height()//2)
+        ink=bright.pixelColor(bright.width()//2,bright.height()//2)
+        assert max(abs(a-b) for a,b in zip(paper.getRgb()[:3],(255,153,138)))<=2, paper.getRgb()
+        assert ink==color, (ink.getRgb(),color.getRgb())
+        win.drawing.gamma.setValue(0)
         if renderer=='direct3d': assert surface.compositor.drawing_stats()['textures']>0
         win.drawing.visible.setChecked(False); QTest.qWait(100); image=capture_surface(surface)
         color=image.pixelColor(image.width()//2,image.height()//2); assert color.red()>240 and color.green()<70
@@ -781,7 +809,7 @@ def run_gpu(directory,renderer='opengl'):
         win.viewer.clear(); QTest.qWait(100); capture_surface(surface).save(str(output/'gpu-welcome.png'))
         result=dict(status='passed',frozen=bool(getattr(sys,'frozen',False)),renderer=win.viewer.renderer,swap_interval=surface.format().swapInterval(),drawings=True,resize=True,active_frame_readout=True,wipe_drawings_clipped=True,wipe_handle_smooth=True)
         result.update(overlay_checks)
-        result.update(gpu_drawing_layers=True,cursor_outside_reset=True)
+        result.update(gpu_drawing_layers=True,preview_gamma=True,cursor_outside_reset=True)
         result.update(check_native_cursor(win))
         result.update(check_native_render())
         from smoke1182 import check as check1182

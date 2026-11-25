@@ -45,7 +45,7 @@ def test_disabled_cadence_onion_is_not_exported(application,tmp_path,monkeypatch
     before=QSpinBox();before.setValue(3)
     after=QSpinBox();after.setValue(4)
     ghost=QSpinBox();ghost.setValue(80)
-    window=SimpleNamespace(doc=Document(),job=None,drawing=SimpleNamespace(finish=lambda:None,onion=onion,before=before,after=after,ghost=ghost),begin_task=lambda name,task,done:task(None,Event()))
+    window=SimpleNamespace(doc=Document(),job=None,drawing=SimpleNamespace(finish=lambda:None,onion=onion,before=before,after=after,ghost=ghost),begin_task=lambda name,task,done,**kwargs:task(None,Event()))
     link=SimpleNamespace(window=window,metadata={'fps':Fraction(24)},drawing_capability=True,drawing_modes=None,drawing_request=None,cameras=['persp'],host='maya',origin=lambda:1,offset=0,token='test',changed=SimpleNamespace(emit=lambda:None))
     TimelineLink.send_drawings(link,'persp','blue_pencil',True)
     assert captured=={'before':0,'after':0}

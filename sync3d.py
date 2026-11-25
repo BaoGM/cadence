@@ -38,8 +38,9 @@ def to_cadence(frame, origin, dcc_fps, timeline_fps, offset):
     return rounded((Fraction(str(frame)) - Fraction(str(origin))) * timeline_fps / dcc_fps) + offset
 
 
-def to_host(frame, origin, dcc_fps, timeline_fps, offset):
-    return float(Fraction(str(origin)) + Fraction(frame - offset) * dcc_fps / timeline_fps)
+def to_host(frame, origin, dcc_fps, timeline_fps, offset, *, whole_frames=False):
+    position = Fraction(str(origin)) + Fraction(frame - offset) * dcc_fps / timeline_fps
+    return rounded(position) if whole_frames else float(position)
 
 
 from sync3d_instances import InstanceConnections
@@ -200,7 +201,7 @@ class TimelineLink(InstanceConnections, QObject):
         else:
             self.pending = None
         if self.direction != 'receive' and self.awaiting is None and w.doc.state.position != self.last_position:
-            target = to_host(w.doc.state.position, self.origin(), self.metadata['fps'], w.doc.fps, self.offset)
+            target = to_host(w.doc.state.position, self.origin(), self.metadata['fps'], w.doc.fps, self.offset, whole_frames=self.host=='maya')
             self.sequence = (self.sequence + 1) % 2147483648
             if self.send(dict(type='frame', frame=target, seq=self.sequence)):
                 self.awaiting = self.sequence
@@ -346,9 +347,8 @@ class TimelineLink(InstanceConnections, QObject):
             self.changed.emit()
         w.begin_task(tr('Préparation des dessins'),lambda progress,cancel:build_bundle(
             keys,endpoint_path().parent/'drawing_transfers',doc.drawing_transfer_id,width,height,fps,host_fps,
-            origin,offset,camera,mode,before,after,opacity,progress,cancel),prepared)
-        if w.job:
-            w.job.finished.connect(lambda:QTimer.singleShot(0,self.changed.emit))
+            origin,offset,camera,mode,before,after,opacity,progress,cancel),prepared,
+            on_finished=self.changed.emit)
 
     def send_current_drawings(self):
         if self.dialog is None:

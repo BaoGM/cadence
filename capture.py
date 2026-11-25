@@ -33,6 +33,14 @@ def native_monitors():
     ctypes.windll.user32.EnumDisplayMonitors(None,None,visit,0)
     return result
 
+def screen_device(screen):
+    if os.name=='nt':
+        interface=screen.nativeInterface()
+        if interface is not None:
+            try: return monitor_info(int(interface.handle()))[0]
+            except RuntimeError: pass
+    return ''
+
 def physical_region(screen,region,monitors=None):
     g=screen.geometry()
     if monitors is None and os.name=='nt':
@@ -62,7 +70,7 @@ class RegionPicker(QDialog):
     def __init__(self,screen):
         super().__init__(None,Qt.WindowType.FramelessWindowHint|Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setGeometry(screen.geometry()); self.setCursor(Qt.CursorShape.CrossCursor)
+        self.setScreen(screen); self.setGeometry(screen.geometry()); self.setCursor(Qt.CursorShape.CrossCursor)
         self.anchor=None; self.region=QRect()
     def mousePressEvent(self,e):
         if e.button()==Qt.MouseButton.LeftButton: self.anchor=e.position().toPoint(); self.region=QRect()
@@ -102,6 +110,7 @@ class CaptureDialog(QDialog):
     def __init__(self,parent):
         super().__init__(parent); self.setWindowTitle(tr('Capturer l’écran')); self.resize(520,320)
         self.quick=False; self.armed=False; self.proc=None; self.output=None; self.region=None; self.countdown=0; self.stopping=False
+        self.hidden_mirror=None; self.review_target=False
         self.feedback=CaptureFeedback(); self.record_ready=threading.Event(); self.start_notified=False
         self.destroyed.connect(self.feedback.deleteLater)
         self.outline=RegionOutline(); self.destroyed.connect(self.outline.deleteLater); self.finished.connect(self.outline.hide)
@@ -116,7 +125,13 @@ class CaptureDialog(QDialog):
         from studio_icons import icon
         style_inspector(self)
         inspector_section(root,'capture','Enregistrement')
-        for s in QApplication.screens(): self.screens.addItem(tr(f'{s.name()} · {s.geometry().width()} × {s.geometry().height()}'),s)
+        screens=QApplication.screens()
+        for s in screens:
+            name=s.name()
+            if sum(other.name()==name for other in screens)>1:
+                name+=f' ({screens.index(s)+1})'
+            self.screens.addItem(f'{name} · {s.geometry().width()} × {s.geometry().height()}',s)
+        self.screens.setCurrentIndex(screens.index(parent.screen()) if parent.screen() in screens else 0)
         root.addWidget(self.screens); self.screens.currentIndexChanged.connect(self.reset_region)
         self.zone=QPushButton(tr('Tracer une zone…')); self.zone.clicked.connect(self.pick); root.addWidget(self.zone)
         self.full=QPushButton(tr('Utiliser tout l’écran')); self.full.clicked.connect(self.reset_region); root.addWidget(self.full)
@@ -128,7 +143,7 @@ class CaptureDialog(QDialog):
         root.addLayout(row)
         row=QHBoxLayout(); row.addWidget(QLabel(tr('Inclure :')))
         self.include_cadence=QCheckBox(tr('Cadence')); self.include_cadence.setToolTip(tr('Décoché : réduire Cadence pendant la capture.'))
-        self.include_keyboard=QCheckBox(tr('Clavier'))
+        self.include_keyboard=QCheckBox(tr('Touches'))
         self.include_cursor=QCheckBox(tr('Curseur')); self.include_cursor.setChecked(True)
         self.include_clicks=QCheckBox(tr('Clic'))
         for control in (self.include_cadence,self.include_keyboard,self.include_cursor,self.include_clicks): row.addWidget(control)
@@ -150,6 +165,7 @@ class CaptureDialog(QDialog):
         menu.addAction(tr('Arrêter la capture et ouvrir dans Cadence'),self.stop); self.tray.setContextMenu(menu); self.tray_menu=menu
         self.tray.setToolTip(tr('Cadence · capture en cours · Ctrl+Maj+F8 pour arrêter'))
         self.update_audio_options(); self.update_region_ui()
+        self.initial_settings=self.settings_values()
     def update_audio_options(self):
         enabled=self.format.currentText()=='MP4'
         self.system_audio.setEnabled(enabled); self.microphone.setEnabled(enabled); self.audio_note.setVisible(not enabled)
@@ -173,21 +189,55 @@ class CaptureDialog(QDialog):
             self.system_audio.setChecked(data.get('system_audio') is True); self.microphone.setChecked(data.get('microphone') is True)
             self.include_cadence.setChecked(data.get('include_cadence') is True)
             self.include_keyboard.setChecked(data.get('keyboard') is True); self.include_clicks.setChecked(data.get('clicks') is True)
-            screen=self.screens.findText(data.get('screen',''))
-            if screen>=0: self.screens.setCurrentIndex(screen)
-            if data.get('region'): self.region=QRect(*data['region'])
+            screens=[self.screens.itemData(i) for i in range(self.screens.count())]
+            saved_label=data.get('screen','')
+            names=[s.name() for s in screens]
+            index=-1
+            for field,values in [('screen_serial',[s.serialNumber() for s in screens]),
+                                 ('screen_device',[screen_device(s) for s in screens])]:
+                value=data.get(field)
+                if value and values.count(value)==1:
+                    index=values.index(value); break
+            if index<0:
+                index=self.screens.findText(saved_label)
+                name=saved_label.partition(' · ')[0]
+                if index<0 and names.count(name)==1: index=names.index(name)
+            if index>=0:
+                self.screens.setCurrentIndex(index)
+                if data.get('region'):
+                    bounds=QRect(0,0,screens[index].geometry().width(),screens[index].geometry().height())
+                    region=QRect(*data['region'])
+                    previous_size=re.search(r' · (\d+) × (\d+)$',saved_label)
+                    if previous_size:
+                        old_w,old_h=map(int,previous_size.groups())
+                        if old_w and old_h:
+                            x,y,w,h=region.getRect()
+                            left=round(x*bounds.width()/old_w); top=round(y*bounds.height()/old_h)
+                            region=QRect(left,top,round((x+w)*bounds.width()/old_w)-left,round((y+h)*bounds.height()/old_h)-top)
+                    region=region.intersected(bounds)
+                    if region.width()>=2 and region.height()>=2: self.region=region
+                    else: self.review_target=True
+            elif saved_label:
+                self.review_target=True
         except (OSError,ValueError,TypeError): pass
+    def settings_values(self):
+        screen=self.screens.currentData()
+        return dict(format=self.format.currentText(),fps=self.fps.currentData(),cursor=self.include_cursor.isChecked(),
+            include_cadence=self.include_cadence.isChecked(),keyboard=self.include_keyboard.isChecked(),clicks=self.include_clicks.isChecked(),
+            system_audio=self.system_audio.isChecked(),microphone=self.microphone.isChecked(),folder=self.folder.text().strip(),
+            screen=self.screens.currentText(),screen_device=screen_device(screen) if screen else '',screen_serial=screen.serialNumber() if screen else '',
+            region=list(self.region.getRect()) if self.region else None)
     def save_settings(self):
         from preferences import write_file
-        write_file(self.settings_path(),dict(format=self.format.currentText(),fps=self.fps.currentData(),cursor=self.include_cursor.isChecked(),
-            include_cadence=self.include_cadence.isChecked(),keyboard=self.include_keyboard.isChecked(),clicks=self.include_clicks.isChecked(),
-            system_audio=self.system_audio.isChecked(),microphone=self.microphone.isChecked(),folder=self.folder.text().strip(),screen=self.screens.currentText(),region=list(self.region.getRect()) if self.region else None))
+        values=self.settings_values()
+        write_file(self.settings_path(),values)
+        self.initial_settings=values
     def run(self,quick=False):
 
         # QDialog.exec exits when hidden. This loop survives hiding during selection/recording.
         loop=QEventLoop(self); self.finished.connect(loop.quit)
-        self.quick=quick
-        if quick:
+        self.quick=quick and not self.review_target
+        if self.quick:
             self.setWindowModality(Qt.WindowModality.NonModal)
             QTimer.singleShot(0,self.quick_begin)
         else:
@@ -198,27 +248,34 @@ class CaptureDialog(QDialog):
     def quick_begin(self):
         self.begin()
         if not self.armed: self.reject()
-        elif not self.include_cadence.isChecked(): self.parentWidget().showMinimized()
+        elif not self.include_cadence.isChecked(): self.conceal_window()
     def reset_region(self,*args):
         self.region=None
         if hasattr(self,'status'): self.update_region_ui()
     def pick(self):
         self.outline.hide(); self.hide()
-        if not self.include_cadence.isChecked(): self.parentWidget().hide()
+        if not self.include_cadence.isChecked(): self.conceal_window()
         picker=RegionPicker(self.screens.currentData())
         try:
             if picker.exec()==QDialog.DialogCode.Accepted:
                 self.region=QRect(picker.region); self.status.setText(tr(f'Zone : {self.region.width()} × {self.region.height()}'))
         finally:
             picker.close(); self.restore(); self.update_region_ui()
+    def conceal_window(self):
+        mirror=getattr(self.parentWidget(),'video_mirror',None)
+        if mirror is not None and mirror.isVisible():
+            self.hidden_mirror=mirror; mirror.hide()
+        self.parentWidget().showMinimized()
     def restore(self):
         self.parentWidget().setWindowState(self.saved_state); self.parentWidget().show()
+        if self.hidden_mirror is not None:
+            self.hidden_mirror.show(); self.hidden_mirror=None
         if self.quick:
             self.hide()
         else:
             self.show(); self.raise_(); self.activateWindow()
     def begin(self):
-        if self.proc or self.countdown or self.mux_thread: return
+        if self.armed or self.proc or self.countdown or self.mux_thread: return
         screen=self.screens.currentData()
         try: self.rect_px=physical_region(screen,self.region if self.region is not None else QRect(0,0,screen.geometry().width(),screen.geometry().height()))
         except Exception as e: QMessageBox.warning(self,tr('Capture'),tr(str(e))); return
@@ -253,7 +310,7 @@ class CaptureDialog(QDialog):
                 seconds=min(3,max(1,math.ceil(remaining)))
                 self.status.setText(tr(f'Démarrage dans {seconds}…')); self.feedback.countdown(self.screens.currentData(),seconds); return
             self.countdown=0; self.feedback.hide(); self.hide()
-            if not self.include_cadence.isChecked(): self.parentWidget().showMinimized()
+            if not self.include_cadence.isChecked(): self.conceal_window()
             QTimer.singleShot(350,self.launch); return
         if self.proc:
             code=self.proc.poll()
@@ -297,7 +354,6 @@ class CaptureDialog(QDialog):
             self.status.setText(tr('Finalisation de la vidéo…')); self.cancel.setEnabled(False)
             try: self.proc.stdin.write(b'q\n'); self.proc.stdin.flush()
             except (OSError,BrokenPipeError): pass
-            self.restore()
     def recording_finished(self,code):
         self.inputs.stop()
         self.armed=False
@@ -340,6 +396,9 @@ class CaptureDialog(QDialog):
     def reject(self):
         self.inputs.stop()
         if self.mux_thread: return
+        if not self.quick and not self.armed and self.initial_settings!=self.settings_values():
+            try: self.save_settings()
+            except OSError as e: QMessageBox.warning(self,tr('Capture'),tr(str(e))); return
         self.armed=False
         self.feedback.hide(); self.outline.hide()
         if self.proc: self.stop(); return

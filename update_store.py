@@ -31,18 +31,60 @@ def base_executable(executable=None):
     return exe
 
 
+def elevated_process():
+    from ctypes import wintypes
+    kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+    security=ctypes.WinDLL('advapi32',use_last_error=True)
+    kernel.GetCurrentProcess.restype=wintypes.HANDLE
+    security.OpenProcessToken.argtypes=(wintypes.HANDLE,wintypes.DWORD,ctypes.POINTER(wintypes.HANDLE))
+    security.GetTokenInformation.argtypes=(wintypes.HANDLE,ctypes.c_int,wintypes.LPVOID,wintypes.DWORD,ctypes.POINTER(wintypes.DWORD))
+    kernel.CloseHandle.argtypes=(wintypes.HANDLE,)
+    token=wintypes.HANDLE()
+    if not security.OpenProcessToken(kernel.GetCurrentProcess(),0x0008,ctypes.byref(token)):
+        return True
+    try:
+        elevation=wintypes.DWORD()
+        count=wintypes.DWORD()
+        if not security.GetTokenInformation(token,20,ctypes.byref(elevation),ctypes.sizeof(elevation),ctypes.byref(count)):
+            return True
+        return bool(elevation.value)
+    finally:
+        kernel.CloseHandle(token)
+
+
 def shared_install(base):
     import winreg
-    for name in ('ProgramFiles','ProgramW6432','ProgramFiles(x86)'):
-        folder=os.environ.get(name)
-        if folder and base.is_relative_to(Path(folder)): return True
-    try:
-        key=r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Cadence.Hybrid.Studio2_is1'
-        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,key) as handle:
-            folder=winreg.QueryValueEx(handle,'InstallLocation')[0]
-        return bool(folder) and base.parent==Path(folder).resolve()
-    except OSError:
-        return False
+    from ctypes import wintypes
+    if elevated_process(): return True
+    base=Path(base).resolve()
+    roots={os.environ.get(name) for name in ('ProgramFiles','ProgramW6432','ProgramFiles(x86)')}
+    common=r'SOFTWARE\Microsoft\Windows\CurrentVersion'
+    uninstall=common+r'\Uninstall\Cadence.Hybrid.Studio2_is1'
+    for view in (winreg.KEY_WOW64_64KEY,winreg.KEY_WOW64_32KEY):
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,common,0,winreg.KEY_READ|view) as key:
+                for name in ('ProgramFilesDir','ProgramFilesDir (x86)','ProgramW6432Dir'):
+                    try: roots.add(winreg.QueryValueEx(key,name)[0])
+                    except FileNotFoundError: pass
+        except FileNotFoundError: pass
+        except OSError: return True
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,uninstall,0,winreg.KEY_READ|view) as key:
+                folder=winreg.QueryValueEx(key,'InstallLocation')[0]
+                if folder and base.parent==Path(folder).resolve(): return True
+        except FileNotFoundError: pass
+        except OSError: return True
+    if any(folder and base.is_relative_to(Path(folder).resolve()) for folder in roots): return True
+    # Ask the kernel whether this token can add files and subdirectories, without writing a probe.
+    kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+    open_dir=kernel.CreateFileW
+    open_dir.argtypes=(wintypes.LPCWSTR,wintypes.DWORD,wintypes.DWORD,wintypes.LPVOID,wintypes.DWORD,wintypes.DWORD,wintypes.HANDLE)
+    open_dir.restype=wintypes.HANDLE
+    handle=open_dir(str(base.parent),0x0002|0x0004,0x7,None,3,0x02000000,None)
+    if handle==wintypes.HANDLE(-1).value: return True
+    kernel.CloseHandle.argtypes=(wintypes.HANDLE,)
+    kernel.CloseHandle(handle)
+    return False
 
 
 def prune_version(store,version):
@@ -53,7 +95,7 @@ def prune_version(store,version):
     try:
         if (path/'.managed').read_text(encoding='ascii')!=version: return
         # Windows refuses deletion of a running executable. Leave that instance's resources intact.
-        (path/'Cadence.exe').unlink()
+        (path/'Cadence.exe').unlink(missing_ok=True)
         shutil.rmtree(path)
     except OSError:
         logging.info('Retained update directory %s',version)
@@ -89,8 +131,11 @@ def read_state(store):
     try:
         state=json.loads((store/'state.json').read_text('utf-8'))
         if not isinstance(state,dict): raise ValueError('Invalid update state')
-        for name in ('active','pending','failed','previous'):
+        for name in ('active','pending','failed','previous','installed','installing','cleanup','rollback_active'):
             if state.get(name): version_tuple(state[name])
+        if 'prune' in state:
+            if not isinstance(state['prune'],list) or len(state['prune'])>16: raise ValueError('Invalid cleanup state')
+            for version in state['prune']: version_tuple(version)
         return state
     except FileNotFoundError: return {}
 
@@ -132,7 +177,8 @@ def unpack(package,directory,cancel):
                 while data:=src.read(1024*1024):
                     if cancel.is_set(): raise UpdateCancelled()
                     dst.write(data)
-    if not (directory/'Cadence.exe').is_file() or not (directory/'_internal').is_dir():
+    if not (directory/'Cadence.exe').is_file() or not ((directory/'_internal').is_dir() or
+            any(path.is_dir() for path in directory.glob('_internal-[0-9]*'))):
         raise ValueError('Incomplete update')
 
 
@@ -160,6 +206,12 @@ def stage(base,release,package,digest,manifest,cancel):
                 # An interrupted stage may have renamed the completed directory before writing the pointer.
                 orphan=Path(temp)/'orphan'
                 target.rename(orphan)
+            from update_install import runtime_name, atomic_copy
+            if (data/runtime_name(release.version)).is_dir():
+                atomic_copy(package,store/(release.version+'.zip'))
+                descriptor=Path(temp)/'descriptor.json'
+                descriptor.write_text(json.dumps(manifest),encoding='utf8')
+                os.replace(descriptor,store/(release.version+'.json'))
             data.rename(target)
             state['pending']=release.version; write_state(store,state)
         return release.version
@@ -175,14 +227,46 @@ def spawn(exe,args,ready=None):
 def startup_ready(version,executable=None):
     name=os.environ.pop('CADENCE_TRIAL_READY','')
     exe=Path(executable or sys.executable).resolve()
-    if exe.parent.parent.name==STORE and exe.parent.name==version and re.fullmatch(r'ready-[0-9a-f]{32}',name):
+    if not re.fullmatch(r'ready-[0-9a-f]{32}',name): return
+    if exe.parent.parent.name==STORE and exe.parent.name==version:
         (exe.parent.parent/name).touch()
+    elif read_state(exe.parent/STORE).get('installing')==version:
+        (exe.parent/STORE/name).touch()
 
 
 def dispatch(base,version,args,*,launch=spawn,timeout=120):
+    if os.environ.pop('CADENCE_KEEP_CURRENT','')=='1': return False
     store=base.parent/STORE
     if not (store/'state.json').is_file() or shared_install(base): return False
     state=read_state(store)
+    if os.environ.get('CADENCE_TRIAL_READY') and state.get('installing')==version: return False
+    from update_install import discard_completed, runtime_name, plain, verify_staged, digest, runtime_hashes
+    plain(store)
+    pending=state.get('installing') or state.get('cleanup') or state.get('pending')
+    if pending and plain(plain(store/pending)/runtime_name(pending)).is_dir():
+        if state.get('installing') or state.get('cleanup') or version_tuple(pending)>version_tuple(version):
+            try:
+                if (store/(pending+'.json')).exists() or state.get('pending')==pending and not state.get('installing'):
+                    verify_staged(store,pending)
+                else:
+                    # Launchers through 2.0.7 did not retain the signed ZIP. Only resume a worker
+                    # whose executable and runtime match the already running installed application.
+                    package=store/pending
+                    runtime=runtime_name(pending)
+                    if pending!=version or digest(plain(package/'Cadence.exe'))!=digest(base):
+                        raise ValueError('Unverified recovery executable')
+                    if runtime_hashes(package/runtime)!=runtime_hashes(base.parent/runtime):
+                        raise ValueError('Unverified recovery runtime')
+            except (OSError,ValueError,KeyError) as error:
+                logging.exception('Update package could not be authenticated')
+                os.environ['CADENCE_UPDATE_ERROR']=type(error).__name__
+                with locked(store):
+                    state=read_state(store)
+                    if state.get('pending')==pending and not state.get('installing'):
+                        state.pop('pending'); state['failed']=pending; write_state(store,state)
+                return False
+            launch(plain(store/pending/'Cadence.exe'),['--apply-in-place',*args]); return True
+    discard_completed(store,state)
     def usable(v):
         return v and version_tuple(v)>version_tuple(version) and (store/v/'Cadence.exe').is_file()
     def previously_active():

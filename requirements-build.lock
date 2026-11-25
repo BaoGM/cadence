@@ -13,9 +13,9 @@ PyAudioWPatch==0.2.12.9 --hash=sha256:963376e94f46c84e994eda4d25ffd62b712881ad5d
 Pygments==2.21.0 --hash=sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9
 pyinstaller==6.22.3 --hash=sha256:500bd58c7bf7e584a8435adccbd763a0b918d5c12b08d74ff50fd79b2915458b
 pyinstaller-hooks-contrib==2026.9 --hash=sha256:fb3e67dd64122561724c48ad0366ac9e8c16e638b63bf7d85de03bf3fdbf06c3
-PySide6_Addons==6.12.0 --hash=sha256:98d8d62010da6605344cee83e5c96fb846170a1f2d924523f10f5d92078b02b0
-PySide6_Essentials==6.12.0 --hash=sha256:c9a95102aa23c1f86516a30d5a9be37552d324eee7e567eb7508973f1218cb42
+pyside6_addons @ https://download.qt.io/snapshots/ci/pyside/6.12/e36b8f6c8f9d3a4447ffc32d6ad0637de75f0ef6/pyside6/pyside6_addons-6.12.0a1.dev1795480720-cp310-abi3-win_amd64.whl --hash=sha256:d76571310bc9bdd3330d8ccff186a30b08457897688405faa3e776bd71d0cd73
+pyside6_essentials @ https://download.qt.io/snapshots/ci/pyside/6.12/e36b8f6c8f9d3a4447ffc32d6ad0637de75f0ef6/pyside6/pyside6_essentials-6.12.0a1.dev1795480720-cp310-abi3-win_amd64.whl --hash=sha256:999c7e2238ef6a66b3c62e259b9b35b6b1654d2a4758f238bd817d8da2ce8459
 pytest==9.1.1 --hash=sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c
 pywin32-ctypes==0.2.3 --hash=sha256:8a1513379d709975552d202d942d9837758905c8d01eb82b8bcc30918929e7b8
 setuptools==84.2.1 --hash=sha256:ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2
-shiboken6==6.12.0 --hash=sha256:a1906cb8116869178c64b6bab52623bbc8b4ceed7b30bfc3c9aa0f6e67f6438e
+shiboken6 @ https://download.qt.io/snapshots/ci/pyside/6.12/e36b8f6c8f9d3a4447ffc32d6ad0637de75f0ef6/pyside6/shiboken6-6.12.0a1.dev1795480720-cp310-abi3-win_amd64.whl --hash=sha256:cd0507e5e9f5482e58020374e93e6cdc6d800d44514c4bb7a45aa18963be3065

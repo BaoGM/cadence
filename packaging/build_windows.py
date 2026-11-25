@@ -57,7 +57,13 @@ def main():
         raise ValueError('Build requires pinned Python x64 version')
     packages = {}
     for line in (SOURCE / 'requirements-build.lock').read_text(encoding='utf-8').splitlines():
-        name, version = line.split(' --hash=', 1)[0].split('==')
+        requirement = line.split(' --hash=', 1)[0]
+        if ' @ ' in requirement:
+            from packaging.utils import parse_wheel_filename
+            name, url = requirement.split(' @ ', 1)
+            version = str(parse_wheel_filename(url.rsplit('/', 1)[1])[1])
+        else:
+            name, version = requirement.split('==')
         actual = importlib.metadata.version(name)
         if actual != version:
             raise ValueError(f'Package mismatch: {name}: expected {version}, found {actual}')

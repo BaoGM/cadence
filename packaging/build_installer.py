@@ -33,7 +33,7 @@ def build(version, payload, output, compiler=None, test_build=False):
         raise ValueError('Version attendue : major.minor.patch')
     payload = Path(payload).resolve()
     output = Path(output).resolve()
-    for required in ('Cadence.exe', '_internal', 'Licences'):
+    for required in ('Cadence.exe', '_internal-'+version, 'Licences'):
         if not (payload / required).exists():
             raise FileNotFoundError(payload / required)
     import pefile
@@ -69,6 +69,10 @@ def build(version, payload, output, compiler=None, test_build=False):
     compiler = compiler_path(compiler)
     command = [str(compiler), f'/DAppVersion={version}', f'/DPayloadDir={payload}',
                f'/DManifestFile={manifest}', f'/DAssociationsFile={associations}', f'/O{output}']
+    if not test_build:
+        from build_maintenance import build_maintenance
+        maintenance = build_maintenance(work / 'maintenance')
+        command.append(f'/DMaintenanceDir={maintenance}')
     if test_build:
         command.append('/DTestBuild=1')
     command.append(str(SOURCE / 'packaging/Cadence.iss'))

@@ -79,6 +79,14 @@ def test_mapping_fractional_rates_negative_origin_and_offset():
         assert to_cadence(host, -1001, fps, Fraction(24), 7) == frame
 
 
+@pytest.mark.parametrize('source,target', [(12,24), (24,12)])
+def test_maya_maps_every_position_to_an_integer_frame(source,target):
+    for pos in range(97):
+        converted=to_host(pos,101,Fraction(target),Fraction(source),0,whole_frames=True)
+        assert type(converted) is int
+        assert abs(Fraction(converted-101)-Fraction(pos*target,source))<=Fraction(1,2)
+
+
 @pytest.mark.parametrize('value', [float('nan'), float('inf'), True, '24', 0, 10000])
 def test_reject_bad_rates(value):
     with pytest.raises((ValueError, TypeError)):

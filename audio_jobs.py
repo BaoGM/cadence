@@ -10,6 +10,11 @@ class AudioJobs(QObject):
     status=Signal(str)
     def __init__(self,parent=None):
         super().__init__(parent); self.pending={}; self.active=None; self.closing=False
+        self.worker=Task(parent=self)
+        self.worker.progress.connect(self.progress_changed)
+        self.worker.result.connect(self.completed)
+        self.worker.failed.connect(self.failed_task)
+        self.worker.finished.connect(self.finished)
     def set_media(self,media):
         self.pending={m['audio']:dict(m) for m in media if m.get('audio_pending')}
         if self.active and self.active[0] not in self.pending: self.active[1].cancel.set()
@@ -18,10 +23,9 @@ class AudioJobs(QObject):
         if self.active or self.closing: return
         if not self.pending: self.status.emit(''); return
         path,data=next(iter(self.pending.items()))
-        task=Task(lambda p,c:prepare_audio(data,p,c),self); self.active=(path,task)
-        task.progress.connect(self.progress_changed)
-        task.result.connect(self.completed); task.failed.connect(self.failed_task); task.finished.connect(self.finished)
-        self.status.emit('Audio 0 %'); task.start()
+        self.active=(path,self.worker)
+        self.status.emit('Audio 0 %')
+        self.worker.start_work(lambda p,c:prepare_audio(data,p,c))
     @Slot(float,str)
     def progress_changed(self,value,message):
         if self.active and self.active[0] in self.pending: self.status.emit(f'Audio {round(value*100)} %')
@@ -35,7 +39,9 @@ class AudioJobs(QObject):
             self.pending.pop(self.active[0],None); self.failed.emit(message)
     @Slot()
     def finished(self):
-        task=self.active[1]; task.wait(); self.active=None; task.deleteLater(); self.start_next()
+        self.worker.wait()
+        self.active=None
+        self.start_next()
     def stop(self):
         self.closing=True; self.pending.clear()
         if self.active: self.active[1].cancel.set(); self.active[1].wait()

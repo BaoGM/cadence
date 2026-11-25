@@ -22,9 +22,10 @@ def application():
     return QApplication.instance() or QApplication([])
 
 
-@pytest.fixture(scope='module')
-def clips(tmp_path_factory):
-    root=tmp_path_factory.mktemp('layers')
+@pytest.fixture
+def clips(tmp_path,monkeypatch):
+    root=tmp_path
+    monkeypatch.setenv('CADENCE_CACHE',str(root/'cache'))
     entries=[]
     for color,frequency in [('red',440),('blue',880)]:
         path=root/(color+'.mp4')

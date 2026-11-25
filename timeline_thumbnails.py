@@ -17,11 +17,13 @@ class ReadThumbnails(QRunnable):
         self.result = result
 
     def run(self):
-        import av
+        from av import FFmpegError
+        from media_inputs import open_local_media
+        from export_sources import open_shared
         path, _, _, rotation, start, end, fps, offset, samples = self.key
         images = []
         try:
-            with av.open(path, timeout=(3, 3)) as movie:
+            with open_shared(path) as stream, open_local_media(stream, timeout=(3, 3), buffer_size=256*1024) as movie:
                 video = movie.streams.video[0]
                 video.codec_context.thread_count = 1
                 for index in range(samples):
@@ -38,7 +40,7 @@ class ReadThumbnails(QRunnable):
                             following = next(decoded, None)
                             if following is None: break
                             frame = following
-                    except (StopIteration, av.FFmpegError):
+                    except (StopIteration, FFmpegError):
                         break
                     w, h = frame.width, frame.height
                     scale = 96 / max(w, h)
@@ -48,7 +50,7 @@ class ReadThumbnails(QRunnable):
                     if rotation:
                         image = image.transformed(QTransform().rotate(-rotation))
                     images.append(image)
-        except (OSError, ValueError, IndexError, av.FFmpegError):
+        except (OSError, ValueError, IndexError, FFmpegError):
             pass
         try:
             self.result.ready.emit(self.key, tuple(images))

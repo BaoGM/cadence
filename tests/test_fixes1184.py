@@ -7,7 +7,7 @@ from PySide6.QtCore import QPoint, QPointF, Qt, QEvent
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtTest import QTest
 
-from model import State, Segment, MediaTrack, TrackInfo
+from model import Document, State, Segment, MediaTrack, TrackInfo
 from test_drawing import application, window
 from test_render1170 import clips, document
 from test_sync1120 import pump
@@ -145,6 +145,35 @@ def test_failed_library_open_preserves_edit_without_playing(window, application,
     assert not errors and not panel.file_error.isHidden() and panel.file_error.text()
     assert w.doc is old and old.state==original
     assert not panel.temporary and not panel.play_timer.isActive() and not w.transport.running
+
+
+def test_library_double_click_appends_selected_in_list_order(window,application,clips):
+    w=window; panel=w.playlists_panel
+    doc=Document(clips[0]['fps']); doc.append_media([clips[1]]); w.install_doc(doc)
+    original=doc.active_track
+    doc.add_media_track()
+    doc.append_media([clips[0]])
+    destination=doc.active_track.info.id
+    w.install_doc(doc)
+    identity=panel.store.create('Batch',[clips[1]['path'],clips[0]['path']])
+    panel.rebuild((identity,None))
+    w.library.show(); w.library_tabs.setCurrentWidget(panel)
+    w.activateWindow(); application.processEvents()
+    points=[panel.files.visualItemRect(panel.files.item(i)).center() for i in (0,1)]
+    view=panel.files.viewport()
+    QTest.mouseClick(view,Qt.LeftButton,Qt.NoModifier,points[1])
+    QTest.mouseClick(view,Qt.LeftButton,Qt.ControlModifier,points[0])
+    assert len(panel.files.selectedItems())==2 and w.job is None
+    QTest.mouseClick(view,Qt.LeftButton,Qt.NoModifier,points[0])
+    QTest.mouseDClick(view,Qt.LeftButton,Qt.NoModifier,points[0])
+    QTest.mouseRelease(view,Qt.LeftButton,Qt.NoModifier,points[0])
+    pump(application,lambda:w.job is None and w.transport.running,timeout=30)
+    w.pause()
+    assert w.doc is doc and doc.active_track_id==destination
+    assert not panel.temporary and doc.state.tracks[0]==original
+    assert [doc.media[seg.media]['path'] for seg in doc.active_track.segments]==[
+        clips[0]['path'],clips[1]['path'],clips[0]['path']]
+    assert doc.undo() and doc.active_track.length==clips[0]['frames']
 
 
 @pytest.mark.parametrize('case', ['quick', 'slow', 'multiple'])

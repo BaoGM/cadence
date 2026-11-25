@@ -41,10 +41,11 @@ def scan_folder(path,*,skip_junctions=False):
     return sorted(directories, key=str.casefold), sorted(files, key=str.casefold)
 
 
-def has_subfolders(path):
+def has_subfolders(path, excluded=()):
+    hidden={path_key(folder) for folder in excluded}
     try:
         with os.scandir(path) as entries:
-            return any(entry.is_dir(follow_symlinks=False) for entry in entries)
+            return any(entry.is_dir(follow_symlinks=False) and path_key(entry.path) not in hidden for entry in entries)
     except OSError:
         return False
 
@@ -67,8 +68,10 @@ def folder_tree_files(folder, records, cancel):
         if key in visited or not Path(directory).is_relative_to(root): continue
         visited.add(key)
         children,files=scan_folder(directory,skip_junctions=True)
-        result.extend(ordered_folder_files(records.get(directory,{}),files))
-        pending.extend(reversed(children))
+        record=records.get(directory,{})
+        result.extend(ordered_folder_files(record,files))
+        hidden={path_key(path) for path in record.get('excluded_folders',())}
+        pending.extend(child for child in reversed(children) if path_key(child) not in hidden)
     return result
 
 
@@ -97,6 +100,7 @@ class PlaylistStore:
                     for folder, record in item['folders'].items():
                         if not Path(folder).is_absolute() or not isinstance(record, dict): raise ValueError('Dossier suivi invalide.')
                         self.validate_paths(record.get('files')); self.validate_paths(record.get('excluded'))
+                        self.validate_paths(record.get('excluded_folders',[]))
             self.entries = entries
 
     @staticmethod
@@ -145,6 +149,23 @@ class PlaylistStore:
     def remove(self, identity):
         self.commit([item for item in self.entries if item['id'] != identity])
 
+    def remove_nodes(self,nodes):
+        folders={}
+        for identity,folder in nodes:
+            folders.setdefault(identity,[]).append(folder)
+        entries=copy.deepcopy(self.entries)
+        remaining=[]
+        for entry in entries:
+            selected=folders.get(entry['id'],())
+            if any(not folder or path_key(folder)==path_key(entry['root']) for folder in selected):
+                continue
+            for folder in selected:
+                parent=canonical(Path(folder).parent)
+                record=entry['folders'].setdefault(parent,dict(files=[],excluded=[]))
+                record['excluded_folders']=unique_paths([*record.get('excluded_folders',()),folder])
+            remaining.append(entry)
+        self.commit(remaining)
+
     def files(self, identity, folder=None):
         item = self.entry(identity)
         if item['kind'] == 'list': return list(item['files'])
@@ -156,7 +177,8 @@ class PlaylistStore:
             previous = item['folders'].get(folder, dict(files=[], excluded=[]))
             excluded = [] if refresh else previous['excluded']
             ordered = ordered_folder_files(dict(files=previous['files'],excluded=excluded),files)
-            item['folders'][folder] = dict(files=ordered, excluded=excluded)
+            item['folders'][folder] = dict(files=ordered, excluded=excluded,
+                                          excluded_folders=[] if refresh else previous.get('excluded_folders',[]))
         self.update(identity, operation)
 
     def set_files(self, identity, paths, folder=None, removed=()):

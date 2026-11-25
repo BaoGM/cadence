@@ -14,8 +14,16 @@ class Task(QThread):
     result = Signal(object)
     failed = Signal(str)
     cancelled = Signal()
-    def __init__(self,fn,parent=None):
-        super().__init__(parent); self.fn=fn; self.cancel=threading.Event()
+    def __init__(self,fn=None,parent=None):
+        super().__init__()
+        self.fn=fn
+        self.cancel=threading.Event()
+        if parent is not None:
+            self.setParent(parent)
+    def start_work(self,fn):
+        self.cancel=threading.Event()
+        self.fn=fn
+        self.start()
     def run(self):
         try:
             value=self.fn(lambda p,m:self.progress.emit(p,m),self.cancel)
@@ -24,6 +32,8 @@ class Task(QThread):
         except Cancelled: self.cancelled.emit()
         except Exception as e:
             logging.exception('Media task failed'); self.failed.emit(str(e).strip() or type(e).__name__)
+        finally:
+            self.fn=None
 
 class Decoder(QThread):
     ready=Signal(int,object)
@@ -31,6 +41,16 @@ class Decoder(QThread):
     def __init__(self,parent=None,*,warm_codecs=False):
         super().__init__(parent); self.cache=getattr(parent,'frame_cache',None); self.condition=threading.Condition(); self.requested=None; self.prefetch=[]; self.stopping=False; self.generation=0; self.last_target=None; self.backwards=False
         self.warm_codecs=warm_codecs
+        self.release_pending=False
+    def release_sources(self):
+        with self.condition:
+            self.generation+=1
+            self.requested=None
+            self.prefetch.clear()
+            self.last_target=None
+            self.backwards=False
+            self.release_pending=True
+            self.condition.notify()
     def request(self,token,media,index,ahead=()):
         cached=self.cache.get(frame_cache_key(media,index)) if self.cache is not None and 'proxy' in media else None
         with self.condition:
@@ -61,13 +81,19 @@ class Decoder(QThread):
         try:
             while True:
                 with self.condition:
-                    while self.requested is None and not self.prefetch and not self.stopping: self.condition.wait()
+                    while self.requested is None and not self.prefetch and not self.release_pending and not self.stopping: self.condition.wait()
                     if self.stopping: break
-                    if self.requested is not None:
+                    release=self.release_pending
+                    if release:
+                        self.release_pending=False
+                    elif self.requested is not None:
                         token,media,index=self.requested; self.requested=None
                     else:
                         media,index=self.prefetch.pop(0); token=None
                     generation=self.generation
+                if release:
+                    reader.close()
+                    continue
                 try:
                     cancel=lambda:self.stopping or generation!=self.generation
                     if media is None:

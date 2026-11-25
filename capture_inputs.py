@@ -67,6 +67,7 @@ class CaptureInputs(QWidget):
         self.expires = 0.
         self.buttons = set()
         self.pointer = None
+        self.click_expires = 0.
         self.timer = QTimer(self)
         self.timer.setInterval(16)
         self.timer.timeout.connect(self.tick)
@@ -76,7 +77,9 @@ class CaptureInputs(QWidget):
         self.keyboard, self.clicks = keyboard, clicks
         if not keyboard and not clicks: return
         if self.reader is None: self.reader = WindowsInputs()
-        area = screen.geometry() if region is None else region.translated(screen.geometry().topLeft())
+        area = screen.geometry()
+        if region is not None: area = region.translated(area.topLeft()).intersected(area)
+        self.setScreen(screen)
         self.setGeometry(area)
         self.previous = self.reader.pressed(keyboard)
         self.show()
@@ -92,7 +95,11 @@ class CaptureInputs(QWidget):
         elif now >= self.expires:
             self.caption = ''
         self.buttons = keys & {1,2,4} if self.clicks else set()
-        self.pointer = self.mapFromGlobal(QCursor.pos()) if self.buttons else None
+        if self.buttons:
+            self.pointer = self.mapFromGlobal(QCursor.pos())
+            self.click_expires = now + .075
+        elif now >= self.click_expires:
+            self.pointer = None
         self.previous = keys
         if old != (self.caption, self.buttons, self.pointer): self.update()
 
@@ -103,6 +110,7 @@ class CaptureInputs(QWidget):
         self.caption = ''
         self.buttons.clear()
         self.pointer = None
+        self.click_expires = 0.
         self.expires = 0.
 
     def paintEvent(self, event):

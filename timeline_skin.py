@@ -50,7 +50,7 @@ def flag(p, x, y, height=11, color=AMBER):
 
 
 def headers(t, p):
-    width = t.track_left()
+    width = t.track_header_width()
     p.fillRect(QRectF(0, 0, width, t.height()), QColor(HEAD))
     ruler_y = t.ruler_y()
     p.fillRect(QRectF(0, ruler_y, width, t.ruler_height()), QColor(RULER))
@@ -118,7 +118,7 @@ def compact_tick_center(x, width, ratio):
 
 def ruler(t, p):
     left, top = t.track_left(), t.ruler_y()
-    p.fillRect(QRectF(left, top, t.width() - left, t.ruler_height()), QColor(RULER))
+    p.fillRect(QRectF(t.track_header_width(), top, t.width() - t.track_header_width(), t.ruler_height()), QColor(RULER))
     if not t.simple:
         line(p, 0, top + 25.5, t.width(), top + 25.5, BORDER)
     if not t.state or not t.state.length:
@@ -277,12 +277,12 @@ def simple_strip(t):
         left=max(left_pixel/ratio,-8)
         right=min(right_pixel/ratio,bar.width()+8)
         if right<=left: continue
-        radius=min(4,(right-left)/2)
+        radius=min(6,(right-left)/2)
         rect=QRectF(left,0,right-left,bar.height())
         ink.setBrush(QColor('#303941' if segment.muted else '#2d4249'))
-        ink.drawRoundedRect(rect,radius,4)
+        ink.drawRoundedRect(rect,radius,6)
         if segment.muted:
-            shape=QPainterPath(); shape.addRoundedRect(rect,radius,4)
+            shape=QPainterPath(); shape.addRoundedRect(rect,radius,6)
             ink.save(); ink.setClipPath(shape)
             for x in range(math.floor(left-bar.height()),math.ceil(right),9):
                 line(ink,x,bar.height(),x+bar.height(),0,'#46515a')
@@ -425,6 +425,27 @@ def marker_at(t, point):
 
 def markers(t, p):
     drag=t.marker_drag
+    if t.state.marker_notes:
+        notes=t.state.marker_notes
+        if notes is not getattr(t,'_range_source',None):
+            ranges=[]
+            for f,d,_ in notes:
+                if d<=1: continue
+                if ranges and f<=ranges[-1][1]:
+                    ranges[-1]=(ranges[-1][0],max(ranges[-1][1],f+d))
+                else: ranges.append((f,f+d))
+            t._range_source=notes
+            t._marker_ranges=ranges
+            t._marker_ends=[end for _,end in ranges]
+        y=t.simple_track_rect().bottom()-2 if t.simple else t.marker_lane_height-3
+        i=bisect_right(t._marker_ends,t.view_start)
+        while i<len(t._marker_ranges):
+            start,end=t._marker_ranges[i]
+            if start>=t.view_start+t.span(): break
+            left=max(t.track_left(),t.x_for(start))
+            right=min(t.track_right(),t.x_for(end))
+            if right>left: p.fillRect(QRectF(left,y,right-left,2),QColor('#bd9566'))
+            i+=1
     for i, frame, area, text_area in marker_areas(t):
         if drag.destination is not None and drag.source==frame:
             continue

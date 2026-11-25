@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
+from contextlib import contextmanager
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject, QPoint, QSize, Qt
+from PySide6.QtCore import QDeadlineTimer, QEvent, QObject, QPoint, QSize, Qt, QTimer
 from shiboken6 import isValid
 from PySide6.QtGui import QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QCheckBox, QColorDialog, QFrame, QHBoxLayout, QLabel, QLayout,
@@ -93,7 +94,7 @@ def control(name, symbol=None, caption=None, action=None, size=17):
 
 
 def build_editing_strip(w):
-    from widgets import ScrubDoubleSpinBox
+    from widgets import ScrubDoubleSpinBox, adjustment_button
     body, row = strip('studioEditing', 44, 12)
     row.setSpacing(8)
     contents = QWidget()
@@ -101,7 +102,9 @@ def build_editing_strip(w):
     controls.setContentsMargins(0, 0, 2, 0)
     controls.setSpacing(8)
     controls.addWidget(glyph('settings'))
-    controls.addWidget(QLabel(tr('Exposition')))
+    w.exposure_button = adjustment_button('Exposition')
+    w.exposure_button.clicked.connect(w.toggle_exposure)
+    controls.addWidget(w.exposure_button)
     w.exp_spin = ScrubDoubleSpinBox()
     w.exp_spin.setRange(-10, 10)
     w.exp_spin.setDecimals(2)
@@ -115,9 +118,6 @@ def build_editing_strip(w):
     reset = control('Réinitialiser l’exposition', 'refresh', size=15)
     reset.clicked.connect(lambda:w.set_exposure(0))
     controls.addWidget(reset)
-    w.apply_export = QCheckBox(tr('Appliquer à l’export'))
-    w.apply_export.setChecked(True)
-    controls.addWidget(w.apply_export)
     controls.addWidget(divider())
     w.editing_flags = QWidget()
     flags = QHBoxLayout(w.editing_flags)
@@ -135,8 +135,6 @@ def build_editing_strip(w):
         a.setChecked(box.isChecked())
         a.toggled.connect(box.setChecked)
         box.toggled.connect(a.setChecked)
-    menu_toggle(w.apply_export)
-    choices.addSeparator()
     for attr, name, checked, hint in (
         ('copy_audio', 'Copier/coller le son', False, 'Décoché : les images collées sont accompagnées de silence. Cocher avant de copier pour inclure le son.'),
         ('leave_gap', 'Laisser un vide', False, 'Alt-déplacement : conserver un vide à la place du bloc déplacé.'),
@@ -182,6 +180,11 @@ class StudioChrome(QObject):
         window.drawing.panel.layout().setSizeConstraint(QLayout.SetNoConstraint)
         self.build_top()
         self.build_viewer()
+        from studio_sidepanels import SidePanelMotion
+        self.side_motion = SidePanelMotion(self)
+        self.video_settle = QTimer(self)
+        self.video_settle.setSingleShot(True)
+        self.video_settle.timeout.connect(self.finish_video_layout)
         self.build_rail()
         self.build_timeline()
         self.build_transport()
@@ -331,7 +334,7 @@ class StudioChrome(QObject):
         self.right_button.clicked.connect(lambda:self.toggle_side('right'))
         row.addWidget(self.right_button)
         menu = QMenu(self.view)
-        for key in ('header','drawing','comparison','timecode','transport','timeline','tools'):
+        for key in ('header','drawing','comments','comparison','timecode','transport','timeline','tools'):
             menu.addAction(w.panel_actions[key])
         self.view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.view.customContextMenuRequested.connect(lambda point:menu.exec(self.view.mapToGlobal(point)))
@@ -382,16 +385,46 @@ class StudioChrome(QObject):
         key=self.w.workspaces.mode+'/'+side
         if shown:
             self.side_history[key]=shown
-            for name in shown: docks[name].hide()
+            wanted=shown
         else:
-            wanted=[name for name in self.side_history.get(key,()) if name in docks]
-            for name in wanted or list(docks)[:1]:
-                dock=docks[name]
-                dock.show()
-                if self.w.workspaces.mode=='read':
-                    from studio_hover import slide_in
-                    slide_in(dock.widget(),QPoint(-20 if side=='left' else 20,0))
+            wanted=[name for name in self.side_history.get(key,()) if name in docks] or list(docks)[:1]
+        self.side_motion.toggle([docks[name] for name in wanted],not shown)
         self.align_workspace()
+
+    @contextmanager
+    def change_video_layout(self, target_size=None):
+        w = self.w
+        self.side_motion.settle()
+        self.video_settle.stop()
+        self.video_target_size = target_size
+        self.video_deadline = QDeadlineTimer(250)
+        self.stage_layout.setEnabled(False)
+        w.viewer.layout_pending = True
+        updates = w.updatesEnabled()
+        w.setUpdatesEnabled(False)
+        try:
+            yield
+        finally:
+            w.layout().activate()
+            w.setUpdatesEnabled(updates)
+            self.video_settle.start(0)
+
+    def finish_video_layout(self):
+        w = self.w
+        # Windows and the two dock layouts report intermediate sizes during a state change.
+        # Keep the previous video frame until the stage has its final geometry.
+        if self.video_target_size and w.size()!=self.video_target_size and not self.video_deadline.hasExpired():
+            self.video_settle.start(16)
+            return
+        for widget in (w, w.viewer_workspace, w.viewer_workspace.content):
+            widget.layout().activate()
+        if self.headers.top.isVisible() and self.headers.read and not w.video_fullscreen:
+            self.headers.reserve_top(self.top.height() if self.headers.narrow_header() else 0)
+        self.stage_layout.setEnabled(True)
+        self.stage_layout.invalidate()
+        self.stage_layout.activate()
+        w.viewer.layout_pending = False
+        w.viewer.update()
 
     def build_rail(self):
         w = self.w
@@ -522,7 +555,6 @@ class StudioChrome(QObject):
         w.transport_left.setSpacing(10)
         w.transport_center.setContentsMargins(0, 0, 0, 0)
         w.transport_center.setSpacing(2)
-        w.transport_center.insertWidget(w.transport_center.indexOf(w.loop_btn), divider())
         w.compare_controls.setVisible(w.compare_enabled.isChecked())
         w.compare_enabled.toggled.connect(w.compare_controls.setVisible)
         for i in range(w.transport_center.count()):
@@ -532,6 +564,7 @@ class StudioChrome(QObject):
         w.transport_widget.widget().setObjectName('studioTransport')
 
     def sync_mode(self, mode, simple):
+        self.side_motion.settle()
         for key,b in self.mode_buttons.items():
             b.setChecked(key == mode)
             b.setIcon(icon('edit' if key=='edit' else 'play', color='#112b29' if key==mode else '#d3deea'))
@@ -567,9 +600,14 @@ class StudioChrome(QObject):
     def eventFilter(self, obj, event):
         if isValid(self.w) and hasattr(self,'headers') and event.type() in (QEvent.Type.Resize, QEvent.Type.Move, QEvent.Type.Show, QEvent.Type.Hide):
             if obj is self.w:
+                if event.type() in (QEvent.Resize, QEvent.Hide):
+                    self.side_motion.settle()
                 self.responsive()
             elif obj is self.top:
                 self.center_modes()
+            elif (self.side_motion.measuring or self.side_motion.paths) and event.type() in (QEvent.Move,QEvent.Resize):
+                if obj is self.w.viewer_workspace:
+                    self.w.compact_transport.schedule()
             else:
                 self.align_workspace()
         return False
@@ -582,8 +620,10 @@ class StudioChrome(QObject):
             shown=any(not p.isHidden() for p in docks.values())
             text=tr(hide if shown else show)
             button.setEnabled(bool(docks))
-            button.setToolTip(text)
-            button.setAccessibleName(text)
+            if button.toolTip()!=text:
+                button.setToolTip(text)
+            if button.accessibleName()!=text:
+                button.setAccessibleName(text)
             button.setCheckable(True)
             button.setChecked(shown)
         w.compact_transport.schedule()
@@ -643,7 +683,6 @@ class StudioChrome(QObject):
         self.w.viewer.setMinimumHeight(70 if short else 90)
         self.w.editing_flags.setVisible(not condensed)
         self.w.editing_overflow.setVisible(condensed)
-        self.w.apply_export.setVisible(not narrow)
         for button in (self.w.open_btn,self.w.save_btn,self.w.export_btn):
             button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly if narrow
                                       else Qt.ToolButtonStyle.ToolButtonTextBesideIcon)

@@ -1,6 +1,6 @@
-PySide6_Essentials==6.12.0
-PySide6_Addons==6.12.0
-shiboken6==6.12.0
+pyside6_essentials @ https://download.qt.io/snapshots/ci/pyside/6.12/e36b8f6c8f9d3a4447ffc32d6ad0637de75f0ef6/pyside6/pyside6_essentials-6.12.0a1.dev1795480720-cp310-abi3-win_amd64.whl#sha256=999c7e2238ef6a66b3c62e259b9b35b6b1654d2a4758f238bd817d8da2ce8459
+pyside6_addons @ https://download.qt.io/snapshots/ci/pyside/6.12/e36b8f6c8f9d3a4447ffc32d6ad0637de75f0ef6/pyside6/pyside6_addons-6.12.0a1.dev1795480720-cp310-abi3-win_amd64.whl#sha256=d76571310bc9bdd3330d8ccff186a30b08457897688405faa3e776bd71d0cd73
+shiboken6 @ https://download.qt.io/snapshots/ci/pyside/6.12/e36b8f6c8f9d3a4447ffc32d6ad0637de75f0ef6/pyside6/shiboken6-6.12.0a1.dev1795480720-cp310-abi3-win_amd64.whl#sha256=cd0507e5e9f5482e58020374e93e6cdc6d800d44514c4bb7a45aa18963be3065
 av==19.0.2
 numpy==2.5.4
 pyinstaller==6.22.3

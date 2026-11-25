@@ -3,6 +3,7 @@ import json,logging,subprocess,tempfile,threading,time,uuid
 from pathlib import Path
 from fractions import Fraction
 from model import RATE,sample_at
+from media_inputs import local_input_args
 
 _locks={}
 _guard=threading.Lock()
@@ -54,7 +55,7 @@ def prepare_audio(data,progress=None,cancel=None):
         af=f'asetpts=PTS-{data.get("video_start",0):.12f}/TB,aresample={RATE}:async=1:first_pts=0'+audio_filter(data.get('cadence'))+f',apad,atrim=end_sample={samples}'
         args=[ffmpeg(),'-hide_banner','-loglevel','error','-nostdin','-copyts','-i',data['path'],'-map','0:a:0','-vn','-af',af,'-ar',str(RATE),'-ac','2','-c:a','pcm_s16le','-f','s16le','pipe:1']
         with tempfile.TemporaryFile(mode='w+b') as errors:
-            proc=subprocess.Popen(args,stdout=subprocess.PIPE,stderr=errors,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+            proc=subprocess.Popen(local_input_args(args),stdout=subprocess.PIPE,stderr=errors,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
             stopped=threading.Event()
             def watch():
                 while not stopped.wait(.1):

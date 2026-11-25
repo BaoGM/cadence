@@ -53,7 +53,7 @@ class MediaSourceDrops(QObject):
                                      window.edit_track_structure(window.doc.add_sources_to_track, identity, keys))
         return submenu
 
-    def insert_library(self,payload,identity,frame):
+    def insert_library(self,payload,identity,frame,*,autoplay=False):
         from media import prepare_batch
         from playlist_store import folder_tree_files
         window=self.window; panel=window.playlists_panel; doc=window.doc
@@ -61,7 +61,7 @@ class MediaSourceDrops(QObject):
         if 'node' in payload:
             entry,node=payload['node']
             if entry=='temporary':
-                saved=next((item['doc'] for item in panel.temporary if item['id']==node),None)
+                saved=next((item for item in panel.temporary if item['id']==node),None)
                 paths=panel.temporary_paths(saved) if saved else []
             elif node:
                 folder=node; records=panel.store.entry(entry)['folders']
@@ -80,6 +80,8 @@ class MediaSourceDrops(QObject):
             if window.doc is not doc or doc.state.tracks!=tracks or doc.fps!=original_rate: return
             if doc.insert_track_sources(identity,items,frame,adopt_rate=adopt_rate):
                 window.install_doc(doc)
+                if autoplay:
+                    panel.pending_playback=doc; panel.play_timer.start()
         window.begin_media_open(paths or [folder], 'Ajout de médias',prepare,success)
 
     def target(self, position):

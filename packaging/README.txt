@@ -6,4 +6,4 @@ The build starts from pinned tools and a fresh build directory. release.py consu
 
 Third-party sources and original notices are explicit, hash-verified inputs. No developer parent directory or historical test report is required.
 
-Outputs are unsigned until the separate signing workflow has been approved and implemented.
+Public update descriptors are signed separately. Windows executables are currently distributed without Authenticode signing.

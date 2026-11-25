@@ -12,11 +12,26 @@ def test_cache_eviction_and_live_limit():
     cache.put('huge',np.zeros(30,dtype=np.uint8)); assert cache.bytes==12
     cache.clear(); assert cache.bytes==0 and not cache.frames
 
+def test_default_cache_budget_and_loaded_time_units(window,monkeypatch):
+    import json
+    import cache_ram
+    from playback_preferences import load,path
+    monkeypatch.setattr(cache_ram,'physical_memory_mb',lambda:8192)
+    assert default_cache_mb()==2048
+    monkeypatch.setattr(cache_ram,'physical_memory_mb',lambda:2048)
+    assert default_cache_mb()==1024
+    for settings,expected in [({},'frames'),({'units':'time'},'time'),({'units':'frames'},'frames')]:
+        path().write_text(json.dumps(settings),encoding='utf-8')
+        load(window)
+        assert window.timeline.units==expected
+
 def test_ram_preferences_and_shared_cache(window):
     from preferences import ShortcutDialog
     w=window
     assert w.decoder.cache is w.reference_decoder.cache is w.frame_cache
     assert w.preferences['ram_cache_mb']==default_cache_mb()
+    assert w.preferences['clear_cache_on_exit']
+    assert validate(dict(w.preferences,clear_cache_on_exit=False),w.action_registry)['clear_cache_on_exit'] is False
     data=dict(w.preferences,ram_cache_mb=256); w.apply_preferences(data)
     assert w.frame_cache.budget==256*MIB
     assert validate(dict(data,ram_cache_mb=10**12),w.action_registry)['ram_cache_mb']==maximum_cache_mb()

@@ -317,12 +317,14 @@ void initialize(Renderer& state) {
     check(adapter->GetParent(IID_PPV_ARGS(&factory)),"Get DXGI factory");
     DXGI_ADAPTER_DESC description={}; check(adapter->GetDesc(&description),"Get adapter description");
     char adapter_name[256]={}; WideCharToMultiByte(CP_UTF8,0,description.Description,-1,adapter_name,sizeof(adapter_name),nullptr,nullptr);
-    std::snprintf(state.information,sizeof(state.information),"adapter=%s; feature=0x%X; selection=%s; flip-sequential; interval=1",adapter_name,unsigned(level),selection);
+    std::snprintf(state.information,sizeof(state.information),"adapter=%s; feature=0x%X; selection=%s; window-blit; interval=1",adapter_name,unsigned(level),selection);
     dxgi_device->SetMaximumFrameLatency(1);
     DXGI_SWAP_CHAIN_DESC1 swap={};
     swap.Width=1; swap.Height=1; swap.Format=DXGI_FORMAT_B8G8R8A8_UNORM;
     swap.SampleDesc.Count=1; swap.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    swap.BufferCount=2; swap.SwapEffect=DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+    // The Qt backing store takes over this child HWND during dock transitions.
+    // A flip-model surface lets DWM stretch its last buffer on the first reveal.
+    swap.BufferCount=2; swap.SwapEffect=DXGI_SWAP_EFFECT_DISCARD;
     swap.Scaling=DXGI_SCALING_STRETCH; swap.AlphaMode=DXGI_ALPHA_MODE_IGNORE;
     check(factory->CreateSwapChainForHwnd(state.device.Get(),state.window,&swap,nullptr,nullptr,&state.swapchain),"CreateSwapChainForHwnd");
     factory->MakeWindowAssociation(state.window,DXGI_MWA_NO_ALT_ENTER);

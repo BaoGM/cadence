@@ -48,12 +48,20 @@ def alpha_bounds(image):
 
 
 @lru_cache(maxsize=16)
-def _table(ev,mode,opacity,gain,swapped,reference_ev=None):
+def preview_levels(ev, gamma):
     from media import exposure_lut
     values=exposure_lut(ev) if ev else np.arange(256,dtype=np.uint8)
-    if mode=='single': return values
-    reference_ev=ev if reference_ev is None else reference_ev
-    reference=exposure_lut(reference_ev) if reference_ev else np.arange(256,dtype=np.uint8)
+    if not gamma: return values
+    opacity = abs(gamma) / 10.
+    target = 255. if gamma > 0 else 0.
+    return np.floor(values * (1. - opacity) + target * opacity + .5).astype(np.uint8)
+
+
+@lru_cache(maxsize=16)
+def _table(ev,mode,opacity,gain,swapped,reference_ev=None,gamma=0.):
+    if mode=='single': return preview_levels(ev,gamma)
+    values=preview_levels(ev,0.)
+    reference=values if reference_ev is None else preview_levels(reference_ev,0.)
     a,b=values[:,None],reference[None,:]
     if swapped: a,b=b,a
     if mode=='overlay':
@@ -63,15 +71,16 @@ def _table(ev,mode,opacity,gain,swapped,reference_ev=None):
     else:
         output=np.abs(np.subtract(a,b,dtype=np.int16))
         if gain!=1: output=np.clip(output*gain,0,255)
-    return np.ascontiguousarray(output,dtype=np.uint8)
+    output=np.ascontiguousarray(output,dtype=np.uint8)
+    return preview_levels(0.,gamma)[output] if gamma else output
 
 
-def rgb_image(a,b=None,*,ev=0.,mode='single',opacity=.5,gain=1.,swapped=False,flip_h=False,flip_v=False):
-    if mode=='single' and not (ev or flip_h or flip_v): return None
+def rgb_image(a,b=None,*,ev=0.,mode='single',opacity=.5,gain=1.,swapped=False,flip_h=False,flip_v=False,gamma=0.):
+    if mode=='single' and not (ev or gamma!=0 or flip_h or flip_v): return None
     if mode not in ('single','overlay','difference') or not available(): return None
     arrays=(a,) if mode=='single' else (a,b)
     if any(not isinstance(arr,np.ndarray) or arr.dtype!=np.uint8 or arr.ndim!=3 or arr.shape[2]!=3 or not arr.size for arr in arrays): return None
-    if not all(np.isfinite(v) for v in (ev,opacity,gain)): return None
+    if not all(np.isfinite(v) for v in (ev,opacity,gain,gamma)) or abs(gamma)>10: return None
     views=[]
     for arr in arrays:
         if arr.strides[2]!=1: arr=np.ascontiguousarray(arr)
@@ -79,14 +88,14 @@ def rgb_image(a,b=None,*,ev=0.,mode='single',opacity=.5,gain=1.,swapped=False,fl
         if flip_v: arr=arr[::-1]
         views.append(arr)
     a=views[0]; b=views[1] if len(views)>1 else None
-    reference_ev=ev
+    reference_ev=None
     if b is not None and a.shape!=b.shape:
         from comparison import fit_reference
         if ev:
-            exposed=_apply_table(b,None,_table(ev,'single',opacity,gain,False))
+            exposed=_apply_table(b,None,preview_levels(ev,0.))
             b=np.frombuffer(exposed.constBits(),np.uint8).reshape(exposed.height(),exposed.bytesPerLine())[:,:exposed.width()*3].reshape(exposed.height(),exposed.width(),3)
         b=fit_reference(b,a.shape[1],a.shape[0]); reference_ev=0.
-    return _apply_table(a,b,_table(ev,mode,opacity,gain,swapped,reference_ev))
+    return _apply_table(a,b,_table(ev,mode,opacity,gain,swapped,reference_ev,gamma))
 
 
 def _apply_table(a,b,table):

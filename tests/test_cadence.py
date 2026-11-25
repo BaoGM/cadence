@@ -55,10 +55,10 @@ def test_exposure_ffmpeg_parity(tmp_path):
         out=np.frombuffer(proc.stdout,dtype=np.uint8).reshape(rgb.shape)
         assert np.max(np.abs(out.astype(int)-exposure_lut(ev)[rgb].astype(int)))<=1
 
-@pytest.fixture(scope='module')
-def prepared(tmp_path_factory):
-    root=tmp_path_factory.mktemp('media')
-    os.environ['CADENCE_CACHE']=str(root/'cache')
+@pytest.fixture
+def prepared(tmp_path,monkeypatch):
+    root=tmp_path
+    monkeypatch.setenv('CADENCE_CACHE',str(root/'cache'))
     m=prepare_media(Path(__file__).resolve().parents[1]/'assets'/'Demonstration.mp4')
     return m,root
 
@@ -847,13 +847,24 @@ def test_compact_timeline_when_panels_hidden(prepared):
         win.resize(1600,1000); app.processEvents()
         assert win.viewer.height()>before
         assert win.timeline.height()==win.timeline.media_height() and win.timeline_panel.height()==timeline_height
-        assert abs(win.timeline_panel.height()-win.timeline.height()-win.studio.timeline_bar.height())<=2
+        slot_height=win.timeline_scroll_slot.height()
+        assert slot_height==win.timeline_scroll.sizeHint().height()
+        assert abs(win.timeline_panel.height()-win.timeline.height()-win.studio.timeline_bar.height()-slot_height)<=2
         for control in (win.copy_audio,win.leave_gap,win.link_tracks):
             assert win.header.isAncestorOf(control) and not win.timeline_panel.isAncestorOf(control)
-        win.timeline.zoom=4; win.timeline.clamp_view(); app.processEvents()
-        assert win.timeline_scroll.isVisible() and win.timeline_scroll.geometry().bottom()<win.timeline_panel.widget().height()
-        assert win.timeline_panel.height()>timeline_height
-        win.timeline.reset_view(); app.processEvents(); assert win.timeline_panel.height()==timeline_height
+        for simple in (True,False):
+            win.workspaces.set_timeline_simple(simple)
+            app.processEvents()
+            geometry=win.timeline_panel.geometry()
+            assert not win.timeline_scroll.isVisible()
+            inactive=win.timeline_scroll_slot.grab().toImage()
+            from timeline_skin import BASE
+            assert inactive.pixelColor(inactive.width()//2,inactive.height()//2).name()==BASE
+            win.timeline.zoom=4; win.timeline.clamp_view(); app.processEvents()
+            assert win.timeline_scroll.isVisible()
+            assert win.timeline_scroll.height()==slot_height and win.timeline_panel.geometry()==geometry
+            win.timeline.reset_view(); app.processEvents()
+            assert not win.timeline_scroll.isVisible() and win.timeline_panel.geometry()==geometry
         win.layout_action.trigger(); app.processEvents(); assert win.timeline_panel.height()<=timeline_height+26
     finally: doc.saved_signature=doc.signature(); win.close(); app.processEvents()
 

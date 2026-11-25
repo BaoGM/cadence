@@ -66,6 +66,7 @@ def test_capture_preferences_cancel_and_keep_window(application,tmp_path,monkeyp
         dialog.include_cadence.setChecked(False); dialog.quick_begin(); assert parent.isMinimized()
         parent.showNormal()
         screen=SimpleNamespace(geometry=lambda:QRect(0,0,640,360))
+        monkeypatch.setattr(dialog.inputs,'setScreen',lambda screen:None)
         dialog.inputs.reader=SimpleNamespace(pressed=lambda keyboard:set(),name=lambda key:str(key))
         dialog.inputs.start(screen,None,True,True)
         assert dialog.inputs.timer.isActive()
@@ -78,13 +79,18 @@ def test_capture_preferences_cancel_and_keep_window(application,tmp_path,monkeyp
 
 
 def test_input_overlay_held_buttons_keys_and_stop(application,monkeypatch):
+    import capture_inputs
+    clock = [10.]
+    monkeypatch.setattr(capture_inputs, 'time', SimpleNamespace(monotonic=lambda: clock[0]))
     pressed=set()
     reader=SimpleNamespace(pressed=lambda keyboard:set(pressed),name=lambda key:{17:'Ctrl',65:'A',16:'Maj'}.get(key,''))
     overlay=CaptureInputs(reader)
     screen=SimpleNamespace(geometry=lambda:QRect(-1280,100,1280,720))
+    attached=[]; monkeypatch.setattr(overlay,'setScreen',attached.append)
     monkeypatch.setattr(QCursor,'pos',lambda:QPoint(-1200,180))
     try:
         overlay.start(screen,QRect(10,20,400,300),True,True)
+        assert attached==[screen]
         assert overlay.geometry()==QRect(-1270,120,400,300)
         assert overlay.windowFlags() & Qt.WindowType.WindowTransparentForInput
         pressed.update((17,162,65,1)); overlay.tick()
@@ -92,7 +98,11 @@ def test_input_overlay_held_buttons_keys_and_stop(application,monkeypatch):
         assert overlay.pointer==QPoint(70,60)
         for button in (2,4):
             pressed.clear(); pressed.add(button); overlay.tick(); assert overlay.buttons=={button}
-        pressed.clear(); overlay.tick(); assert not overlay.buttons
+        pressed.clear(); overlay.tick(); assert not overlay.buttons and overlay.pointer==QPoint(70,60)
+        clock[0] += .050
+        overlay.tick(); assert overlay.pointer==QPoint(70,60)
+        clock[0] += .050
+        overlay.tick(); assert overlay.pointer is None
         overlay.expires=0; overlay.tick(); assert not overlay.caption
         overlay.stop(); assert not overlay.timer.isActive() and not overlay.previous and overlay.isHidden()
         overlay.start(screen,None,False,False); assert not overlay.timer.isActive()
@@ -123,3 +133,14 @@ def test_quarter_screen_and_compact_transport(application,tmp_path,monkeypatch):
         assert w.action_registry['Synchronisation 3D/Adapter la cadence du média courant…'][1]=='Ctrl+Alt+R'
     finally:
         w.doc.saved_signature=w.doc.signature(); w.close(); application.processEvents()
+
+def test_release_audit_allows_keyframe_pro_interop_only_in_guides(tmp_path,monkeypatch):
+    from pathlib import Path
+    import pytest
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1]/'packaging'))
+    from audit_release import audit_assets
+    for name in ('guide_fr.txt','guide_en.txt'):
+        (tmp_path/name).write_text('Keyframe Pro 2',encoding='utf8')
+    assert set(audit_assets(tmp_path))=={'guide_fr.txt','guide_en.txt'}
+    (tmp_path/'ui_en.txt').write_text('Keyframe Pro 2',encoding='utf8')
+    with pytest.raises(ValueError,match='Unexpected reference'): audit_assets(tmp_path)

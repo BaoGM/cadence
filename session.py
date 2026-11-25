@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from PySide6.QtCore import QObject, QTimer, QLockFile, QPointF
 from model import Document
+from project_io import ProjectSizeError
 from preferences import preference_path
 from workspace_modes import encoded, decoded
 from ui_text import tr
@@ -16,9 +17,8 @@ def session_path():
 
 
 def read_session(path):
-    path=Path(path)
-    if path.stat().st_size>64*1024*1024: raise ValueError('Fichier de session trop volumineux.')
-    data=json.loads(path.read_text(encoding='utf-8'))
+    from project_io import PROJECT_BYTES, read_json
+    data=read_json(path,PROJECT_BYTES,'Fichier de session trop volumineux.')
     if not isinstance(data,dict) or data.get('format')!='cadence-session' or data.get('version')!=1:
         raise ValueError('Fichier de session incompatible.')
     project=data.get('project_path')
@@ -59,12 +59,13 @@ def write_snapshot(path,document,view,encoder=None):
     state,media,fps,review,project,dirty=document
     payload=dict(format='cadence-session',version=1,updated=datetime.now(timezone.utc).isoformat(),
                  project_path=project,dirty=dirty,view=view)
-    document=dict(format='cadence-studio',version=17 if state.marker_names else 16 if state.second_track is not None or not state.track_info.audio_enabled or review.get('reference_track') else 15 if len(review.get('references',[]))>1 else 14 if review.get('reference_cadence') or any(m.get('cadence') for m in media.values()) else 13 if any(m.get('has_video') is False for m in media.values()) else 12 if state.frame_markers else 11,
+    document=dict(format='cadence-studio',version=20 if state.has_image_adjustments else 19 if state.marker_styles else 18 if state.marker_notes else 17 if state.marker_names else 16 if state.second_track is not None or not state.track_info.audio_enabled or review.get('reference_track') else 15 if len(review.get('references',[]))>1 else 14 if review.get('reference_cadence') or any(m.get('cadence') for m in media.values()) else 13 if any(m.get('has_video') is False for m in media.values()) else 12 if state.frame_markers else 11,
                   media=list(media.values()),fps=str(fps),comparison=review)
     encoded_state=(encoder or SnapshotEncoder()).state(state)
-    text=encode_json(payload)[:-1]+',"document":'+encode_json(document)[:-1]+',"state":'+encoded_state+'}}'
+    from project_io import PROJECT_BYTES, write_json_chunks
+    chunks=(encode_json(payload)[:-1],',"document":',encode_json(document)[:-1],',"state":',encoded_state,'}}')
     path=Path(path); path.parent.mkdir(parents=True,exist_ok=True)
-    temporary=path.with_suffix(path.suffix+'.tmp'); temporary.write_text(text,encoding='utf-8'); temporary.replace(path)
+    write_json_chunks(path,chunks,PROJECT_BYTES,'Fichier de session trop volumineux.')
 
 
 def number(data,key,default,lo,hi):
@@ -75,6 +76,7 @@ def number(data,key,default,lo,hi):
 class SessionRecovery(QObject):
     def __init__(self,window):
         super().__init__(window); self.w=window; self.path=session_path(); self.future=None; self.fingerprint=None
+        self.over_budget=False
         self.pending=False; self.closed=False; self.pool=None; self.encoder=SnapshotEncoder()
         self.path.parent.mkdir(parents=True,exist_ok=True)
         self.lock=QLockFile(str(self.path)+'.lock'); self.owner=self.lock.tryLock(0)
@@ -93,18 +95,29 @@ class SessionRecovery(QObject):
                     units=t.units,timeline_zoom=t.zoom,timeline_start=t.view_start,selection_track=t.selection_track,
                     zoom=v.zoom,pan=[v.pan.x(),v.pan.y()],angle=v.angle,volume=w.volume.value(),muted=w.volume.muted,
                     loop=w.playback_mode,copy_audio=w.copy_audio.isChecked(),leave_gap=w.leave_gap.isChecked(),
-                    link_tracks=w.link_tracks.isChecked(),apply_exposure=w.apply_export.isChecked(),
+                    link_tracks=w.link_tracks.isChecked(),
                     drawings_visible=d.visible.isChecked(),drawings_export=d.export.isChecked(),
                     onion=d.onion.isChecked(),before=d.before.value(),after=d.after.value(),ghost=d.ghost.value(),
                     brush_size=d.size.value(),brush_opacity=d.opacity.value(),sensitivity=d.sensitivity.value(),color=d.wheel.color())
+
+    def finish_checkpoint(self):
+        try:
+            self.future.result()
+            self.over_budget=False
+        except ProjectSizeError as error:
+            if not self.over_budget:
+                logging.warning('Session recovery write refused: %s',error)
+            self.over_budget=True
+        except Exception as error:
+            logging.exception('Session recovery write failed: %s',error)
+            self.fingerprint=None
+        self.future=None
 
     def checkpoint(self,wait=False):
         if not self.owner or self.closed or self.pending or self.w.job or not self.w.doc.media: return
         if self.future:
             if not wait and not self.future.done(): return
-            try: self.future.result()
-            except Exception as error: logging.exception('Session recovery write failed: %s',error); self.fingerprint=None
-            self.future=None
+            self.finish_checkpoint()
         w=self.w; doc=w.doc; view=self.view(); review=w.comparison_snapshot()
         key=(id(doc),id(doc.state),tuple((k,id(m)) for k,m in doc.media.items()),doc.project_path,doc.dirty,view,review)
         if key==self.fingerprint: return
@@ -112,9 +125,7 @@ class SessionRecovery(QObject):
         document=(doc.state,{k:dict(m) for k,m in doc.media.items()},doc.fps,review,doc.project_path,doc.dirty)
         self.future=self.pool.submit(write_snapshot,self.path,document,view,self.encoder)
         if wait:
-            try: self.future.result()
-            except Exception as error: logging.exception('Session recovery write failed: %s',error); self.fingerprint=None
-            self.future=None
+            self.finish_checkpoint()
 
     def offer(self):
         if not self.owner or self.closed or self.w.job or self.w.doc.media or not self.path.exists(): return
@@ -136,6 +147,9 @@ class SessionRecovery(QObject):
 
     def restore(self,data,doc):
         w=self.w; quality=w.preferences.get('preview_quality','native')
+        if w.job:
+            self.pending=False
+            return
         self.pending=True
         def prepare(progress,cancel):
             from media import prepare_media, validate_media, Cancelled
@@ -148,9 +162,7 @@ class SessionRecovery(QObject):
             return doc
         def success(restored):
             w.install_doc(restored); self.apply_view(data.get('view',{})); self.fingerprint=None
-        w.begin_task('Restauration de la session',prepare,success)
-        if w.job: w.job.finished.connect(self.restore_finished)
-        else: self.pending=False
+        w.begin_task('Restauration de la session',prepare,success,on_finished=self.restore_finished)
 
     def restore_finished(self): self.pending=False
 
@@ -172,7 +184,7 @@ class SessionRecovery(QObject):
         pan=data.get('pan'); pan=pan if isinstance(pan,list) and len(pan)==2 else [0,0]
         v.pan=QPointF(number({'x':pan[0]},'x',0,-100000,100000),number({'y':pan[1]},'y',0,-100000,100000))
         w.playback_mode='loop' if data.get('loop')=='loop' else 'once'
-        for key,control in [('copy_audio',w.copy_audio),('leave_gap',w.leave_gap),('link_tracks',w.link_tracks),('apply_exposure',w.apply_export),('drawings_visible',d.visible),('drawings_export',d.export),('onion',d.onion)]:
+        for key,control in [('copy_audio',w.copy_audio),('leave_gap',w.leave_gap),('link_tracks',w.link_tracks),('drawings_visible',d.visible),('drawings_export',d.export),('onion',d.onion)]:
             if type(data.get(key)) is bool: control.setChecked(data[key])
         for key,control in [('before',d.before),('after',d.after),('ghost',d.ghost),('brush_size',d.size),('brush_opacity',d.opacity),('sensitivity',d.sensitivity)]:
             control.setValue(number(data,key,control.value(),control.minimum(),control.maximum()))

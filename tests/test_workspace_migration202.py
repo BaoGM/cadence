@@ -7,6 +7,42 @@ from PySide6.QtWidgets import QDockWidget, QMainWindow, QToolBar, QWidget
 from test_drawing import application
 
 
+def test_comments_available_after_layout_restore_and_restart(application,tmp_path,monkeypatch):
+    from app import MainWindow
+
+    monkeypatch.setenv('CADENCE_PREFS',str(tmp_path/'prefs.json'))
+    monkeypatch.setenv('CADENCE_CACHE',str(tmp_path/'cache'))
+    def action(w):
+        popup=w.createPopupMenu()
+        result=next(entry for entry in popup.actions() if entry.data()=='comments')
+        result.trigger()
+        popup.deleteLater()
+    w=MainWindow()
+    w.show()
+    try:
+        w.workspaces.switch('edit')
+        w.drawing.panel.hide()
+        action(w)
+        assert w.drawing.comments.isVisible() and w.drawing.comments_action.isChecked()
+        w.workspaces.reset(all_modes=True)
+        assert w.workspaces.mode=='read' and w.drawing.panel.isHidden()
+        w.workspaces.switch('edit')
+        assert w.drawing.comments.isVisible() and w.drawing.comments_action.isChecked()
+    finally:
+        w.close()
+    w=MainWindow()
+    try:
+        w.show()
+        application.processEvents()
+        assert w.workspaces.mode=='edit' and w.drawing.comments.isVisible()
+        action(w)
+        assert not w.drawing.panel.isHidden() and w.drawing.inspector_tabs.currentIndex()==0
+        action(w)
+        assert w.drawing.comments.isVisible()
+    finally:
+        w.close()
+
+
 def test_restore_maximized_legacy_layout_without_reparenting_live_docks(application, tmp_path, monkeypatch):
     from app import MainWindow
 

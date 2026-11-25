@@ -6,7 +6,7 @@ import numpy as np
 from PySide6.QtCore import Qt, Signal, QRectF, QPointF, QEvent, QVariantAnimation, QEasingCurve, QSize
 from PySide6.QtGui import QColor, QPainter, QPen, QFont, QImage, QPainterPath, QPainterPathStroker, QPolygonF
 from PySide6.QtWidgets import QApplication, QWidget, QDoubleSpinBox, QSpinBox, QMenu, QPushButton
-from media import exposure_lut
+from native_render import preview_levels
 from model import locate
 from drag import ContinuousDrag
 from drawing_timeline import DrawingTimeline
@@ -15,6 +15,16 @@ from preferences import default_canvas, modifier_name
 
 BG=QColor('#101318'); PANEL=QColor('#191e26'); MUTED=QColor('#8895a7'); TEXT=QColor('#e8edf5'); ACCENT=QColor('#68e0cf')
 from studio_transport import TransportButton, VolumeBars
+
+def adjustment_button(label):
+    button = QPushButton(tr(label))
+    button.setCheckable(True)
+    button.setChecked(True)
+    button.setCursor(Qt.PointingHandCursor)
+    button.setStyleSheet('QPushButton {padding:3px 7px;color:#91a2b0;border:1px solid #394956;border-radius:4px;}'
+                         'QPushButton:checked {background:#233b3e;color:#8ce7da;}'
+                         'QPushButton:hover,QPushButton:focus {border-color:#69d9c8;}')
+    return button
 
 def paint_frame_number(p,frame,center,y,bounds,active=False,compact=False):
     p.save(); p.resetTransform(); p.setClipping(False)
@@ -79,8 +89,11 @@ class Viewer(QWidget):
     openRequested=Signal()
     def __init__(self):
         super().__init__(); self.setMinimumSize(160,90); self.setAcceptDrops(True)
+        self.layout_pending=False
+        self.panel_raster=False
+        self.panel_frame=None
         self.reference_rgb=None; self.comparing=False; self.compare_mode='horizontal'; self.compare_opacity=.5; self.compare_gain=1.; self.compare_swapped=False; self.wipe_position=.5; self.wipe_image=None
-        self.rgb=None; self.image=None; self.ev=0; self.origin=None; self.base=0; self.position=0; self.loaded=False
+        self.rgb=None; self.image=None; self.ev=0; self.preview_gamma=0.; self.origin=None; self.base=0; self.position=0; self.loaded=False
         self.gpu_packet=None; self._cpu_preview=None
         self.zoom=1.0; self.pan=QPointF(0,0); self.angle=0.0; self.nav=None; self.controls=default_canvas()
         from preferences import DEFAULT_SCRUB_PIXELS
@@ -92,12 +105,13 @@ class Viewer(QWidget):
         from video_surface import attach_surface
         attach_surface(self)
     def update(self,*args):
+        if self.layout_pending: return
         super().update(*args)
         if getattr(self,'surface',None) is not None: self.surface.update()
         self.presentationChanged.emit()
     def resizeEvent(self,event):
         super().resizeEvent(event)
-        if self.surface is not None: self.surface.setGeometry(self.rect())
+        if self.surface is not None and not self.panel_raster: self.surface.setGeometry(self.rect())
         self.presentationChanged.emit()
     def showEvent(self,event):
         super().showEvent(event)
@@ -111,9 +125,13 @@ class Viewer(QWidget):
         self.rgb=arr.compose() if self.layer_frame is not None else arr
         self.loaded=True; self.apply_effect()
     def set_exposure(self,ev): self.ev=ev; self.apply_effect()
+    def set_gamma_adjustment(self, adjustment):
+        if self.preview_gamma == adjustment: return
+        self.preview_gamma = adjustment
+        self.apply_effect()
     def apply_effect(self):
         if self.rgb is not None:
-            signature=(id(self.rgb),id(self.reference_rgb),self.ev,self.flip_h,self.flip_v,self.comparing,self.compare_mode,self.compare_opacity,self.compare_gain,self.compare_swapped,getattr(self,'geometry_segment',None),getattr(self,'geometry_aspect',None),getattr(self,'geometry_source',False))
+            signature=(id(self.rgb),id(self.reference_rgb),self.ev,self.preview_gamma,self.flip_h,self.flip_v,self.comparing,self.compare_mode,self.compare_opacity,self.compare_gain,self.compare_swapped,getattr(self,'geometry_segment',None),getattr(self,'geometry_aspect',None),getattr(self,'geometry_source',False))
             signature+=(getattr(self,'layer_geometry_ids',()),tuple(sorted((getattr(self,'layer_exposures',None) or {}).items())))
             if signature==getattr(self,'_effect_signature',None): return
             from clip_geometry import apply_geometry
@@ -128,7 +146,7 @@ class Viewer(QWidget):
                 if self.renderer=='direct3d': from native_d3d import prepare
                 else: from native_gpu import prepare
                 self.gpu_packet=prepare(prepared,self.reference_rgb if comparing else None,
-                    ev=self.ev,mode=self.compare_mode if comparing else 'single',opacity=self.compare_opacity,
+                    ev=self.ev,gamma=self.preview_gamma,mode=self.compare_mode if comparing else 'single',opacity=self.compare_opacity,
                     gain=self.compare_gain,swapped=self.compare_swapped,flip_h=self.flip_h,flip_v=self.flip_v,wipe=self.wipe_position)
             if self.gpu_packet is not None:
                 storage=self.gpu_packet[0][0]
@@ -136,7 +154,7 @@ class Viewer(QWidget):
                 self.wipe_image=None; self._effect_signature=signature; self._effect_sources=(self.rgb,self.reference_rgb)
                 self.update(); return
             native_image=rgb_image(prepared,self.reference_rgb if comparing else None,
-                ev=self.ev,mode=self.compare_mode if comparing else 'single',
+                ev=self.ev,gamma=self.preview_gamma,mode=self.compare_mode if comparing else 'single',
                 opacity=self.compare_opacity,gain=self.compare_gain,swapped=self.compare_swapped,
                 flip_h=self.flip_h,flip_v=self.flip_v)
             if native_image is not None:
@@ -144,7 +162,7 @@ class Viewer(QWidget):
                 self._effect_signature=signature; self._effect_sources=(self.rgb,self.reference_rgb)
                 self.update(); return
             def effect(rgb):
-                if self.ev: rgb=exposure_lut(self.ev)[rgb]
+                if self.ev: rgb=preview_levels(self.ev,0.)[rgb]
                 if self.flip_h: rgb=rgb[:,::-1]
                 if self.flip_v: rgb=rgb[::-1]
                 return rgb
@@ -155,9 +173,11 @@ class Viewer(QWidget):
                 if self.compare_mode=='wipe':
                     other=fit_reference(effect(self.reference_rgb),rgb.shape[1],rgb.shape[0])
                     if self.compare_swapped: rgb,other=other,rgb
+                    if self.preview_gamma: other=preview_levels(0.,self.preview_gamma)[other]
                     other=np.ascontiguousarray(other)
                     self.wipe_image=QImage(other.data,other.shape[1],other.shape[0],other.strides[0],QImage.Format.Format_RGB888).copy()
                 else: rgb=compose(rgb,effect(self.reference_rgb),self.compare_mode,self.compare_opacity,self.compare_gain,self.compare_swapped)
+            if self.preview_gamma: rgb=preview_levels(0.,self.preview_gamma)[rgb]
             rgb=np.ascontiguousarray(rgb)
             self.image=QImage(rgb.data,rgb.shape[1],rgb.shape[0],rgb.strides[0],QImage.Format.Format_RGB888).copy()
             self._effect_signature=signature; self._effect_sources=(self.rgb,self.reference_rgb)
@@ -170,16 +190,19 @@ class Viewer(QWidget):
         return size
     def cpu_preview(self):
         if self.gpu_packet is None: return self.image
+        if (len(self.gpu_packet[0])==1 and self.gpu_packet[4]
+                and not self.gpu_packet[2] and not self.gpu_packet[3]):
+            return self.image
         if self._cpu_preview is None or (self.comparing and self.compare_mode=='wipe' and getattr(self,'_cpu_wipe',None)!=self.wipe_position):
             self._cpu_wipe=self.wipe_position
             from native_render import rgb_image
             arrays=self.gpu_packet[0]
             image=rgb_image(arrays[0],arrays[1] if len(arrays)>1 else None,
-                ev=self.ev,mode=self.compare_mode if len(arrays)>1 else 'single',opacity=self.compare_opacity,
+                ev=self.ev,gamma=self.preview_gamma,mode=self.compare_mode if len(arrays)>1 else 'single',opacity=self.compare_opacity,
                 gain=self.compare_gain,swapped=self.compare_swapped,flip_h=self.flip_h,flip_v=self.flip_v)
             if image is None:
                 def effect(rgb):
-                    if self.ev: rgb=exposure_lut(self.ev)[rgb]
+                    if self.ev: rgb=preview_levels(self.ev,0.)[rgb]
                     if self.flip_h: rgb=rgb[:,::-1]
                     if self.flip_v: rgb=rgb[::-1]
                     return rgb
@@ -187,13 +210,14 @@ class Viewer(QWidget):
                 if len(arrays)>1:
                     from comparison import compose
                     rgb=compose(rgb,effect(arrays[1]),self.compare_mode,self.compare_opacity,self.compare_gain,self.compare_swapped,self.wipe_position)
+                if self.preview_gamma: rgb=preview_levels(0.,self.preview_gamma)[rgb]
                 rgb=np.ascontiguousarray(rgb)
                 image=QImage(rgb.data,rgb.shape[1],rgb.shape[0],rgb.strides[0],QImage.Format.Format_RGB888).copy()
             self._cpu_preview=image
         return self._cpu_preview
     def clear(self): self.layer_frame=None; self._effect_signature=None; self._effect_sources=None; self.gpu_packet=None; self._cpu_preview=None; self.reference_rgb=None; self.rgb=None; self.image=None; self.loaded=False; self.update()
     def paintEvent(self,event):
-        if self.renderer in ('opengl','direct3d'): return
+        if self.layout_pending or not self.panel_raster and self.renderer in ('opengl','direct3d'): return
         p=QPainter(self)
         try: self.paint_scene(p)
         finally: p.end()
@@ -206,8 +230,20 @@ class Viewer(QWidget):
             p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform); p.translate(self.width()/2+self.pan.x(),self.height()/2+self.pan.y()); p.rotate(self.angle); p.scale(self.zoom,self.zoom)
             image_rect=QRectF(-size.width()/2,-size.height()/2,size.width(),size.height())
             if self.gpu_packet is not None: self.gpu_packet.wipe=self.wipe_position
-            accelerated=False if sample else video_draw(p,image_rect) if video_draw else self.gpu_packet is not None and self.surface is not None and self.surface.compositor.paint(p,self.gpu_packet,image_rect)
-            if not accelerated: p.drawImage(image_rect,self.cpu_preview())
+            accelerated=False
+            if not sample:
+                if video_draw is not None:
+                    accelerated=video_draw(p,image_rect)
+                elif not self.panel_raster and self.gpu_packet is not None and self.surface is not None:
+                    accelerated=self.surface.compositor.paint(p,self.gpu_packet,image_rect)
+            if not accelerated:
+                frame=self.cpu_preview()
+                if self.panel_raster and not sample:
+                    key=frame.cacheKey()
+                    if self.panel_frame is None or self.panel_frame[0]!=key:
+                        self.panel_frame=key,frame.convertToFormat(QImage.Format.Format_RGB32)
+                    frame=self.panel_frame[1]
+                p.drawImage(image_rect,frame)
             wiping=self.comparing and self.reference_rgb is not None and self.compare_mode=='wipe'
             if wiping:
                 area=QRectF(-size.width()/2,-size.height()/2,size.width(),size.height()); x=area.left()+area.width()*self.wipe_position
@@ -355,13 +391,15 @@ class Timeline(TrackRows,QWidget):
         self.track_indices={'video':SegmentIndex(),'audio':SegmentIndex()}
         self.simple=False; self.selection_track='video'; self.drawing_track=DrawingTimeline(self)
         self.zoom=1.; self.view_start=0.; self.nav=None; self.hover_x=None; self.external_scrubbing=False
-        self.units='time'; self.gesture=None; self.move_span=None; self.drop_frame=None; self.ghost_x=None; self.animated_x=None; self.linked=True; self.leave_gap=False
+        self.units='frames'; self.gesture=None; self.move_span=None; self.drop_frame=None; self.ghost_x=None; self.animated_x=None; self.linked=True; self.leave_gap=False
         self.drag_animation=QVariantAnimation(self); self.drag_animation.setDuration(110); self.drag_animation.setEasingCurve(QEasingCurve.Type.OutCubic); self.drag_animation.valueChanged.connect(self.animate_drop)
         self.clip_preview=ClipDragPreview(self)
         from timeline_thumbnails import ClipThumbnails
         self.thumbnails=ClipThumbnails(self)
         from timeline_gestures import MarkerDrag
         self.marker_drag=MarkerDrag(self)
+        from marker_popup import MarkerHover
+        self.marker_hover=MarkerHover(self)
         self.setMouseTracking(True); self.setToolTip(tr('Glisser : scrub · Maj + glisser : sélectionner · Alt + glisser : déplacer · Alt + Maj + glisser : dupliquer avec le son'))
     def animate_drop(self,value): self.animated_x=float(value); self.update()
     def target_drop(self,x):
@@ -377,11 +415,16 @@ class Timeline(TrackRows,QWidget):
         if changed or lifting: self.clip_preview.describe_target()
         self.update()
     def set_document(self,state,media,fps):
+        if self.state and not state:
+            self.marker_hover.cancel()
+        notes_changed=self.state and state and (
+            self.state.marker_notes is not state.marker_notes or self.state.marker_styles is not state.marker_styles)
         if self.clip_preview.phase=='land' and (state is not self.state or self.simple!=self._land_simple):
             self.clip_preview.clear()
         if not state or not state.selection or self.state is None or self.state.tracks!=state.tracks:
             self.clip_anchor=None
         self.state=state; self.setFixedHeight(42 if self.simple else self.media_height()); self.media=media; self.fps=float(fps); self.clamp_view(); self.update()
+        if notes_changed: self.marker_hover.update_comment()
     def set_units(self,units):
         self.units=units; self.update(); self.unitsChanged.emit(units)
     def install_scrub_band(self,band):
@@ -413,7 +456,8 @@ class Timeline(TrackRows,QWidget):
         height=self.video_height(self.active_media)-6 if track=='video' else 19
         return QRectF(self.track_left(),self.track_y(track),self.track_width(),height)
     def simple_track_rect(self): return QRectF(self.track_left(),self.media_top()+1,self.track_width(),17)
-    def track_left(self): return min(163 if self.width()>1000 else 139 if self.width()>760 else 126, max(22,self.width()//3))
+    def track_header_width(self): return min(163 if self.width()>1000 else 139 if self.width()>760 else 126, max(22,self.width()//3))
+    def track_left(self): return self.track_header_width() + (6 if self.simple else 0)
     def track_right(self):
         margin=40 if self.units=='time' else 32
         return max(self.track_left()+1,self.width()-margin)
@@ -575,14 +619,13 @@ class Timeline(TrackRows,QWidget):
     def timeline_context_menu(self,pos):
         header=self.media_header_menu(pos)
         if header is not None: return header
-        if (self.drawing_track.contains(pos) or not self.simple and pos.y()<self.media_top()) and self.state and self.state.length:
+        if pos.y()<self.media_top() and self.state and self.state.length:
             return self.drawing_track.context_menu(pos.x())
-        menu=QMenu(tr(self)); simple=getattr(self,'simple',False)
+        menu=QMenu(tr(self))
         self.add_units(menu); menu.addSeparator(); self.add_timeline_mode(menu)
-        if not simple and pos.y()<38: self.add_delete_keys(menu,pos.x()); return menu
         menu.addSeparator()
         target=self.context_target(pos.x(),pos.y())
-        if target is None: self.add_delete_keys(menu,pos.x()); return menu
+        if target is None: self.add_annotation_actions(menu,pos.x()); return menu
         a,b,track=target
         self.add_media_audio_action(menu,self.active_media)
         menu.addSeparator()
@@ -598,24 +641,22 @@ class Timeline(TrackRows,QWidget):
         menu.addSeparator()
         action=menu.addAction(tr('Désactiver / Activer '+('la vidéo' if track=='video' else 'l’audio'))); action.triggered.connect(lambda:self.muteRequested.emit(a,b,track))
         action=menu.addAction(tr('Scinder')); action.triggered.connect(lambda:self.splitRequested.emit(track))
-        self.add_delete_keys(menu,pos.x()); return menu
-    def add_delete_keys(self,menu,x):
-        from drawing import active_key
+        self.add_annotation_actions(menu,pos.x()); return menu
+    def add_annotation_actions(self,menu,x):
         self.add_marker_actions(menu,x)
-        available=bool(self.state and self.state.length)
-        frame=self.frame_for(x) if available else 0; key=active_key(self.state.drawings,frame) if available else None
-        selected=self.state.selection if available else None
-        span=selected if selected and selected[0]<=frame<selected[1] else (key.start,key.end) if key else (frame,frame+1)
         if menu.actions() and not menu.actions()[-1].isSeparator(): menu.addSeparator()
-        action=menu.addAction(tr('Supprimer les clés')); action.setData('delete_keys'); action.setEnabled(available and any(k.start<span[1] and k.end>span[0] for k in self.state.drawings))
-        action.triggered.connect(lambda:self.drawingDelete.emit(*span))
+        if self.state and self.state.length:
+            self.drawing_track.add_clipboard_actions(menu,x)
+        else:
+            action=menu.addAction(tr('Supprimer les clés'))
+            action.setData('delete_keys'); action.setEnabled(False)
 
     def add_marker_actions(self,menu,x):
         available=bool(self.state and self.state.length)
         frame=min(self.frame_for(x),self.state.length-1) if available else 0; selection=self.state.selection if available else None
         a,b=selection if selection and selection[0]<=frame<selection[1] else (frame,frame+1)
         if menu.actions() and not menu.actions()[-1].isSeparator(): menu.addSeparator()
-        action=menu.addAction(tr('Ajouter un marqueur')); action.setData('add_marker'); action.setEnabled(available and frame not in self.state.frame_markers); action.triggered.connect(lambda:self.markerAdded.emit(frame))
+        action=menu.addAction(tr('Ajouter un marqueur')); action.setData('add_marker'); action.setEnabled(bool(available and (selection or frame not in self.state.frame_markers))); action.triggered.connect(lambda:self.markerAdded.emit(frame))
         action=menu.addAction(tr('Supprimer les marqueurs')); action.setData('delete_markers'); action.setEnabled(available and any(a<=f<b for f in self.state.frame_markers)); action.triggered.connect(lambda:self.markersDeleted.emit(a,b))
 
     def boundary_for(self,x):
@@ -657,6 +698,9 @@ class Timeline(TrackRows,QWidget):
             from timeline_skin import marker_at
             marker=marker_at(self,e.pos())
             if marker:
+                if self.marker_hover.enabled and self.marker_hover.comment(marker[0]):
+                    e.accept()
+                    return True
                 text=escape(' · '.join(filter(None,(marker[1],self.tick_label(marker[0])))))
                 QToolTip.showText(e.globalPos(),'<span>'+text+'</span>',self)
                 return True
@@ -715,6 +759,7 @@ class Timeline(TrackRows,QWidget):
         from timeline_skin import marker_at
         self.hover_point=e.position()
         marker=marker_at(self,e.position())
+        if not e.buttons(): self.marker_hover.hover(marker,e.position())
         self.hover_marker=marker[0] if marker else None
         if marker: self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.hover_x=e.position().x()

@@ -60,6 +60,7 @@ class TrackRows:
 
     def can_add_at_cursor(self,marker):
         if not self.state or not self.state.length: return False
+        if marker and self.state.selection: return True
         frame=self.state.position
         if not 0<=frame<self.state.length: return False
         if marker:

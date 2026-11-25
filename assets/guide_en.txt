@@ -1,4 +1,4 @@
-Cadence 2.0.6 - Quick guide
+Cadence 2.0.12 - Quick guide
 
 The key examples use the original QWERTY profile. The list at the end shows the active shortcuts for your layout, including your custom bindings.
 
@@ -9,29 +9,29 @@ File > Open media appends video, WAV or MP3 files in sequence. You can also drop
 
 Ctrl+S saves the edit, drawings and comparison references to a .cadence project. Keep the media files in their original locations. Save as creates another project. Ctrl+N starts an empty edit.
 
-Ctrl+E exports MP4, MOV, GIF, WAV or MP3. WAV (48 kHz, 16-bit, stereo) and MP3 (192 kbps) export the track mix. GIF is silent. Enable “Include drawings in export” to export drawings and active onion skins.
+Ctrl+E exports MP4, MOV, GIF, WAV or MP3. WAV (48 kHz, 16-bit, stereo) and MP3 (192 kbps) export the track mix. GIFs are silent. If a source is deleted from disk while the edit is open, Cadence can still use the open file or its cached preview. Enable “Include drawings in export” to export drawings and active onion skins.
 
 ----------------------------------------
 Playback, viewing and panels
 
-Space plays or pauses. Left and Right step one frame in either direction. Comma and Period jump between drawing keys and markers. K switches those two shortcuts between keys and frames. The Previous keyframe and Next keyframe buttons always visit drawing keys and markers. The loop button remembers your playback choice. Ctrl + wheel changes the volume in 5% steps.
+Space plays or pauses. Left and Right step one frame in either direction. Comma and Period jump between drawing keys and markers. K switches those two shortcuts between keys and frames. The Previous keyframe and Next keyframe buttons always visit drawing keys and markers. The loop button remembers your playback choice. Up and Down, or Ctrl + wheel, change the volume in 5% steps. In a list or menu, the arrow keys navigate.
 
 Scrub by dragging on the timeline, on empty space in its header or the playback controls, or on the video with the Pointer tool. Hold Shift on the video for finer scrubbing. Shift-drag on the timeline selects a range and displays its duration. Release the mouse before Shift to keep the range. I and O set its bounds. Escape clears the selection.
 
-In Playback mode, hover over the top of the video to reveal the header. Hovering over the timeline reveals the lower bar, which stays accessible as you move to its controls. Editing mode initially shows every panel. View > Playback / editing mode settings customizes each workspace. F10 opens the main menu when the key is available.
+In Playback mode, hover over the top of the video to reveal the header. Hover over the strip just above the ruler to reveal the lower controls. Editing mode initially shows every panel. View > Playback / editing mode settings customizes each workspace. F10 opens the main menu when the key is available.
 
 Drag dividers to resize panels. View > Edit panel layout allows moving or detaching them. Reset panel layout restores the current mode. File > Options > Preferences > Restore interface resets both modes.
 
-Use the wheel to zoom the video. Middle-drag to pan, Ctrl + horizontal middle-drag to zoom and Shift + vertical middle-drag to rotate. 0 resets the view and its flips. F11 or a double-click enters full screen. Escape exits it. View zoom, pan and rotation affect the preview. Flips (H and Shift+V) affect exports, as does exposure when “Apply to export” is enabled.
+Use the wheel to zoom the video. Middle-drag to pan, Ctrl + horizontal middle-drag to zoom and Shift + vertical middle-drag to rotate. 0 resets the view and its flips. F11 or a double-click enters full screen. Escape exits it. View zoom, pan and rotation affect the preview. Flips (H and Shift+V) affect exports. Click Exposure to switch the selected tracks between their correction and 0 EV. The displayed setting is used for export.
 
-The timecode position is locked by default. Right-click the overlay to unlock and move it. View > Duplicate video view opens an independent, synchronized window, also available by right-clicking the video. Drag the picture to move the window or its edges to resize it. Hover near the lower center to access playback, always-on-top and opacity controls. Space plays or pauses, Tab reveals the controls and Escape closes the window.
+The timeline shows frame numbers by default. The timecode overlay position is locked by default. Right-click the overlay to unlock and move it. View > Duplicate video view opens an independent, synchronized window, also available by right-clicking the video. Drag the picture to move the window or its edges to resize it. Hover near the lower center to access playback, always-on-top and opacity controls. Space plays or pauses, Tab reveals the controls and Escape closes the window.
 
 ----------------------------------------
 Library, media and references
 
 Library stores free playlists and watched folders. New… creates an empty playlist, creates one from files or watches a folder. Click a folder to list its immediate videos. Double-click to open those videos in sequence, or to expand or collapse its subfolders when it has no immediate videos.
 
-Click a video to select it, Ctrl-click to add or remove one and Shift-click to select a range. Double-click plays just that video. Opening a playlist replaces the timeline and stores the previous edit with its tracks, drawings, markers and undo history in Temporary. Right-click a temporary edit to restore, rename or remove it. Save projects you want to keep after closing Cadence.
+Click a video to select it, Ctrl-click to add or remove one and Shift-click to select a range. Double-click to play the chosen video. With several videos selected, double-click one of them to append them to the active track in list order and play them. Delete removes selected files or folders from the library and keeps their originals on disk. Refresh the parent folder to show removed subfolders again. Opening a playlist replaces the timeline and stores the previous edit in Temporary, including tracks, drawings, markers and undo history. Save temporary edits you want to keep after closing Cadence.
 
 Add videos or drop them onto a free playlist to keep their paths. A watched folder copies external videos and adds a suffix for duplicate filenames. Drag to reorder. Right-click to rename any list, including a subfolder, while preserving its folder name on disk. Remove from playlist keeps the file. Refresh scans the folder again. Move to Recycle Bin asks for confirmation. Replace file path locates a moved video for that list.
 
@@ -40,13 +40,13 @@ In Media, right-click to append sources to a track. Drop them onto the track to 
 ----------------------------------------
 Edit the timeline
 
-Each media track holds video and audio. Add a second track with “+ Media track”. Drag track titles to reorder them. The upper track appears in front of the lower one and both contribute to the audio mix. Click a title to select a track. Ctrl-click its title or lane to add or remove that track from the selection. Edits apply to the selected tracks.
+Each media track holds video and audio. Add a second track with “+ Media track”. Drag track titles to reorder them. The upper track appears in front of the lower one and both contribute to the audio mix. Click a title to select a track. Ctrl-click its title or lane to add or remove that track. At least one track stays selected. Edits apply to the selected tracks.
 
 Double-click a track title to expand or collapse its audio. Double-click a clip to select its duration. Shift + double-click selects the whole track. Ctrl + double-click adds or removes one clip. Ctrl + Shift + double-click extends the selection from the last chosen clip through the target, inclusive. With no prior selection, it starts at the playhead. Playback and editing respect discontinuous selections.
 
 Hold Alt throughout a drag to move a clip or range. Add Shift to copy. In detailed view, drop on the destination track. In simplified view, drop on the track title at the left to move between tracks. Moving between tracks closes the gap on the source track. Escape cancels the drag. On the same track, “Leave a gap” preserves the original space. Dropping into a gap fills the gap before shifting later clips.
 
-Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste the range or current frame. Delete removes the range. “Copy/paste audio” and the audio/video and drawings/video link options determine what follows the edit. Drawings and markers are shared across tracks. Linked drawings follow edits when both tracks are selected.
+On the timeline, Ctrl+C copies and Ctrl+X cuts the selection, including clips selected across separate ranges. With no selection, either command takes the current frame. Ctrl+V pastes the latest copy at the playhead. Delete removes the range. “Copy/paste audio” and the audio/video and drawings/video link options determine what follows the edit. Drawings and markers are shared across tracks. Linked drawings follow edits when both tracks are selected.
 
 Right-click a clip to split, duplicate or disable it, remove only its video or audio, or remove the entire clip and close the gap. Right-click a track title to mute the entire track, including in exports, or to reorder or remove it. Ctrl+Z undoes the edit.
 
@@ -61,11 +61,11 @@ Choose a tool from the toolbar or Tools menu. Q returns to Pointer. Drawing appl
 
 Once a shape is started, Shift constrains proportions or angle, Ctrl draws from the center, Alt moves and Alt+Ctrl rotates. With Text, draw a box and type inside it. Enter or clicking outside applies the text, Shift+Enter adds a line and Escape cancels. Double-click text to edit it.
 
-The lasso selects and moves objects. Color or opacity changes apply across the key. Delete removes lassoed objects first. T moves all objects on the current key. Ctrl+T transforms the selection or the clip. Alt+C crops the clip. Drag a handle to resize or drag outside a corner to rotate. Shift preserves proportions or snaps rotation to 15°, Ctrl uses the center and Alt moves. Enter applies, Escape cancels. Clip framing affects exports.
+In the viewer, the lasso selects and moves objects. Ctrl+C copies and Ctrl+X cuts those objects. Ctrl+V pastes them onto the key at the playhead. Delete removes selected objects. Color or opacity changes apply across the key. T moves all objects on the current key. Ctrl+T transforms the selection or the clip. Alt+C crops the clip. Drag a handle to resize or drag outside a corner to rotate. Shift preserves proportions or snaps rotation to 15°, Ctrl uses the center and Alt moves. Enter applies, Escape cancels. Clip framing affects exports.
 
 Drag a drawing key to move it or its handles to change its exposure. Shift-drag selects several keys. Alt-drag moves a selected key range. C copies, X cuts, V pastes, D deletes and Shift+K duplicates at the playhead. For keyboard adjustments, Tab to the timeline and press Enter to focus a key. Shift+Tab and Tab move from the key body to its handles. Left or Right moves the focused part one frame. Enter or Escape leaves this adjustment.
 
-S adds or removes a marker. Drag its flag to move it. Right-click > Rename marker… changes its name. An empty name displays just the flag. Show drawing layer controls visibility. Onion skins extend drawings before or after each key with decreasing opacity. A range of zero disables that side.
+S adds or removes a marker at the current frame. With a timeline selection, S or the + Marker button places a marker spanning each selected range. Hover over a flag to read its comment and scroll longer text with the wheel. This option is in Preferences > Interface. Drag its flag to move it. Right-click > Rename marker… changes its name. An empty name displays just the flag. Show drawing layer controls visibility. Gamma applies an overlay beneath the drawings, from solid black at -10 to solid white at +10. At 0 the original colours return. Click Gamma to switch the overlay off or back on. The displayed setting is used for export. Onion skins extend drawings before or after each key with decreasing opacity. A range of zero disables that side.
 
 ----------------------------------------
 Compare A and B
@@ -81,7 +81,9 @@ Synchronize with Blender or Maya
 
 The synchronization button beside A/B opens the 3D settings. Enable the link, choose the host and restart it after the first connector installation. If Maya asks for permission to run its startup script, check the Cadence connector before allowing it. Synchronized instance identifies the process by version, scene and PID. A disconnection puts the link on hold. Select another instance to change the target.
 
-Choose the direction of synchronization. By default, the start of the 3D range is frame 0 in Cadence. An offset of +10 maps it to frame 10. Positions are converted between frame rates at up to 30 updates per second. Match frame rate adapts the current media or all media while preserving duration and can be undone. Synchronization starts disabled.
+Choose the direction of synchronization. By default, the start of the 3D range is frame 0 in Cadence. An offset of +10 maps it to frame 10. Cadence converts positions between frame rates and rounds to the nearest whole frame in Maya. Match frame rate adapts the current media or all media while preserving duration and can be undone. Synchronization starts disabled.
+
+In a studio, restrict write access to Maya and Blender script directories to the artist and the administrators who maintain the tools.
 
 In the 3D settings, choose a camera and Send drawings. Sending is manual and replaces the previous transfer from the same project to that camera, including its touch-ups. Timing follows the frame rate and offset. A key shorter than one 3D frame can disappear. Include onion skins uses the active Cadence settings.
 
@@ -100,6 +102,17 @@ File > Options contains preferences, shortcuts and navigation gestures. Preview 
 
 QWERTY is the default shortcut layout. When first switching to AZERTY, bindings follow the physical key positions. Each profile then keeps its settings. Click a shortcut field to reassign the key. Use Import, Export and Reset to manage your settings. Video scrubbing defaults to 25 pixels per frame, with tooltips off. Drag horizontally in a numeric field or hold Shift for finer control.
 
-The Windows 2.0 channel checks for updates at startup, at most once per day. Previews are included by default. Both settings are in Preferences. Use Help > Check for updates for an immediate check. Portable and per-user copies download in the background and verify the manifest signature and package hash. Restart to apply. A failed first launch restores the previous version. Shared installations are managed by the administrator.
+Cadence checks for Windows 2.0 updates at startup and daily while the application stays open. Previews are included by default. Both settings are in Preferences. Use Help > Check for updates for an immediate check. Portable and per-user copies download and verify the update in the background. Choose Restart now or Later. On restart, Cadence replaces the executable at its original location and keeps file associations. If the new version fails to start, Cadence restores the previous version. For a shared installation in Program Files\Cadence 2.0, enable maintenance during setup or choose Help > Check for updates > Enable updates… in the installed application. Windows asks for administrator approval when you enable it. Users then receive the same restart prompt. Close other running copies of Cadence before applying the update.
+
+Review comments
+Open Comments in the right panel. Click a marker or use ↑ and ↓ in the list to jump to its frame. Delete or the context menu removes the marker and selects the next one while keeping the playhead in place. If ranges overlap, the panel shows the most recently started active marker.
+
+You can write a comment before creating its marker. Select a range in the timeline or enter one in the panel, then press Enter to confirm. Right-click Frame or Duration (frames) to switch to Frame ranges. Enter 52-320 to include both endpoints, or 5, 8, 10-20, 9 to place the comment at several positions. Hover over a marker to tick its checkboxes or select text and copy it with Ctrl+C.
+
+After a video or audio export, Cadence offers to save the edit’s markers as CSV or OpenTimelineIO in the output folder. The OpenTimelineIO file links directly to the exported media.
+
+Cadence CSV preserves text, name, duration and frame rate. In Keyframe Pro 2, import it as CSV notes using the Frame and Notes columns (first frame = 1). Cadence also reads CSV notes from SyncSketch and xSTUDIO. Enter the first source frame or starting timecode and its position in the edit. For xSTUDIO, export notes for the media you are matching.
+
+For Open RV, export OpenTimelineIO markers and choose the destination folder. In the Save dialog, use Browse beside the Video field to select the rendered review movie. The .otio references that movie. Keep it accessible to the recipient. Cadence imports OTIO video track and clip markers from linear edits, accounting for cuts and frame rates.
 
 Help > Log folder opens the diagnostics to attach to a report.

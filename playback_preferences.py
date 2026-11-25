@@ -13,7 +13,7 @@ def load(window):
     volume=data.get('volume',80)
     if type(volume) not in (int,float) or not 0<=volume<=100: volume=80
     window.volume.setValue(round(volume)); window.volume.setMuted(data.get('muted') is True)
-    window.timeline.set_units('frames' if data.get('units')=='frames' else 'time')
+    window.timeline.set_units('time' if data.get('units')=='time' else 'frames')
     window.master_volume()
     window.timecode_overlay.set_position(data.get('timecode_position',[.5,1]))
     window.timecode_overlay.set_locked(data.get('timecode_locked') is not False)

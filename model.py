@@ -88,6 +88,19 @@ class State:
     second_track: MediaTrack | None = None
     selected_clips: tuple[tuple[str, int, int], ...] = ()
     marker_names: tuple[tuple[int, str], ...] = ()
+    marker_notes: tuple[tuple[int, int, str], ...] = ()
+    marker_styles: tuple[tuple[int, tuple[tuple[int, int, int], ...]], ...] = ()
+    gamma: float = 0.
+    gamma_enabled: bool = True
+    bypassed_exposures: tuple[tuple[str, float], ...] = ()
+
+    @property
+    def visible_gamma(self):
+        return self.gamma if self.gamma_enabled else 0.
+
+    @property
+    def has_image_adjustments(self):
+        return bool(self.gamma or not self.gamma_enabled or self.bypassed_exposures)
 
     def selection_ranges(self, track_id=None):
         if not self.selection:
@@ -192,8 +205,7 @@ class Document:
         self.fps = Fraction(fps)
         self.state = State()
         self.media = {}
-        self.clipboard = (); self.audio_clipboard = (); self.drawing_clipboard = (); self.drawing_clipboard_length = 0
-        self.track_clipboards = {}
+        self.clear_clipboard()
         self.selected_track_ids = ('media-1',)
         self.active_track_id = 'media-1'
         self.undo_stack = []
@@ -203,7 +215,92 @@ class Document:
         self.project_path = None
 
     def signature(self, *, fps=None):
-        return (self.state.tracks, self.fps if fps is None else fps, self.state.drawings, self.state.drawings_linked, self.state.frame_markers, self.state.marker_names, json.dumps(self.review,sort_keys=True))
+        return (self.state.tracks, self.fps if fps is None else fps, self.state.drawings, self.state.drawings_linked, self.state.frame_markers, self.state.marker_names, self.state.marker_notes, self.state.marker_styles, self.state.gamma, self.state.gamma_enabled, self.state.bypassed_exposures, json.dumps(self.review,sort_keys=True))
+
+    def marker_target_ranges(self, frame=None):
+        state = self.state
+        if not state.length:
+            return {}
+        if state.selection:
+            ranges = {}
+            for start, end in state.selection_ranges():
+                if ranges:
+                    last = next(reversed(ranges))
+                    if last + ranges[last] == start:
+                        ranges[last] = end - last
+                        continue
+                ranges[start] = end - start
+            return ranges
+        target = min(state.position, state.length - 1) if frame is None else frame
+        return {target: 1} if 0 <= target < state.length else {}
+
+    def add_timeline_marker(self, frame=None, *, toggle=False):
+        state = self.state
+        targets = self.marker_target_ranges(frame)
+        if not targets:
+            return False
+        frames = set(state.frame_markers)
+        if not state.selection:
+            target = next(iter(targets))
+            if target in frames:
+                if not toggle:
+                    return False
+                frames.remove(target)
+                return self.commit('Supprimer le marqueur', replace(state, frame_markers=tuple(sorted(frames))))
+        notes = {start: (duration, body) for start, duration, body in state.marker_notes}
+        for start, duration in targets.items():
+            text = notes.pop(start, (1, ''))[1]
+            if text or duration > 1:
+                notes[start] = duration, text
+        return self.commit('Ajouter un marqueur', replace(
+            state, frame_markers=tuple(sorted(frames | targets.keys())),
+            marker_notes=tuple((start, *values) for start, values in sorted(notes.items()))))
+
+    def set_marker_note(self, frame, duration, text, styles=()):
+        state = self.state
+        if frame not in state.frame_markers or not 1 <= duration <= state.length - frame:
+            return False
+        notes = [entry for entry in state.marker_notes if entry[0] != frame]
+        if text or duration > 1:
+            notes.append((frame, duration, text))
+        formats = dict(state.marker_styles)
+        if styles:
+            from review_format import style_runs
+            styles = style_runs(styles,text)
+        if styles:
+            formats[frame] = styles
+        else:
+            formats.pop(frame,None)
+        return self.commit('Modifier le commentaire', replace(state, marker_notes=tuple(sorted(notes)),
+                           marker_styles=tuple(sorted(formats.items()))))
+
+    def set_marker_ranges(self, frame, ranges, *, draft=None):
+        state = self.state
+        if not ranges or (frame is not None and frame not in state.frame_markers):
+            return False
+        if any(not 0 <= start < start+duration <= state.length for start,duration in ranges.items()):
+            raise ValueError('Plage d’images invalide.')
+        frames = set(state.frame_markers)
+        labels, styles = dict(state.marker_names), dict(state.marker_styles)
+        notes = {f:(d,body) for f,d,body in state.marker_notes}
+        _,text = notes.pop(frame,(1,''))
+        name = labels.pop(frame,'')
+        runs = styles.pop(frame,())
+        if frame is None and draft is not None:
+            from review_format import style_runs
+            text, runs = draft
+            runs = style_runs(runs,text)
+        frames.discard(frame)
+        for start,duration in ranges.items():
+            if start in frames:
+                raise ValueError('Un marqueur existe déjà au début de cette plage.')
+            frames.add(start)
+            if name: labels[start] = name
+            if runs: styles[start] = runs
+            if text or duration>1: notes[start] = duration,text
+        return self.commit('Modifier les plages du marqueur',replace(state,frame_markers=tuple(sorted(frames)),
+                    marker_names=tuple(sorted(labels.items())),marker_styles=tuple(sorted(styles.items())),
+                    marker_notes=tuple((f,d,body) for f,(d,body) in sorted(notes.items()))))
 
     def rename_marker(self, frame, name):
         if frame not in self.state.frame_markers:
@@ -222,13 +319,16 @@ class Document:
             return False
         points=tuple(sorted(dest if f==source else f for f in state.frame_markers))
         names=tuple(sorted((dest if f==source else f,name) for f,name in state.marker_names))
-        return self.commit('Déplacer le marqueur', replace(state,frame_markers=points,marker_names=names,
+        notes=tuple(sorted((dest if f==source else f,d,text) for f,d,text in state.marker_notes))
+        styles=tuple(sorted((dest if f==source else f,runs) for f,runs in state.marker_styles))
+        return self.commit('Déplacer le marqueur', replace(state,marker_styles=styles,frame_markers=points,marker_names=names,marker_notes=notes,
                            position=dest if state.position==source else state.position))
 
     def normalize_tracks(self):
         ids=tuple(t.info.id for t in self.state.tracks)
-        self.selected_track_ids=ids if len(ids)==1 else tuple(i for i in self.selected_track_ids if i in ids)
-        if self.active_track_id not in ids: self.active_track_id=next(iter(self.selected_track_ids),ids[0])
+        chosen=tuple(i for i in ids if i in self.selected_track_ids)
+        self.selected_track_ids=chosen or (self.active_track_id if self.active_track_id in ids else ids[0],)
+        if self.active_track_id not in self.selected_track_ids: self.active_track_id=self.selected_track_ids[0]
 
     @property
     def active_track(self):
@@ -242,13 +342,22 @@ class Document:
     def select_track(self,identity,extend=False):
         if identity not in {t.info.id for t in self.state.tracks}: return
         chosen=set(self.selected_track_ids) if extend else set()
-        if extend and identity in chosen: chosen.remove(identity)
+        if extend and identity in chosen:
+            if len(chosen)==1: return
+            chosen.remove(identity)
         else: chosen.add(identity)
         self.selected_track_ids=tuple(t.info.id for t in self.state.tracks if t.info.id in chosen)
-        self.active_track_id=identity if identity in chosen or not chosen else self.selected_track_ids[0]
+        self.active_track_id=identity if identity in chosen else self.selected_track_ids[0]
 
     def clipboard_state(self):
         return self.clipboard,self.audio_clipboard,self.drawing_clipboard,self.drawing_clipboard_length
+
+    def clear_clipboard(self):
+        self.clipboard = ()
+        self.audio_clipboard = ()
+        self.drawing_clipboard = ()
+        self.drawing_clipboard_length = 0
+        self.track_clipboards = {}
 
     def add_media_track(self):
         if self.state.second_track is not None: return False
@@ -310,10 +419,15 @@ class Document:
     def dirty(self): return self.signature() != self.saved_signature
 
     def commit(self, label, new):
+        if new.bypassed_exposures:
+            track_ids = {track.info.id for track in new.tracks}
+            new = replace(new, bypassed_exposures=tuple(item for item in new.bypassed_exposures if item[0] in track_ids))
         if new.selected_clips and (new.selection!=self.state.selection or new.tracks!=self.state.tracks):
             new=replace(new,selected_clips=())
         markers={f for f in new.frame_markers if 0<=f<new.length}
-        new=replace(new,frame_markers=tuple(sorted(markers)),marker_names=tuple((f,name) for f,name in new.marker_names if f in markers))
+        notes=tuple((f,min(duration,new.length-f),text) for f,duration,text in new.marker_notes if f in markers and (text or min(duration,new.length-f)>1))
+        new=replace(new,marker_styles=tuple((f,runs) for f,runs in new.marker_styles if f in markers),
+                    frame_markers=tuple(sorted(markers)),marker_names=tuple((f,name) for f,name in new.marker_names if f in markers),marker_notes=notes)
         if new.position>new.length: new=replace(new,position=max(0,new.length-1))
         if new.selection and new.selection[1]>new.length:
             a,b=new.selection; new=replace(new,selection=(a,new.length) if a<new.length else None)
@@ -350,7 +464,9 @@ class Document:
     @selected_tracks
     def copy(self, include_audio=True):
         ranges=self.state.selection_ranges() or (self.selected(),)
-        self.clipboard=tuple(seg for a,b in ranges for seg in slice_segments(self.state.segments,a,b))
+        segments=tuple(seg for a,b in ranges for seg in slice_segments(self.state.segments,a,b))
+        if not segments: return 0
+        self.clipboard=segments
         self.audio_clipboard=tuple(seg for a,b in ranges for seg in slice_segments(self.state.audio,a,b)) if include_audio else ()
         keys=[]; length=0
         for a,b in ranges:
@@ -579,6 +695,7 @@ class Document:
         if not 0<=start<end<=self.state.length: return False
         keys=slice_keys(self.state.drawings,start,end,-start)
         if not keys: return False
+        self.clear_clipboard()
         self.drawing_clipboard=keys; self.drawing_clipboard_length=end-start
         return True
 
@@ -593,36 +710,53 @@ class Document:
         for key in self.drawing_clipboard: keys=put_key(keys,replace(key,start=key.start+at,end=key.end+at))
         return self.commit('Coller les dessins',replace(self.state,drawings=keys,position=at,selection=(at,at+self.drawing_clipboard_length),loop_range=None))
 
-    @selected_tracks
-    def exposure(self, value):
-        return self.commit('Régler l’exposition',replace(self.state,exposure=round(float(value),2)))
+    def exposure(self, value=None, *, enabled=True):
+        selected = {track.info.id for track in self.editable_tracks()}
+        saved = dict(self.state.bypassed_exposures)
+        tracks = []
+        for track in self.state.tracks:
+            identity = track.info.id
+            if identity in selected:
+                if enabled:
+                    previous = saved.pop(identity, track.exposure)
+                    applied = previous if value is None else round(float(value), 2)
+                else:
+                    saved.setdefault(identity, track.exposure)
+                    applied = 0.
+                track = replace(track, exposure=applied)
+            tracks.append(track)
+        state = with_tracks(self.state, tracks)
+        return self.commit('Régler l’exposition', replace(state, bypassed_exposures=tuple(sorted(saved.items()))))
 
     def to_data(self, all_media=False):
         return {'format':'cadence-studio','version':self.format_version(),'fps':str(self.fps),'media':[m for k,m in self.media.items() if all_media or any(s.media==k for s in self.state.all_segments)],'state':asdict(self.state),'comparison':self.review,'drawing_transfer_id':self.drawing_transfer_id}
 
     def format_version(self):
+        if self.state.has_image_adjustments: return 20
+        if self.state.marker_styles: return 19
+        if self.state.marker_notes: return 18
         if self.state.marker_names: return 17
         if self.state.second_track is not None or not self.state.track_info.audio_enabled or self.review.get('reference_track'): return 16
         used={s.media for s in self.state.segments+self.state.audio}
         return 15 if len(self.review.get('references',[]))>1 else 14 if self.review.get('reference_cadence') or any(m.get('cadence') for k,m in self.media.items() if k in used) else 13 if any(m.get('has_video') is False for m in self.media.values()) else 12 if self.state.frame_markers else 11
 
     def save(self, path):
+        from project_io import write_project
         data = self.to_data()
         target = Path(path)
-        tmp = target.with_suffix(target.suffix+'.tmp')
-        tmp.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf-8')
-        tmp.replace(target)
+        write_project(target, data)
         self.project_path = str(target)
         self.saved_signature = self.signature()
 
     @classmethod
     def load(cls, path):
-        data = json.loads(Path(path).read_text(encoding='utf-8'))
+        from project_io import PROJECT_BYTES, read_json
+        data = read_json(path, PROJECT_BYTES, 'Fichier de projet trop volumineux.')
         return cls.from_data(data,str(path))
 
     @classmethod
     def from_data(cls, data, project_path=None):
-        if data.get('format') != 'cadence-studio' or data.get('version') not in range(1,18):
+        if data.get('format') != 'cadence-studio' or data.get('version') not in range(1,21):
             raise ValueError('Ce fichier n’est pas un projet Cadence compatible.')
         doc = cls(Fraction(data['fps']))
         identity=data.get('drawing_transfer_id')
@@ -683,7 +817,46 @@ class Document:
             raise ValueError('Marqueurs invalides.')
         if names:
             doc.state=replace(doc.state,marker_names=tuple(sorted(dict(names).items())))
+        notes = st.get('marker_notes', ())
+        if not isinstance(notes,(list,tuple)) or any(
+                not isinstance(note,(list,tuple)) or len(note)!=3 or type(note[0]) is not int
+                or type(note[1]) is not int or note[0] not in frames or not 1<=note[1]<=length-note[0]
+                or not isinstance(note[2],str) for note in notes):
+            raise ValueError('Commentaires de marqueurs invalides.')
+        if notes:
+            if len({f for f,_,_ in notes})!=len(notes):
+                raise ValueError('Commentaires de marqueurs invalides.')
+            doc.state=replace(doc.state,marker_notes=tuple(sorted(tuple(n) for n in notes)))
+        formats=st.get('marker_styles',())
+        if formats:
+            from review_format import style_runs
+            text_by_frame={f:text for f,_,text in notes}
+            parsed={}
+            if not isinstance(formats,(list,tuple)):
+                raise ValueError('Commentaires de marqueurs invalides.')
+            for item in formats:
+                if (not isinstance(item,(list,tuple)) or len(item)!=2 or type(item[0]) is not int
+                        or item[0] not in text_by_frame or item[0] in parsed):
+                    raise ValueError('Commentaires de marqueurs invalides.')
+                parsed[item[0]]=style_runs(item[1],text_by_frame[item[0]])
+            doc.state=replace(doc.state,marker_styles=tuple(sorted((f,runs) for f,runs in parsed.items() if runs)))
         ids={t.info.id for t in doc.state.tracks}
+        gamma = st.get('gamma', 0.)
+        enabled = st.get('gamma_enabled', True)
+        bypassed = st.get('bypassed_exposures', ())
+        if type(gamma) not in (int,float) or not -10 <= gamma <= 10 or type(enabled) is not bool:
+            raise ValueError('Gamma invalide.')
+        visible = {t.info.id:t.exposure for t in doc.state.tracks}
+        saved = {}
+        if not isinstance(bypassed, (tuple,list)):
+            raise ValueError('Exposition invalide.')
+        for item in bypassed:
+            if (not isinstance(item, (tuple,list)) or len(item)!=2 or not isinstance(item[0],str)
+                    or item[0] not in ids or item[0] in saved or visible[item[0]] != 0
+                    or type(item[1]) not in (int,float) or not -10 <= item[1] <= 10):
+                raise ValueError('Exposition invalide.')
+            saved[item[0]] = float(item[1])
+        doc.state = replace(doc.state, gamma=float(gamma), gamma_enabled=enabled, bypassed_exposures=tuple(sorted(saved.items())))
         clips=st.get('selected_clips') or ()
         if doc.state.selection and isinstance(clips,(list,tuple)):
             valid=tuple((key,a,b) for v in clips if isinstance(v,(list,tuple)) and len(v)==3

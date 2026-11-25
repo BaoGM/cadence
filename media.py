@@ -2,6 +2,7 @@
 from __future__ import annotations
 import hashlib, json, os, subprocess, tempfile, threading, uuid, time, logging
 from cache_ram import FrameCache
+from media_inputs import local_input_args, open_local_media
 from collections import OrderedDict
 from progress_values import FFmpegProgress
 from fractions import Fraction
@@ -23,7 +24,7 @@ def cache_root():
 def run_ffmpeg(args, progress=None, cancel=None, duration=0):
     progress = progress or (lambda value,message:None)
     with tempfile.TemporaryFile(mode='w+b') as err:
-        proc = subprocess.Popen([ffmpeg(),'-hide_banner','-loglevel','error','-nostdin','-y',*args,'-progress','pipe:1'],stdout=subprocess.PIPE,stderr=err,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        proc = subprocess.Popen([ffmpeg(),'-hide_banner','-loglevel','error','-nostdin','-y',*local_input_args(args),'-progress','pipe:1'],stdout=subprocess.PIPE,stderr=err,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         stopped = threading.Event()
         def watch():
             while not stopped.wait(.1):
@@ -55,8 +56,7 @@ def run_ffmpeg(args, progress=None, cancel=None, duration=0):
 
 
 def probe(path):
-    import av
-    with av.open(str(path)) as container:
+    with open_local_media(str(path)) as container:
         if not container.streams.video or (Path(path).suffix.lower() in ('.wav','.mp3') and container.streams.audio):
             if not container.streams.audio: raise ValueError('Ce média ne contient aucune piste audio ou vidéo.')
             a=container.streams.audio[0]
@@ -114,7 +114,6 @@ def display_waveform(values):
 
 
 def direct_preview(source,info,fps,quality,cancel=None):
-    import av
     source_fps=Fraction(info['fps'])
     def reject(reason):
         logging.info('Direct preview rejected: %s; source=%s',reason,source)
@@ -125,7 +124,7 @@ def direct_preview(source,info,fps,quality,cancel=None):
     regular=bool(info['frames']) and abs(info['duration']*float(source_fps)-info['frames'])<=.1
     reason='regular timestamps' if regular else 'frame count/duration mismatch or missing frame count'
     started=time.perf_counter()
-    with av.open(str(source)) as container:
+    with open_local_media(str(source)) as container:
         stream=container.streams.video[0]
         sar=stream.sample_aspect_ratio
         first=None; previous=None; rotation=0
@@ -217,7 +216,7 @@ def prepare_media(path, fps=None, progress=None, cancel=None, quality='native',c
             scale=f'scale=w=min({width}\\,iw):h=min({height}\\,ih):force_original_aspect_ratio=decrease:force_divisible_by=2'
         vf = video_filter(fps,cadence)+f',{scale},setsar=1'
         run_ffmpeg(['-i',str(source),'-map','0:v:0','-vf',vf,'-an','-c:v','mjpeg','-q:v','3','-threads',str(min(4,os.cpu_count() or 2)),'-pix_fmt','yuvj420p',str(proxy)],lambda p,m:progress(p*.8,'Préparation de l’aperçu'),cancel,duration)
-        with av.open(str(proxy)) as c:
+        with open_local_media(str(proxy)) as c:
             v = c.streams.video[0]
             frames = v.frames
             pw,ph = v.width,v.height
@@ -345,7 +344,7 @@ class PreviewReader:
                 self.hardware_reformatters.pop(old,None)
                 self.timestamp_readers.pop(old,None)
             from hardware_decode import open_preview
-            container,hardware=open_preview(path,identity in self.hardware_failed)
+            container,hardware=open_preview(path,identity in self.hardware_failed,share_delete='direct_fps' in media)
             self.containers[identity]=container
             if hardware: self.hardware.add(identity)
         self.containers.move_to_end(identity)
@@ -408,7 +407,26 @@ class PreviewReader:
         if self.owns_cache: self.cache.clear()
 
 
-def export_video(state, media, fps, output, apply_exposure=True, progress=None, cancel=None, onion=None):
+def gif_media_inputs(media, sources, retained, directory, cancel):
+    inputs = dict(media)
+    for key in sources:
+        info = media[key]
+        try:
+            validate_media(info)
+        except FileNotFoundError:
+            recovered = retained.copy_missing(info, directory, cancel) if retained is not None else None
+            if recovered:
+                inputs[key] = dict(info, path=recovered)
+                continue
+            proxy = Path(info.get('proxy', ''))
+            if proxy.name != 'preview.avi' or proxy == Path(info['path']) or not proxy.is_file():
+                raise
+            # A generated preview already includes the media's rate and speed conversion.
+            inputs[key] = dict(info, path=str(proxy), cadence=None)
+    return inputs
+
+
+def export_video(state, media, fps, output, apply_exposure=True, progress=None, cancel=None, onion=None, retained=None):
     progress = progress or (lambda p,m:None)
     if not state.length: raise ValueError('La timeline est vide.')
     output = Path(output).resolve()
@@ -420,6 +438,7 @@ def export_video(state, media, fps, output, apply_exposure=True, progress=None, 
     except PermissionError as error:
         raise ValueError('Ce dossier est protégé. Choisissez un autre dossier pour l’export.\n'+str(output.parent)) from error
     audio_only = extension in ('.wav','.mp3')
+    gif = extension == '.gif'
     video_segments=tuple(s for track in state.tracks for s in track.segments)
     audio_segments=tuple(s for track in state.tracks for s in track.audible)
     sources = list(dict.fromkeys(s.media for s in video_segments if s.media is not None and not s.muted and media[s.media].get('has_video',True)))
@@ -427,36 +446,28 @@ def export_video(state, media, fps, output, apply_exposure=True, progress=None, 
         source = Path(media[key]['path']).resolve()
         if source == output or (output.exists() and source.exists() and source.samefile(output)):
             raise ValueError('Choisissez un fichier différent du média source.')
-    required = audio_segments if audio_only else state.all_segments
-    for key in dict.fromkeys(s.media for s in required if s.media is not None and not s.muted):
-        validate_media(media[key])
-    for key in dict.fromkeys(s.media for s in audio_segments if s.media is not None and not s.muted):
-        if media[key].get('audio_pending'):
-            from audio_prepare import prepare_audio
-            media[key]=prepare_audio(media[key],lambda p,m:progress(0,m),cancel)
-    if output.suffix.lower()=='.gif':
-        with tempfile.TemporaryDirectory(prefix='cadence-gif-') as tmp:
-            intermediate=Path(tmp)/'montage.mp4'
-            export_video(state,media,fps,intermediate,apply_exposure,lambda p,m:progress(p*.8,m),cancel,onion)
-            partial=output.with_name(output.stem+'.'+uuid.uuid4().hex[:8]+'.partial.gif')
-            try:
-                run_ffmpeg(['-i',str(intermediate),'-filter_complex','split[a][b];[a]palettegen[p];[b][p]paletteuse=dither=bayer','-an','-loop','0',str(partial)],lambda p,m:progress(.8+.2*p,'Encodage GIF'),cancel,float(state.length/fps))
-                partial.replace(output)
-            finally:
-                if partial.exists(): partial.unlink()
-        return str(output)
     partial = output.with_name(output.stem+'.'+uuid.uuid4().hex[:8]+'.partial'+output.suffix)
     with tempfile.TemporaryDirectory(prefix='cadence-export-') as tmp:
         pcm_path = Path(tmp)/'timeline.s16'
-        from composite_media import MixedPCM
-        pcm = MixedPCM(state,media,fps)
-        try:
-            with pcm_path.open('wb') as out:
-                for start in range(0,pcm.samples,RATE):
-                    if cancel and cancel.is_set(): raise Cancelled()
-                    out.write(pcm.read(start,min(RATE,pcm.samples-start)))
-                    progress(.1*start/max(1,pcm.samples),'Assemblage de l’audio')
-        finally: pcm.close()
+        if gif:
+            media = gif_media_inputs(media, sources, retained, tmp, cancel)
+        else:
+            required = audio_segments if audio_only else state.all_segments
+            for key in dict.fromkeys(s.media for s in required if s.media is not None and not s.muted):
+                validate_media(media[key])
+            for key in dict.fromkeys(s.media for s in audio_segments if s.media is not None and not s.muted):
+                if media[key].get('audio_pending'):
+                    from audio_prepare import prepare_audio
+                    media[key]=prepare_audio(media[key],lambda p,m:progress(0,m),cancel)
+            from composite_media import MixedPCM
+            pcm = MixedPCM(state,media,fps)
+            try:
+                with pcm_path.open('wb') as out:
+                    for start in range(0,pcm.samples,RATE):
+                        if cancel and cancel.is_set(): raise Cancelled()
+                        out.write(pcm.read(start,min(RATE,pcm.samples-start)))
+                        progress(.1*start/max(1,pcm.samples),'Assemblage de l’audio')
+            finally: pcm.close()
         if audio_only:
             codec = ['-c:a','pcm_s16le','-rf64','auto'] if extension=='.wav' else ['-c:a','libmp3lame','-b:a','192k']
             args = ['-f','s16le','-ar',str(RATE),'-ac','2','-i',str(pcm_path),'-vn',*codec,str(partial)]
@@ -475,7 +486,8 @@ def export_video(state, media, fps, output, apply_exposure=True, progress=None, 
             width,height=(dimension//2*2 for dimension in canvas_size(state,media))
         args,filters = [],[]
         for key in sources: args += ['-i',media[key]['path']]
-        args += ['-f','s16le','-ar',str(RATE),'-ac','2','-i',str(pcm_path)]
+        if not gif:
+            args += ['-f','s16le','-ar',str(RATE),'-ac','2','-i',str(pcm_path)]
         for idx,key in enumerate(sources if state.second_track is None else []):
             occurrences = [j for j,s in enumerate(state.segments) if s.media == key and not s.muted]
             labels = ''.join(f'[src{j}]' for j in occurrences)
@@ -484,7 +496,7 @@ def export_video(state, media, fps, output, apply_exposure=True, progress=None, 
             if len(occurrences)>1: base += f',split={len(occurrences)}'
             filters.append(base+labels)
         for i,seg in enumerate(state.segments if state.second_track is None else []):
-            if seg.media is None or seg.muted:
+            if seg.media not in sources or seg.muted:
                 filters.append(f'color=c=black:s={width}x{height}:r={fps},trim=end_frame={seg.length},setpts=PTS-STARTPTS[v{i}]')
                 continue
             from clip_geometry import geometry_filter,IDENTITY
@@ -500,6 +512,12 @@ def export_video(state, media, fps, output, apply_exposure=True, progress=None, 
             from track_export import video_graph
             filters=video_graph(state,media,sources,fps,width,height,apply_exposure)
         drawbase='drawbase'
+        if state.visible_gamma:
+            opacity = abs(state.visible_gamma) / 10.
+            target = 255 if state.visible_gamma > 0 else 0
+            channel = f'floor(val*(1-{opacity:.12g})+{target}*{opacity:.12g}+0.5)'
+            filters.append(f"[{drawbase}]format=rgb24,lutrgb=r='{channel}':g='{channel}':b='{channel}'[masked]")
+            drawbase='masked'
         if state.drawings and onion and (onion[0] or onion[1]):
             from drawing import render_layer
             from drawing_cache import DrawingRasterCache
@@ -510,7 +528,7 @@ def export_video(state, media, fps, output, apply_exposure=True, progress=None, 
                 if state.second_track is None and (state.flip_h or state.flip_v): image=image.mirrored(state.flip_h,state.flip_v)
                 if not image.save(str(Path(tmp)/f'onion-{frame:08d}.png')): raise ValueError('Impossible de préparer les dessins.')
                 progress(.1+.15*frame/state.length,'Préparation des pelures')
-            index=len(sources)+1
+            index=sum(1 for arg in args if arg=='-i')
             args += ['-framerate',str(fps),'-i',str(Path(tmp)/'onion-%08d.png')]
             filters.append(f'[{drawbase}][{index}:v]overlay=shortest=1[onionbase]')
             drawbase='onionbase'
@@ -532,12 +550,22 @@ def export_video(state, media, fps, output, apply_exposure=True, progress=None, 
                 outlabel=f'draw{key.start}'
                 filters.append(f"[{drawbase}][{input_index}:v]overlay=shortest=1:enable='gte(n,{key.start})*lt(n,{key.end})'[{outlabel}]")
                 drawbase=outlabel
-        filters.append(f'[{drawbase}]format=yuv420p[out]')
+        if gif:
+            filters.extend([f'[{drawbase}]split[colors][pixels]', '[colors]palettegen[palette]',
+                            '[pixels][palette]paletteuse=dither=bayer[out]'])
+        else:
+            filters.append(f'[{drawbase}]format=yuv420p[out]')
         script = Path(tmp)/'filters.txt'
         script.write_text(';\n'.join(filters),encoding='utf-8')
-        args += ['-/filter_complex',str(script),'-map','[out]','-map',f'{len(sources)}:a:0','-c:v','libx264','-preset','fast','-crf','18','-r',str(fps),'-c:a','aac','-b:a','192k','-movflags','+faststart',str(partial)]
+        args += ['-/filter_complex',str(script),'-map','[out]']
+        if gif:
+            args += ['-an','-loop','0']
+            message='Encodage GIF'
+        else:
+            args += ['-map',f'{len(sources)}:a:0','-c:v','libx264','-preset','fast','-crf','18','-r',str(fps),'-c:a','aac','-b:a','192k','-movflags','+faststart']
+            message='Encodage vidéo et audio'
         try:
-            run_ffmpeg(args,lambda p,m:progress(.1+.9*p,'Encodage vidéo et audio'),cancel,float(Fraction(state.length,1)/fps))
+            run_ffmpeg([*args,str(partial)],lambda p,m:progress(.1+.9*p,message),cancel,float(Fraction(state.length,1)/fps))
             if cancel and cancel.is_set(): raise Cancelled()
             partial.replace(output)
         finally:

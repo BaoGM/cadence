@@ -4,6 +4,7 @@ import subprocess, tempfile, time, wave, logging
 from pathlib import Path
 import pyaudiowpatch as pa
 from media import ffmpeg
+from media_inputs import local_input_args, open_local_media
 
 class AudioTrack:
     def __init__(self,manager,device,path):
@@ -77,9 +78,8 @@ class AudioCapture:
             finally: self.temp.cleanup()
 
 def mux_audio(video,tracks,video_start):
-    import av
     video=Path(video)
-    with av.open(str(video)) as source:
+    with open_local_media(str(video)) as source:
         stream=source.streams.video[0]
         duration=float(stream.duration*stream.time_base) if stream.duration is not None else source.duration/1_000_000
     args=[ffmpeg(),'-v','error','-y','-i',str(video)]; filters=[]; names=[]
@@ -95,7 +95,7 @@ def mux_audio(video,tracks,video_start):
         output=Path(temporary.name)
     try:
         args+=['-filter_complex',';'.join(filters),'-map','0:v:0','-map','[a]','-c:v','copy','-c:a','aac','-b:a','192k','-t',f'{duration:.9f}','-movflags','+faststart',str(output)]
-        result=subprocess.run(args,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        result=subprocess.run(local_input_args(args),stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         if result.returncode: raise RuntimeError(result.stderr.decode('utf-8',errors='replace')[-2000:])
         output.replace(video)
     finally:

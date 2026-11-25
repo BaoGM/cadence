@@ -7,7 +7,7 @@ from library_style import (icon, style_button, panel_strip, panel_heading, Libra
                            TreeRows, SourceRows, SYMBOL_ROLE, EmptyHint, set_preview)
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal, QTimer, QFile, QSignalBlocker, QEvent, QMimeData
+from PySide6.QtCore import Qt, Signal, QTimer, QFile, QSignalBlocker, QEvent, QMimeData, QItemSelectionModel
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtCore import QUrl
 from shiboken6 import isValid
@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, Q
                               QMenu, QFileDialog, QInputDialog, QMessageBox, QSplitter,
                               QScrollArea, QLayout, QLabel)
 
-from playlist_store import PlaylistStore, scan_folder, has_subfolders, copy_into_folder, path_key, VIDEO_EXTENSIONS
+from playlist_store import PlaylistStore, scan_folder, has_subfolders, copy_into_folder, canonical, path_key, VIDEO_EXTENSIONS
 from ui_text import tr
 
 LIBRARY_MIME='application/x-cadence-library'
@@ -35,20 +35,36 @@ class PlaylistTree(LibraryTree):
 
 class PlaylistFiles(QListWidget):
     filesDropped = Signal(list)
-    playRequested = Signal(str)
+    playRequested = Signal(list)
 
     def __init__(self):
         super().__init__()
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self.pressed_selection=None
+
+    def mousePressEvent(self,event):
+        self.pressed_selection=None
+        item=self.itemAt(event.position().toPoint())
+        if (item and item.isSelected() and event.button()==Qt.LeftButton and event.modifiers()==Qt.NoModifier
+                and len(self.selectedIndexes())>1):
+            self.pressed_selection=item,self.selectionModel().selection()
+        super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event):
         item = self.itemAt(event.position().toPoint())
-        path = item.data(Qt.ItemDataRole.UserRole) if item else None
+        group=self.pressed_selection
+        self.pressed_selection=None
+        if item and item.isSelected() and len(self.selectedIndexes())>1:
+            group=item,self.selectionModel().selection()
         super().mouseDoubleClickEvent(event)
-        if path and event.button() == Qt.MouseButton.LeftButton and event.modifiers() == Qt.KeyboardModifier.NoModifier:
-            self.playRequested.emit(path)
+        if item and event.button() == Qt.MouseButton.LeftButton and event.modifiers() == Qt.KeyboardModifier.NoModifier:
+            if group and group[0] is item:
+                self.selectionModel().select(group[1],QItemSelectionModel.ClearAndSelect)
+                paths=[selected.data(Qt.UserRole) for selected in sorted(self.selectedItems(),key=self.row)]
+            else: paths=[item.data(Qt.UserRole)]
+            self.playRequested.emit(paths)
 
     def startDrag(self, actions):
         super().startDrag(actions | Qt.CopyAction)
@@ -101,6 +117,7 @@ class PlaylistPanel(QWidget):
         style_button(new,'plus'); style_button(self.open_button,'open'); style_button(self.refresh_button,'refresh',True)
         splitter = LibrarySplitter(Qt.Orientation.Vertical); splitter.setHandleWidth(6); splitter.setChildrenCollapsible(False)
         self.tree = PlaylistTree(); self.tree.setHeaderHidden(True)
+        self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tree.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
         self.tree.setDefaultDropAction(Qt.CopyAction)
         self.tree.setItemDelegate(TreeRows(self.tree)); self.tree.setIndentation(13); self.tree.setMouseTracking(True)
@@ -117,7 +134,7 @@ class PlaylistPanel(QWidget):
         self.files.setItemDelegate(SourceRows(self.files,thumbnails=window.source_previews)); self.empty_files=EmptyHint(self.files,'')
         self.files.model().rowsMoved.connect(self.reordered)
         self.files.filesDropped.connect(self.add_paths)
-        self.files.playRequested.connect(self.play_file)
+        self.files.playRequested.connect(self.open_selected_files)
         self.files.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.files.customContextMenuRequested.connect(self.files_menu)
         files_panel=QWidget(); file_layout=QVBoxLayout(files_panel)
@@ -196,7 +213,7 @@ class PlaylistPanel(QWidget):
                 data = (entry['id'], folder)
                 item = self.add_node(followed if folder else saved, entry['name'], data)
                 if folder:
-                    if has_subfolders(folder): self.add_node(item, '…', None)
+                    if has_subfolders(folder,entry['folders'].get(folder,{}).get('excluded_folders',())): self.add_node(item, '…', None)
                     item.setToolTip(0, folder)
                 if current and current[0] == entry['id']: selection = item
             for record in self.temporary:
@@ -243,7 +260,7 @@ class PlaylistPanel(QWidget):
         if editable: paths = self.store.files(*data)
         elif data:
             record = next((r for r in self.temporary if r['id'] == data[1]), None)
-            if record: paths = self.temporary_paths(record['doc'])
+            if record: paths = self.temporary_paths(record)
         for path in paths:
             item = QListWidgetItem(icon('film'), Path(path).name); item.setData(Qt.ItemDataRole.UserRole, path)
             set_preview(item,dict(path=path))
@@ -260,8 +277,9 @@ class PlaylistPanel(QWidget):
         self.rebuilding = False
 
     @staticmethod
-    def temporary_paths(doc):
+    def temporary_paths(record,*,with_keys=False):
         occurrences={}
+        doc=record['doc']
         for lane,track in enumerate(doc.state.tracks):
             for segments in (track.segments,track.audio):
                 frame=0
@@ -269,7 +287,9 @@ class PlaylistPanel(QWidget):
                     if segment.media in doc.media:
                         occurrences[frame,lane,segment.media]=doc.media[segment.media]['path']
                     frame+=segment.length
-        return [occurrences[key] for key in sorted(occurrences,key=lambda key:key[:2])]
+        excluded=record.get('hidden_paths',())
+        keys=[key for key in sorted(occurrences,key=lambda key:key[:2]) if key not in excluded]
+        return keys if with_keys else [occurrences[key] for key in keys]
 
     def browse(self, refresh=False, item=None):
         if not self.store: return
@@ -283,10 +303,11 @@ class PlaylistPanel(QWidget):
             self.scans[token]=(item,refresh or self.scans[token][1])
             return
         self.scans[token]=(item,refresh)
+        records=self.store.entry(identity)['folders']
         def scan():
             try:
                 dirs,files=scan_folder(folder)
-                result=(dirs,files,{p for p in dirs if has_subfolders(p)})
+                result=(dirs,files,{p for p in dirs if has_subfolders(p,records.get(p,{}).get('excluded_folders',()))})
                 error=''
             except (OSError,ValueError) as exc:
                 result,error=None,str(exc)
@@ -296,7 +317,7 @@ class PlaylistPanel(QWidget):
 
     def folder_scanned(self,token,result,error):
         item,refresh=self.scans.pop(token)
-        if not isValid(item): return
+        if not isValid(item) or item.treeWidget() is not self.tree: return
         data=item.data(0,Qt.ItemDataRole.UserRole)
         identity,folder=data
         pending=self.pending_open==data
@@ -307,10 +328,12 @@ class PlaylistPanel(QWidget):
         directories,files,expandable=result
         def apply():
             self.store.scanned(identity, folder, files, refresh)
+            hidden={path_key(p) for p in self.store.entry(identity)['folders'][canonical(folder)].get('excluded_folders',())}
+            visible=[directory for directory in directories if path_key(directory) not in hidden]
             existing = {item.child(i).data(0, Qt.ItemDataRole.UserRole): item.child(i) for i in range(item.childCount())}
             for key, child in list(existing.items()):
-                if key is None or key[1] not in directories: item.removeChild(child)
-            for directory in directories:
+                if key is None or key[1] not in visible: item.removeChild(child)
+            for directory in visible:
                 if (identity, directory) not in existing:
                     child = self.add_node(item, self.store.folder_name(identity, directory), (identity, directory))
                     child.setToolTip(0, directory)
@@ -382,9 +405,16 @@ class PlaylistPanel(QWidget):
         self.run(lambda: self.store.set_files(identity, self.all_paths(), folder))
 
     def remove_files(self):
-        if self.w.job or not self.current or self.current[0] == 'temporary': return
+        if self.w.job or not self.current: return
         removed = self.selected_paths(); keys = {path_key(p) for p in removed}
         identity, folder = self.current
+        if identity=='temporary':
+            record=next((r for r in self.temporary if r['id']==folder),None)
+            if record:
+                row_ids=self.temporary_paths(record,with_keys=True)
+                record.setdefault('hidden_paths',set()).update(row_ids[self.files.row(item)] for item in self.files.selectedItems())
+                self.show_files()
+            return
         self.run(lambda: self.store.set_files(identity, [p for p in self.all_paths() if path_key(p) not in keys], folder, removed))
         self.show_files()
 
@@ -407,10 +437,12 @@ class PlaylistPanel(QWidget):
 
     def files_menu(self, point):
         item = self.files.itemAt(point)
-        if not item or self.w.job or not self.current or self.current[0] == 'temporary': return
+        if not item or self.w.job or not self.current: return
         if not item.isSelected(): self.files.setCurrentItem(item)
         menu = QMenu(self)
         menu.addAction(tr('Retirer de la liste'), self.remove_files)
+        if self.current[0]=='temporary':
+            menu.exec(self.files.mapToGlobal(point)); return
         if len(self.files.selectedItems()) == 1: menu.addAction(tr('Remplacer le chemin…'), self.relocate_file)
         menu.addAction(tr('Afficher dans l’explorateur'), lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(item.data(Qt.ItemDataRole.UserRole)).parent))))
         menu.addSeparator(); menu.addAction(tr('Mettre à la corbeille…'), self.trash_files)
@@ -434,15 +466,18 @@ class PlaylistPanel(QWidget):
     def tree_menu(self, point):
         item = self.tree.itemAt(point)
         if not item or self.w.job: return
+        if item.isSelected() and len(self.tree.selectedItems())>1:
+            menu=QMenu(self)
+            menu.addAction(tr('Retirer de la bibliothèque'),self.remove_selected_entries)
+            menu.exec(self.tree.mapToGlobal(point))
+            return
         self.tree.setCurrentItem(item)
         data = self.current
         if not data: return
         menu = QMenu(self); menu.addAction(tr('Ouvrir'), self.open_current).setEnabled(self.open_button.isEnabled())
         menu.addAction(tr('Renommer la liste…'), self.rename)
         if data[0] != 'temporary':
-            entry = self.store.entry(data[0])
-            if data[1] is None or path_key(data[1]) == path_key(entry['root']):
-                menu.addAction(tr('Retirer de la bibliothèque'), self.remove_entry)
+            menu.addAction(tr('Retirer de la bibliothèque'), self.remove_selected_entries)
             if data[1]: menu.addAction(tr('Actualiser'), lambda: self.browse(refresh=True))
         else: menu.addAction(tr('Retirer de la bibliothèque'), self.remove_temporary)
         menu.exec(self.tree.mapToGlobal(point))
@@ -466,8 +501,21 @@ class PlaylistPanel(QWidget):
         self.temporary = [r for r in self.temporary if r['id'] != self.current[1]]
         self.current = None; self.rebuild()
 
-    def remove_entry(self):
-        self.run(lambda: self.store.remove(self.current[0])); self.current = None; self.rebuild()
+    def remove_selected_entries(self):
+        if self.w.job: return
+        items=[item for item in self.tree.selectedItems() if item.data(0,Qt.UserRole)]
+        if not items: return
+        nodes=[item.data(0,Qt.UserRole) for item in items]
+        saved=[node for node in nodes if node[0]!='temporary']
+        def remove():
+            if saved: self.store.remove_nodes(saved)
+            temporary={folder for identity,folder in nodes if identity=='temporary'}
+            self.temporary=[rec for rec in self.temporary if rec['id'] not in temporary]
+            with QSignalBlocker(self.tree):
+                for item in items:
+                    if item.treeWidget() is self.tree: item.parent().removeChild(item)
+            self.selected(self.tree.currentItem(),None)
+        self.run(remove)
 
     def archive_current(self):
         w = self.w; doc = w.doc
@@ -483,6 +531,13 @@ class PlaylistPanel(QWidget):
     def play_file(self, path):
         if self.w.job: return
         self.open_paths([path], autoplay=True)
+
+    def open_selected_files(self,paths):
+        if not paths or self.w.job: return
+        if len(paths)==1: self.play_file(paths[0])
+        else:
+            track=self.w.doc.active_track
+            self.w.media_source_drops.insert_library(dict(paths=paths),track.info.id,track.length,autoplay=True)
 
     def show_file_error(self, message):
         self.file_error.setText(tr(message))

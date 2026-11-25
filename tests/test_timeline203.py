@@ -36,6 +36,7 @@ def test_four_digit_graduation_visible_at_end(timeline, monkeypatch, width, leng
 
 
 def test_read_headers_and_transport_keep_hover(window, application, clips):
+    from test_studio200 import finish_hide
     w = window
     doc = Document()
     doc.append_media([clips[0]])
@@ -49,6 +50,8 @@ def test_read_headers_and_transport_keep_hover(window, application, clips):
     first, bar = headers.geometries()
     away = w.viewer.mapToGlobal(w.viewer.rect().center())
     headers.update_hover(away)
+    finish_hide(w.studio.top)
+    finish_hide(w.studio.timeline_bar)
     assert not headers.top.isVisible() and not headers.ruler.isVisible()
     headers.update_hover(first.center())
     assert headers.top.isVisible() and w.studio.view.window() is headers.top
@@ -56,8 +59,11 @@ def test_read_headers_and_transport_keep_hover(window, application, clips):
     play = w.play_btn.mapToGlobal(w.play_btn.rect().center())
     assert not bar.contains(play)
     timeline = w.timeline.mapToGlobal(w.timeline.rect().center())
-    for point in (timeline, play, bar.center()):
+    headers.update_hover(timeline)
+    assert not headers.ruler.isVisible()
+    for point in (play, bar.center()):
         headers.update_hover(away)
+        finish_hide(w.studio.timeline_bar)
         headers.update_hover(point)
         assert headers.ruler.isVisible()
     QTest.mouseClick(w.play_btn, Qt.LeftButton)
@@ -65,11 +71,14 @@ def test_read_headers_and_transport_keep_hover(window, application, clips):
     assert headers.ruler.isVisible() and w.transport.running
     QTest.mouseClick(w.play_btn, Qt.LeftButton)
     headers.update_hover(away)
+    finish_hide(w.studio.timeline_bar)
     assert not headers.ruler.isVisible()
     w.transport_widget.hide()
     application.processEvents()
     bar = headers.geometries()[1]
-    headers.update_hover(QPoint(bar.center().x(), bar.top() - 8))
+    headers.update_hover(QPoint(bar.center().x(), bar.top() - 1))
+    assert not headers.ruler.isVisible()
+    headers.update_hover(QPoint(bar.center().x(), bar.top()))
     assert headers.ruler.isVisible()
 
 

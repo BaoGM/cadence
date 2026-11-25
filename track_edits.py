@@ -15,6 +15,8 @@ def selected_tracks(operation):
             targets=[t for t in targets if document.state.selection_ranges(t.info.id)]
         if not targets: return 0 if operation.__name__ in ('copy','cut') else False
         if len(tracks)==1:
+            if operation.__name__=='paste' and tracks[0].info.id in document.track_clipboards:
+                document.clipboard,document.audio_clipboard,document.drawing_clipboard,document.drawing_clipboard_length=document.track_clipboards[tracks[0].info.id]
             result=operation(document,*args,**kwargs)
             if operation.__name__ in ('copy','cut') and result:
                 document.track_clipboards={tracks[0].info.id:document.clipboard_state()}

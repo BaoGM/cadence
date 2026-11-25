@@ -8,6 +8,7 @@ This inventory does not replace the original notices under Licences in the Windo
 | PySide6 / Shiboken6 / Qt 6.12 | Interface and graphics | Qt/PySide LGPL/GPL alternatives, exceptions and third-party component notices; retain the exact bundled notices |
 | PyAV 19.0.2 | Video decoding | PyAV BSD terms; bundled FFmpeg libraries have their own terms |
 | FFmpeg export build | Encoding and media processing | GPL-enabled build; included codec libraries and their sources are listed in its manifest |
+| OpenSSL | TLS for updates and HTTPS | Apache-2.0 and upstream notices in the OpenSSL-Cadence source bundle |
 | NumPy 2.5.4 | Array processing | BSD and bundled numerical-library notices |
 | PyAudioWPatch | Windows audio capture | MIT and PortAudio notices |
 | psutil 7.2.2 | Local 3D process discovery | BSD |

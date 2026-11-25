@@ -80,3 +80,94 @@ def test_export_geometry_and_gif(application,tmp_path):
     with av.open(str(gif)) as c: frames=[f.to_ndarray(format='rgb24') for f in c.decode(video=0)]
     assert frames and frames[0][45,80,0]>180 and frames[0][3,3].max()<30
     imported=prepare_media(gif); assert imported['frames']>0
+
+
+@pytest.mark.parametrize('use_proxy',[False,True],ids=['open-source','cached-preview'])
+def test_offline_gif_keeps_video_after_source_deletion(tmp_path,monkeypatch,use_proxy):
+    import av
+    from export_sources import SessionVideoSources
+    from media import run_ffmpeg
+    monkeypatch.setenv('CADENCE_CACHE',str(tmp_path/'cache'))
+    source=tmp_path/('source.mkv' if use_proxy else 'source.mp4')
+    run_ffmpeg(['-f','lavfi','-i','testsrc2=s=80x60:r=10:d=1','-f','lavfi','-i','sine=d=1',
+                '-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac',str(source)])
+    item=prepare_media(source,defer_audio=True)
+    key=item['id']
+    state=State((Segment(key,2,9),))
+    retained=SessionVideoSources()
+    try:
+        if not use_proxy:
+            assert Path(item['proxy'])==source
+            retained.retain([item])
+        original=tmp_path/'reference.gif'
+        export_video(state,{key:item},Fraction(10),original)
+        source.unlink()
+        Path(item['audio']).unlink()
+        destination=tmp_path/'offline.gif'
+        export_video(state,{key:item},Fraction(10),destination,retained=retained)
+        def decode(path):
+            with av.open(str(path)) as container:
+                assert not container.streams.audio
+                return [frame.to_ndarray(format='rgb24') for frame in container.decode(video=0)]
+        expected=decode(original)
+        actual=decode(destination)
+        assert len(actual)==len(expected)==7
+        assert max(np.abs(a.astype(int)-b).mean() for a,b in zip(actual,expected)) < (16 if use_proxy else .01)
+        assert not np.array_equal(actual[0],actual[-1])
+        if not use_proxy:
+            retained.close()
+            preserved=destination.read_bytes()
+            with pytest.raises(FileNotFoundError,match='Média source introuvable'):
+                export_video(state,{key:item},Fraction(10),destination,retained=retained)
+            assert destination.read_bytes()==preserved
+        assert not list(tmp_path.glob('*.partial.gif'))
+    finally:
+        retained.close()
+
+
+def test_window_gif_after_loaded_mp4_removed(window,tmp_path,monkeypatch):
+    import av
+    import time
+    import weakref
+    import export_sources
+    from PySide6.QtTest import QTest
+    from media import run_ffmpeg
+    source=tmp_path/'plan.mp4'
+    run_ffmpeg(['-f','lavfi','-i','testsrc2=s=80x60:r=10:d=1','-c:v','libx264',str(source)])
+    streams=[]
+    open_shared=export_sources.open_shared
+    def observe_source(path):
+        stream=open_shared(path)
+        if Path(path)==source: streams.append(weakref.ref(stream))
+        return stream
+    monkeypatch.setattr(export_sources,'open_shared',observe_source)
+    completed=[]
+    errors=[]
+    monkeypatch.setattr(window,'confirm_discard',lambda:True)
+    monkeypatch.setattr(window,'export_done',completed.append)
+    monkeypatch.setattr(window,'error',errors.append)
+    def await_job(done):
+        until=time.monotonic()+12
+        while not done() and time.monotonic()<until:
+            QTest.qWait(15)
+            time.sleep(.005)
+        assert done(),errors
+    window.open_path(str(source))
+    await_job(lambda:window.job is None and window.display_frame==0 and window.rendered_token==window.token)
+    original=source.read_bytes()
+    source.unlink()
+    output=tmp_path/'plan.gif'
+    window.start_export(str(output))
+    await_job(lambda:window.job is None)
+    assert not errors and completed==[str(output)]
+    with av.open(str(output)) as container:
+        assert sum(1 for _ in container.decode(video=0))==10
+    def source_open():
+        return any((file:=stream()) is not None and not file.closed for stream in streams)
+    assert source_open()
+    window.new_project()
+    await_job(lambda:not source_open())
+    assert not window.doc.media and window.isVisible()
+    with source.open('xb') as replacement: replacement.write(original)
+    window.open_path(str(source))
+    await_job(lambda:window.job is None and window.display_frame==0 and window.rendered_token==window.token)

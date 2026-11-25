@@ -22,10 +22,11 @@ GROUPS={
     'Lecture':[
         ['Lecture / pause'],
         ['Début','Fin','Image précédente','Image suivante'],
-        ['Clé précédente','Clé suivante']],
+        ['Clé précédente','Clé suivante'],
+        ['Augmenter le volume','Diminuer le volume']],
     'Affichage':[
         ['Afficher la timeline','Afficher le bandeau supérieur',
-         'Afficher les commandes de lecture','Afficher le time code','Afficher la liste de lecture','Afficher la barre d’outils','Afficher les outils de dessin','Afficher les réglages de comparaison'],
+         'Afficher les commandes de lecture','Afficher le time code','Afficher la liste de lecture','Afficher la barre d’outils','Afficher les outils de dessin','Commentaires','Afficher les réglages de comparaison'],
         # Preserve the requested usage order: zoom/reset, fullscreen, mirrors, units.
         ['Réinitialiser le canvas','Zoom vidéo +','Zoom vidéo −','Plein écran vidéo','Dupliquer l’image vidéo','Flip - miroir vertical','Flop - miroir horizontal','Timecode / frames','Basculer entre les vues de la timeline'],
         ['Mode Lecture / Édition','Options des modes Lecture / Édition…'],
@@ -69,7 +70,7 @@ def organize_menus(window):
 PANEL_NAMES={
     'timeline':'Timeline','header':'Bandeau supérieur',
     'transport':'Commandes de lecture','timecode':'Time code',
-    'comparison':'Comparaison','drawing':'Dessin','tools':'Barre d’outils','library':'Liste de lecture',
+    'comparison':'Comparaison','drawing':'Dessin','comments':'Commentaires','tools':'Barre d’outils','library':'Liste de lecture',
 }
 
 def panel_menu(window):
@@ -89,7 +90,7 @@ def panel_menu(window):
     menu.addSeparator()
     timeline=window.timeline
     timeline.add_timeline_mode(menu); menu.addSeparator(); timeline.add_units(menu)
-    timeline.add_delete_keys(menu,timeline.x_for(window.doc.state.position+.5))
+    timeline.add_annotation_actions(menu,timeline.x_for(window.doc.state.position+.5))
     menu.addSeparator()
     action=menu.addAction(tr(window.layout_action.text())); action.setCheckable(True); action.setChecked(window.layout_editable)
     action.triggered.connect(lambda:trigger(window.layout_action))

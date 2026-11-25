@@ -22,6 +22,10 @@ def synchronized_format():
 
 
 def configure_graphics():
+    if sys.platform == 'win32':
+        # A native HWND for a video or hover control should not promote every
+        # dock to an independently composed child window during its animation.
+        QApplication.setAttribute(Qt.ApplicationAttribute.AA_DontCreateNativeWidgetSiblings)
     QSurfaceFormat.setDefaultFormat(synchronized_format())
 
 

@@ -16,9 +16,9 @@ from shortcut_edit import ConflictDialog
 
 def test_marker_toggle_and_preserved_selection(window):
  w=window; w.doc.state=replace(w.doc.state,position=5,selection=(3,12),drawings=(DrawingKey(4,9,(Mark(points=((.2,.2,1),)),)),))
- w.drawing.add_marker(); assert w.doc.state.frame_markers==(5,)
- w.drawing.add_marker(); assert w.doc.state.frame_markers==() and w.doc.state.drawings
- w.doc.undo(); assert w.doc.state.frame_markers==(5,)
+ w.drawing.add_marker(); assert w.doc.state.frame_markers==(3,) and w.doc.state.marker_notes==((3,9,''),)
+ w.drawing.add_marker(); assert w.doc.state.frame_markers==(3,) and w.doc.state.drawings
+ w.doc.undo(); assert not w.doc.state.frame_markers
  w.drawing.delete_selected_keys(); assert not w.doc.state.drawings and w.doc.state.selection==(3,12)
  w.doc.undo(); assert w.doc.state.drawings and w.doc.state.selection==(3,12)
 

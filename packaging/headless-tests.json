@@ -44,5 +44,16 @@
   "tests/test_workspace_migration202.py",
   "tests/test_preferences204.py",
   "tests/test_timeline205.py",
-  "tests/test_timeline_library204.py"
+  "tests/test_timeline_library204.py",
+  "tests/test_drawing_preview209.py",
+  "tests/test_export_markers211.py",
+  "tests/test_image_adjustments211.py",
+  "tests/test_machine_client.py",
+  "tests/test_machine_maintenance.py",
+  "tests/test_marker_hover210.py",
+  "tests/test_panel_transition209.py",
+  "tests/test_review_comments.py",
+  "tests/test_review_popup211.py",
+  "tests/test_shared_update.py",
+  "tests/test_update_in_place.py"
 ]

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 project(cadence_native VERSION 1.0 LANGUAGES CXX)
-find_package(Qt6 6.12.0 EXACT REQUIRED COMPONENTS Core Gui)
+find_package(Qt6 6.12.1 EXACT REQUIRED COMPONENTS Core Gui)
 add_library(cadence_native SHARED graphics.cpp render.cpp gpu.cpp)
 if(WIN32)
     target_sources(cadence_native PRIVATE d3d.cpp)

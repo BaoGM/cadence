@@ -5,6 +5,7 @@ native/build/
 native/bin/
 .ruff_cache/
 vendor/*.exe
+vendor/windows-runtime/
 .venv/
 venv/
 build/

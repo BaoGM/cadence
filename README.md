@@ -4,7 +4,7 @@ Cadence is a Windows video review and annotation application for animation. Its 
 
 ## Features
 
-- Frame stepping, looping, markers and audio scrubbing.
+- Frame stepping, looping, audio scrubbing and drawing keys. Markers support frame ranges, formatted comments, checkboxes and CSV or OpenTimelineIO interchange.
 - Reference sequences with side-by-side, stacked, overlay, difference and wipe comparison.
 - Drawing, text, vector shapes, selections and onion skins.
 - Video and audio editing, linked tracks, undo and redo.
@@ -19,11 +19,11 @@ Cadence is a Windows video review and annotation application for animation. Its 
 
 ## Installation
 
-Windows 10 or 11, 64-bit. The unsigned [Cadence 2.0.6 preview](https://github.com/BaoGM/cadence/releases/tag/v2.0.6-windows-studio2) includes an installer, a portable archive, checksums and corresponding sources.
+Windows 10 or 11, 64-bit. The unsigned [Cadence 2.0.12 Windows release](https://github.com/BaoGM/cadence/releases/tag/v2.0.12-windows-studio2) includes an installer, a portable archive, checksums and corresponding sources.
 
 The default installation is per user. Cadence 2.0 installs alongside Windows 1.x and stores its preferences, library and cache in `%LOCALAPPDATA%/CadenceStudio-2`. For a portable copy, extract the complete archive and run `Cadence.exe`.
 
-[Cadence 1.18.5 for Windows](https://github.com/BaoGM/cadence/releases/tag/v1.18.5-windows) and [Cadence 1.18.0 for Linux](https://github.com/BaoGM/cadence/releases/tag/v1.18.0) remain available. The Windows 2.0 update channel uses tags ending in `-windows-studio2`.
+[Cadence for Linux](https://github.com/BaoGM/cadence/releases/tag/v1.18.0) is maintained on [feature/linux-port](https://github.com/BaoGM/cadence/tree/feature/linux-port). The default branch tracks Windows 2.x.
 
 ## Use
 
@@ -45,8 +45,6 @@ The [French guide](assets/guide_fr.txt) and [English guide](assets/guide_en.txt)
 ## Development
 
 See [BUILD.txt](BUILD.txt), [build and release verification](docs/BUILD.md), and [contribution guidelines](CONTRIBUTING.md). Automated tests use a synthetic video generated from source; personal media and the former demonstration video are excluded.
-
-The 1.15.1 preview was built from commit `b2946dc9d735709875a7914f4ca27c6e980876fd`. Its [Windows build](https://github.com/BaoGM/cadence/actions/runs/43111528534) passed on GitHub Actions, including C++ compilation and French/English application checks. Later documentation changes on main do not change the released binaries or corresponding source archives. Artifacts are unsigned; code signing still requires review and approval. A repeatable build procedure does not imply byte-for-byte identical binaries.
 
 ## License
 

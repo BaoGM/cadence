@@ -68,6 +68,10 @@ def test_ticks_leave_rounded_cuts_and_ends_visible(application,selected):
     image=t.grab().toImage()
     bar=t.simple_track_rect(); top=int(bar.top()); bottom=int(bar.bottom())-1; middle=int(bar.center().y())
     base='#161d25'; inside=image.pixelColor(round(t.x_for(11)),middle).name()
+    assert t.x_for(0)==t.track_header_width()+6
+    assert t.frame_for(t.track_left())==0
+    for column in range(t.track_header_width(),t.track_left()):
+        assert image.pixelColor(column,middle).name()==base
     for f in (0,50,115,200):
         x=round(t.x_for(f))
         if 0<f<200:
@@ -82,8 +86,8 @@ def test_ticks_leave_rounded_cuts_and_ends_visible(application,selected):
             assert image.pixelColor(edge,top).name()==base
             assert image.pixelColor(edge,bottom).name()==base
             assert all(image.pixelColor(edge,y).lightness()>=18 for y in range(top,bottom+1))
-            assert image.pixelColor(edge+sign*5,top).name()==inside
-            assert image.pixelColor(edge+sign*5,bottom).name()==inside
+            assert image.pixelColor(edge+sign*7,top).name()==inside
+            assert image.pixelColor(edge+sign*7,bottom).name()==inside
     for f in (45,55,100,110,120,125):
         x=int(t.x_for(f)+.5)
         background=image.pixelColor(x+4,middle).red()

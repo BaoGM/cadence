@@ -41,6 +41,21 @@ jobs:
         run: python packaging/fetch_release_inputs.py --url "$env:INPUT_BUNDLE_URL" --sha256 "$env:INPUT_BUNDLE_SHA256"
       - name: Fetch verified FFmpeg binary
         run: python packaging/fetch_ffmpeg.py
+      - name: Prepare pinned Windows TLS libraries
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'cadence-tls-input.zip'
+          Invoke-WebRequest 'https://github.com/BaoGM/cadence/releases/download/v2.0.12-windows-studio2/Cadence-2.0.12-Windows.zip' -OutFile $archive
+          $folder = New-Item -ItemType Directory (Join-Path $env:RUNNER_TEMP 'cadence-tls')
+          $zip = [IO.Compression.ZipFile]::OpenRead($archive)
+          try {
+            foreach ($name in @('libssl-3-x64.dll', 'libcrypto-3-x64.dll')) {
+              $entry = $zip.GetEntry("Cadence/_internal-2.0.12/$name")
+              if (!$entry -or $entry.Length -gt 16MB) { throw "Invalid TLS input" }
+              [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, (Join-Path $folder $name))
+            }
+          } finally { $zip.Dispose() }
+          python packaging/windows_runtime.py --tls $folder
       - name: Compile and verify current sources
         shell: pwsh
         run: python packaging/build_windows.py --msvc-root "$env:CADENCE_MSVC_ROOT" --qt-root "$env:CADENCE_QT_ROOT"

@@ -77,6 +77,9 @@ def main():
         'Elle contient les sources, recettes, correctifs et notices originales des bibliothèques livrées. '
         'Elle ne sert pas à exécuter Cadence.\n', encoding='utf-8')
     (stage / 'Associer Cadence.cmd').write_bytes(b'@echo off\r\nstart "" "%~dp0Cadence.exe" --register-associations\r\n')
+    compatibility = stage / '_internal'
+    compatibility.mkdir(exist_ok=True)
+    (compatibility / 'layout.txt').write_text('_internal-' + version + '\n', encoding='ascii')
     report = audit(stage)
     portable = output / f'Cadence-{version}-Windows.zip'
     archive(portable, {f'Cadence/{f.relative_to(stage).as_posix()}': f for f in stage.rglob('*') if f.is_file()})

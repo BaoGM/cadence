@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from PySide6.QtCore import QCoreApplication, QItemSelectionModel, QLocale, QSignalBlocker
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import (QAbstractButton, QDockWidget, QGroupBox, QLabel, QLineEdit,
+from PySide6.QtWidgets import (QAbstractButton, QDockWidget, QGroupBox, QLabel, QLineEdit, QPlainTextEdit, QTextEdit,
                                QMenu, QTabBar, QToolBar, QWidget)
 
 import ui_text
@@ -58,7 +58,7 @@ def retranslate(window, wanted):
             relabel(widget.windowTitle,widget.setWindowTitle)
         elif isinstance(widget,(QMenu,QGroupBox)):
             relabel(widget.title,widget.setTitle)
-        elif isinstance(widget,QLineEdit):
+        elif isinstance(widget,(QLineEdit,QPlainTextEdit,QTextEdit)):
             relabel(widget.placeholderText,widget.setPlaceholderText)
         elif isinstance(widget,QTabBar):
             for index in range(widget.count()):

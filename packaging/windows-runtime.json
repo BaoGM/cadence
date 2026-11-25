@@ -1,0 +1,263 @@
+{
+  "bindings": [
+    {
+      "component": "pyside6_essentials",
+      "url": "https://download.qt.io/snapshots/ci/pyside/6.12/e36b8f6c8f9d3a4447ffc32d6ad0637de75f0ef6/pyside6/pyside6_essentials-6.12.0a1.dev1795480720-cp310-abi3-win_amd64.whl",
+      "sha256": "999c7e2238ef6a66b3c62e259b9b35b6b1654d2a4758f238bd817d8da2ce8459",
+      "upstream_hashes": {}
+    },
+    {
+      "component": "pyside6_addons",
+      "url": "https://download.qt.io/snapshots/ci/pyside/6.12/e36b8f6c8f9d3a4447ffc32d6ad0637de75f0ef6/pyside6/pyside6_addons-6.12.0a1.dev1795480720-cp310-abi3-win_amd64.whl",
+      "sha256": "d76571310bc9bdd3330d8ccff186a30b08457897688405faa3e776bd71d0cd73",
+      "upstream_hashes": {}
+    },
+    {
+      "component": "shiboken6",
+      "url": "https://download.qt.io/snapshots/ci/pyside/6.12/e36b8f6c8f9d3a4447ffc32d6ad0637de75f0ef6/pyside6/shiboken6-6.12.0a1.dev1795480720-cp310-abi3-win_amd64.whl",
+      "sha256": "cd0507e5e9f5482e58020374e93e6cdc6d800d44514c4bb7a45aa18963be3065",
+      "upstream_hashes": {}
+    }
+  ],
+  "openssl": {
+    "source_revision": "0eb2651bdf5d25a017f529518b6cf5f1bbc697cb",
+    "source_sha256": "ce3b10858de1971e0c8aa8f75267fd35edeebc1b9887d4a7716804650a0be6f3",
+    "configuration": "VC-WIN64A shared no-tests no-asm no-makedepend no-autoload-config"
+  },
+  "files": {
+    "PySide6/Qt6Core.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "87a985b5f5a7aa7640f75261dd4828d1c91069d08a3db2564b57cc162420532c"
+    },
+    "PySide6/Qt6Gui.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "2aaee22b7fc21d02a1058197c7232b44da332ee65a7c692ae30d6e79911e0d51"
+    },
+    "PySide6/Qt6Multimedia.dll": {
+      "component": "pyside6_addons",
+      "sha256": "9d2fc9017a7a12a4fb7edf766ad532eaf04e0a9aa6ce9696a473421a47d0c6c0"
+    },
+    "PySide6/Qt6MultimediaWidgets.dll": {
+      "component": "pyside6_addons",
+      "sha256": "55b1ae6b0c06d454dcf0317ef454190e4a2e2d7d7df3661ff7deaa23a507f54e"
+    },
+    "PySide6/Qt6Network.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "76a3d5507658dd1158046bbccc845c41b52571f2b291eb411245990835f321ba"
+    },
+    "PySide6/Qt6OpenGL.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "dbc7ac3e7f34e2268022348fb431638a4776e7a7197c35123edd2b83f2a3bbf4"
+    },
+    "PySide6/Qt6Qml.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "95306495d081a22b82f3a3df29a77faea78e0cefbf044d1c0834252d73c14a70"
+    },
+    "PySide6/Qt6QmlMeta.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "4b17a2bdd88728cd7285ff2ece96dee64216b781bfd4cbb675cf360b0740a604"
+    },
+    "PySide6/Qt6QmlModels.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "d1bdad64f8d4b9b2c1b740b6d853fc1573184d7d2a6cfe967ddbce50d19f3d21"
+    },
+    "PySide6/Qt6QmlWorkerScript.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "114bcac94530070defe80144a311159af57c340202a8934e9239f8f0a3b11ebe"
+    },
+    "PySide6/Qt6Quick.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "c15ac0995b0a61255aab0b33f4309620ae5aea109a4397d6425e57a0bd70d5cf"
+    },
+    "PySide6/Qt6Svg.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "0e7251140cb0969f069e3efe2a6346640735fc91ba43722f2a5000aeae8e3c03"
+    },
+    "PySide6/Qt6Test.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "26242e42c2864828838edcc09eb8126dd5e6846c1f9161634f1741fa318af5b0"
+    },
+    "PySide6/Qt6VirtualKeyboard.dll": {
+      "component": "pyside6_addons",
+      "sha256": "b462e873f1e52c8bc11f1f7955dea5527be53126cd9cd2a15c2053167b677bd1"
+    },
+    "PySide6/Qt6Widgets.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "84dbb50097464c645f10a78f14532549740ca8e3da27395011ad7106cf8cafc2"
+    },
+    "PySide6/QtCore.pyd": {
+      "component": "pyside6_essentials",
+      "sha256": "6122ca7a8e5102780e65fba69d12fd990a49c05f56f0170001fe8726e7316e95"
+    },
+    "PySide6/QtGui.pyd": {
+      "component": "pyside6_essentials",
+      "sha256": "84d78fff87dfd052f0c436cdf432565568f8fa77d1f87d62928904dc7cefb802"
+    },
+    "PySide6/QtMultimedia.pyd": {
+      "component": "pyside6_addons",
+      "sha256": "d853d73fd7d9be9e283e697ce47198130ea5e027feb9aa8746b5dc919c595c82"
+    },
+    "PySide6/QtMultimediaWidgets.pyd": {
+      "component": "pyside6_addons",
+      "sha256": "f982e7d30335e8f7342a824b982ffea760a7834b3133d91f4ff840ffa53dadaf"
+    },
+    "PySide6/QtNetwork.pyd": {
+      "component": "pyside6_essentials",
+      "sha256": "820cb0ecd0cb6371d8f3f5f3c43cccb72dbc25167b8f0ecfcde9ccb0e2df5afc"
+    },
+    "PySide6/QtOpenGL.pyd": {
+      "component": "pyside6_essentials",
+      "sha256": "a16ba8762e7a68951ba98d4e0f11356e6f4256f600994bda4b20a7eb544bd17d"
+    },
+    "PySide6/QtSvg.pyd": {
+      "component": "pyside6_essentials",
+      "sha256": "38a1bf38d03a58d90ed700ed24f250af2268523f7ccc1dfb0d4fd2c18dc2b4a8"
+    },
+    "PySide6/QtTest.pyd": {
+      "component": "pyside6_essentials",
+      "sha256": "5be94b40f1207f6dbbc899b953e16f0cd8bdf08c4d8eae1d77e9c360bab147d0"
+    },
+    "PySide6/QtWidgets.pyd": {
+      "component": "pyside6_essentials",
+      "sha256": "756e48c089bd8c1aad03a4ee4b3ed5b3011adbc303696eef24dd56be16c5df66"
+    },
+    "PySide6/avcodec-63.dll": {
+      "component": "pyside6_addons",
+      "sha256": "2e3bc6885073b0880703a4427e6baa5342c326e66134ac2d14ca2ec058a49394"
+    },
+    "PySide6/avformat-63.dll": {
+      "component": "pyside6_addons",
+      "sha256": "1a1374b4ed71c267c8ccf95ac9755d03215377f12790918e53d89d20be69edc7"
+    },
+    "PySide6/avutil-61.dll": {
+      "component": "pyside6_addons",
+      "sha256": "5e81f138ef35aa9172fbb00fb70fe4b980dece2a2133a119f115ae71e2fd6dd0"
+    },
+    "PySide6/opengl32sw.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "7c95a31f5b0552a661f8c54db0ea48903433125177565632d3f0381b45695aab"
+    },
+    "PySide6/plugins/generic/qtuiotouchplugin.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "b90366805b0fe52a42f743c9e711a6b689bfaa699381830e940234f23ffacb33"
+    },
+    "PySide6/plugins/iconengines/qsvgicon.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "529759e5b6125e573a653f14bdf0cf33d65e5526d464f4d5048002f04e833d36"
+    },
+    "PySide6/plugins/imageformats/qgif.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "832255dc028f75011103d523e1e5255929b7700346e60fa9d5731b2429d99e01"
+    },
+    "PySide6/plugins/imageformats/qicns.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "24de7acffecf288797c8a67f999406c7f6809602057cf16abdd40d20585ab526"
+    },
+    "PySide6/plugins/imageformats/qico.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "f720c5e34df0953416b09858a99a0ced3561c500238ccec985e05435fd7fd114"
+    },
+    "PySide6/plugins/imageformats/qjpeg.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "f828da9185158e69ca6cecf6b0802dbca9cad92b9982decda66c25eced347704"
+    },
+    "PySide6/plugins/imageformats/qsvg.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "f52d9c12ec5890bdf593cff61cd4e5ca0828fd5cc364c54e32dd40cae0e5abf9"
+    },
+    "PySide6/plugins/imageformats/qtga.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "e0278e93aa5576252bafc47a2f21a4c6516e288b28823ee8c41b1f761776d607"
+    },
+    "PySide6/plugins/imageformats/qtiff.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "597948733e347ae7aacd4a60d687bb7cc3bb30139da77c369f5740aba2bed24b"
+    },
+    "PySide6/plugins/imageformats/qwbmp.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "cfed50ed75ea51b75fb070ef10ce2939ea09bb0cf3fbd7a5e9dd5cac1e811c96"
+    },
+    "PySide6/plugins/imageformats/qwebp.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "0385f28bc8a039d9a286c0bbc14868f70637b09d6bc31d0a234d101b777d51e6"
+    },
+    "PySide6/plugins/multimedia/ffmpegmediaplugin.dll": {
+      "component": "pyside6_addons",
+      "sha256": "855d27b49b6214915e48021cf6aae8349c67397c803d2edfa458cb81e10416d0"
+    },
+    "PySide6/plugins/multimedia/windowsmediaplugin.dll": {
+      "component": "pyside6_addons",
+      "sha256": "aaa4a4be554e1cb642d723275cc2241c1513e70dfc74fbd5b53090452fe05b8e"
+    },
+    "PySide6/plugins/networkinformation/qnetworklistmanager.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "5cafb782099bb931e0998714c90e852a10827a6c2c1698f692ff0c643d29ceab"
+    },
+    "PySide6/plugins/platforminputcontexts/qtvirtualkeyboardplugin.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "5f718ec2a55c7203a7323e889c2a3a1d4bc01f2a529c78c982bdfe6cc778f5a8"
+    },
+    "PySide6/plugins/platforms/qdirect2d.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "929fbe0ae79b5b896703c3afc5278b797eefcde35ce6a8e99ffa6d53bf0cf37a"
+    },
+    "PySide6/plugins/platforms/qminimal.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "56d7ae3e3fb6d8a186117d8629d5c825a6cfde688a6a7c2b375330f03217f56f"
+    },
+    "PySide6/plugins/platforms/qoffscreen.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "e3d35d618ec52eb37f9626ef0f7c9cb3afbf9155fe7140e7a58ceb51222194fe"
+    },
+    "PySide6/plugins/platforms/qwindows.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "04e24e655f8e1f44919d23fd60530c10ed54eb5329125825ffff3b81d0345d40"
+    },
+    "PySide6/plugins/styles/qmodernwindowsstyle.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "419c40d22433914fadc3946db7bee1f6d01da3e0ada78e265c6672239e616e5a"
+    },
+    "PySide6/plugins/tls/qcertonlybackend.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "44af2232caf0f62ab031f53641d52f93d0902169b90f323f92a11b31d147cff6"
+    },
+    "PySide6/plugins/tls/qopensslbackend.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "594483b1b6a9a9ebc0c89415c2be5f73dec63f5ec1810083de7a198bd6ca27f3"
+    },
+    "PySide6/plugins/tls/qschannelbackend.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "8a409f82b2693f1666ba258727f548b9d51089e5840fa28ee8cd028a06ccbc05"
+    },
+    "PySide6/pyside6.abi3.dll": {
+      "component": "pyside6_essentials",
+      "sha256": "3b263c0e14728f1886077b432b17b164386d481ca07f20fbf461f526f653e441"
+    },
+    "PySide6/swresample-7.dll": {
+      "component": "pyside6_addons",
+      "sha256": "e36774bb7911cad98b53b8365d7ea4ade0bce29d8fe04d858247b8c1d1242ed6"
+    },
+    "PySide6/swscale-10.dll": {
+      "component": "pyside6_addons",
+      "sha256": "68bb04f02ed85ae9116fdbfcf207f8b14a39cebbd449f84c19c9d81e7ad3fe75"
+    },
+    "libcrypto-3-x64.dll": {
+      "component": "OpenSSL",
+      "member": "libcrypto-3-x64.dll",
+      "sha256": "20890fb6450d2990657869ee72dceb6e2a74acc6011eef4cee4be57cd9d00dca"
+    },
+    "libssl-3-x64.dll": {
+      "component": "OpenSSL",
+      "member": "libssl-3-x64.dll",
+      "sha256": "b6875b6fa51a3b8a370c74e0c763a893283ba8e28e1c08b42b3d339175865066"
+    },
+    "shiboken6/Shiboken.pyd": {
+      "component": "shiboken6",
+      "sha256": "be2121d32c282b8cca64e7a3415d84cc245ff6cf4793e0cc7d33f4350e3751ab"
+    },
+    "shiboken6/shiboken6.abi3.dll": {
+      "component": "shiboken6",
+      "sha256": "026528c60123ee907425b0de1ee0e79d7f22fef50fe6470d27f7a004b9da59c4"
+    }
+  }
+}

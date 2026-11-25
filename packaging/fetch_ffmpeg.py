@@ -5,11 +5,11 @@ import tempfile
 import urllib.request
 import zipfile
 
-RELEASE='autobuild-2026-11-10-12-39'
-NAME='ffmpeg-n9.0.2-48-gd4070a14ce-win64-gpl-9.0'
+RELEASE='autobuild-2026-11-24-12-41'
+NAME='ffmpeg-n9.0.2-963-g4d831360c9-win64-gpl-9.0'
 URL=f'https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/{RELEASE}/{NAME}.zip'
-ARCHIVE_SHA256='e08cfa1d5ec52a4e405c55ddb6c91b42fb2a9dafe5bcecfcbffd6db3e9bdba0e'
-EXECUTABLE_SHA256='13ff6c19ae468b95126489df1bed036d17ac2982be75cbdf998354b100520434'
+ARCHIVE_SHA256='378bb3b24dcbefe9ecd07f54bd5a4787701890ec10d47cc10b8c02d39d799eef'
+EXECUTABLE_SHA256='cc4737d115fd010b193d1acf0c9ccc3eb3a6f7a8e12716c305cdd3d83e9111f2'
 
 
 def main():

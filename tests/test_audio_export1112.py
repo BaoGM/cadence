@@ -157,9 +157,20 @@ def test_audio_export_waits_for_pending_audio(tmp_path,monkeypatch):
                      '-c:v','libx264','-c:a','aac',str(source)])
     item=media.prepare_media(source,defer_audio=True)
     assert item['audio_pending']
+    popen=media.subprocess.Popen
+    observed_inputs=[]
+    def observe(args,*values,**options):
+        if '-i' in args:
+            for idx,arg in enumerate(args):
+                if arg=='-i':
+                    assert args[idx-2:idx]==['-protocol_whitelist','file']
+                    observed_inputs.append(args[idx+1])
+        return popen(args,*values,**options)
+    monkeypatch.setattr(media.subprocess,'Popen',observe)
     doc=Document(25); doc.append_media([item])
     output=tmp_path/'ready.wav'
     media.export_video(doc.state,dict(doc.media),doc.fps,output)
+    assert str(source) in observed_inputs
     with wave.open(str(output),'rb') as audio:
         assert audio.getnframes()==sample_at(doc.state.length,doc.fps)
         assert np.abs(np.frombuffer(audio.readframes(audio.getnframes()),dtype='<i2')).max()>1000

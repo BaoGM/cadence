@@ -22,7 +22,7 @@ def test_title_panels_metadata_and_context_modes(window,application):
     assert not {'inspector','meta','status'} & w.workspaces.panels.keys()
     assert not w.findChildren(QStatusBar)
     assert all(not any(part in key for part in ('Afficher les ajustements','Afficher les informations du média','Afficher la barre d’état')) for key in w.action_registry)
-    for widget in (w.exp_spin,w.apply_export,w.copy_audio,w.leave_gap,w.link_tracks,w.link_drawings): assert w.header.isAncestorOf(widget)
+    for widget in (w.exp_spin,w.exposure_button,w.copy_audio,w.leave_gap,w.link_tracks,w.link_drawings): assert w.header.isAncestorOf(widget)
     assert w.transport_widget.isAncestorOf(w.media_info)
     menu=w.createPopupMenu(); assert menu.actions()[0].data()=='workspace_mode' and menu.actions()[1].isSeparator()
     menu.actions()[0].trigger(); assert w.workspaces.mode=='read' and not w.workspaces.toggle.isChecked()

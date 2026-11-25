@@ -64,10 +64,15 @@ class DrawingTimeline(QObject):
         if key.end-key.start==1: return 'extend'
         return 'left' if x<center else 'right'
     def context_menu(self,x):
-        t=self.t; frame=t.frame_for(x); key=self.hit(x); selection=t.state.selection
-        span=selection if selection and selection[0]<=frame<selection[1] else (key.start,key.end) if key else None
+        t=self.t
         t.selection_track='drawing'
         menu=QMenu(t); t.add_units(menu); menu.addSeparator(); t.add_timeline_mode(menu); menu.addSeparator()
+        self.add_clipboard_actions(menu,x)
+        t.add_marker_actions(menu,x)
+        return menu
+    def add_clipboard_actions(self,menu,x):
+        t=self.t; frame=t.frame_for(x); key=self.hit(x); selection=t.state.selection
+        span=selection if selection and selection[0]<=frame<selection[1] else (key.start,key.end) if key else None
         has_keys=bool(span and any(k.start<span[1] and k.end>span[0] for k in t.state.drawings))
         clipboard_length=getattr(t,'drawing_clipboard_length',0)
         commands=[('paste','Coller la clé'),('copy','Copier la clé'),('cut','Couper la clé')]
@@ -79,10 +84,8 @@ class DrawingTimeline(QObject):
             action.setEnabled(enabled)
             a,b=(frame,frame) if operation=='paste' else span or (frame,frame+1)
             action.triggered.connect(lambda checked=False,op=operation,start=a,end=b:t.drawingClipboardRequested.emit(op,start,end))
-        menu.addSeparator(); action=menu.addAction(tr('Supprimer les clés')); action.setEnabled(has_keys)
+        menu.addSeparator(); action=menu.addAction(tr('Supprimer les clés')); action.setData('delete_keys'); action.setEnabled(has_keys)
         if span: action.triggered.connect(lambda:t.drawingDelete.emit(*span))
-        t.add_marker_actions(menu,x)
-        return menu
     def eventFilter(self,obj,e):
         t=self.t; kind=e.type()
         if self.mode and (not t.state or self.source is not t.state.drawings or kind in (QEvent.Type.Hide,QEvent.Type.WindowDeactivate,QEvent.Type.FocusOut)):
@@ -157,8 +160,8 @@ class DrawingTimeline(QObject):
                 elif mode in ('left','right','extend'): t.drawingResized.emit(*change)
             elif mode=='click': t.seek.emit(self.key.start)
             t.unsetCursor(); t.update(); t.finish_range_drag()
-            if not change and e.modifiers()==Qt.NoModifier and mode in ('click','left','right','extend'):
-                part='body' if mode=='click' else mode
+            if not change and e.modifiers()==Qt.NoModifier and mode in ('left','right','extend'):
+                part=mode
                 if part=='extend': part='left' if e.position().x()<t.x_for((self.key.start+self.key.end)/2) else 'right'
                 self.focus_part(self.key,part)
             e.accept(); return True

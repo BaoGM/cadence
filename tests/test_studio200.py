@@ -5,6 +5,12 @@ from PySide6.QtTest import QSignalSpy, QTest
 from test_drawing import application, window
 
 
+def finish_hide(widget):
+    motion=getattr(widget,'entrance',None)
+    if motion and motion.on_hidden is not None:
+        motion.setCurrentTime(0)
+
+
 def test_native_menus_modes_timeline_and_clock(window, application):
     w = window
     chrome = w.studio
@@ -28,6 +34,7 @@ def test_native_menus_modes_timeline_and_clock(window, application):
     assert '12' in w.timecode_overlay.frame
     assert not hasattr(chrome,'clock')
     chrome.headers.update_hover(QPoint(-100,-100))
+    finish_hide(chrome.top)
     assert not chrome.top.isVisible() and not chrome.view.isVisible()
     first,_=chrome.headers.geometries()
     chrome.headers.update_hover(QPoint(first.center().x(),first.top()+3))
@@ -58,6 +65,34 @@ def test_menu_key_respects_custom_action(window, application):
     application.processEvents()
     QTest.keyClick(w.viewer, Qt.Key.Key_F10)
     assert spy.count() == 1 and not w.studio.menu.isVisible()
+
+
+def test_video_layout_applies_only_settled_sizes(window, application):
+    from PySide6.QtCore import QEvent, QObject
+    w=window
+    class Sizes(QObject):
+        def eventFilter(self, obj, event):
+            if event.type()==QEvent.Resize: sizes.append(obj.size())
+            return False
+    probe=Sizes()
+    sizes=[]
+    w.viewer.installEventFilter(probe)
+    w.showMaximized()
+    QTest.qWait(180)
+    original=w.viewer.size()
+    for fullscreen in (True,False):
+        sizes.clear()
+        w.toggle_fullscreen()
+        QTest.qWait(350)
+        assert w.video_fullscreen==fullscreen and not w.viewer.layout_pending
+        assert sizes and all(size==w.viewer.size() for size in sizes)
+    assert w.isMaximized() and w.viewer.size()==original
+    sizes.clear()
+    w.studio.right_button.click()
+    w.studio.right_button.click()
+    QTest.qWait(80)
+    assert not w.viewer.layout_pending and w.viewer.size()==original
+    assert all(size==original for size in sizes)
 
 
 def test_comparison_buttons_close_panel_when_disabled(window, application):
@@ -131,7 +166,7 @@ def test_compact_read_headers_preserve_tools_and_timeline(window, application):
     application.processEvents()
     for dock in (w.library,w.edit_toolbar,w.drawing.panel):
         assert not bounds(headers.top).intersects(bounds(dock))
-    headers.update_hover(w.timeline.mapToGlobal(w.timeline.rect().center()))
+    headers.update_hover(w.play_btn.mapToGlobal(w.play_btn.rect().center()))
     headers.timer.stop()
     application.processEvents()
     assert w.studio.timeline_bar.isVisible()
@@ -162,15 +197,33 @@ def test_reader_panels_slide_in_their_own_direction(window, application):
     assert c.view.window() is c.top.window()
     c.headers.show_ruler()
     check(c.timeline_bar,QPoint(0,18))
-    c.dock_button.click()
-    check(w.library.widget(),QPoint(-20,0))
-    c.right_button.click()
-    check(w.drawing.panel.widget(),QPoint(20,0))
+    for button,dock,left in ((c.dock_button,w.library,True),(c.right_button,w.drawing.panel,False)):
+        initial=w.viewer_workspace.geometry()
+        button.click()
+        motion=c.side_motion
+        motion.pause()
+        start,end=motion.paths[dock]
+        assert start.right()<0 if left else start.left()>=w.width()
+        assert start.width()==end.width()
+        motion.setCurrentTime(motion.duration()//2)
+        middle=w.viewer_workspace.geometry()
+        assert middle.width()<initial.width() and (middle.left()>initial.left())==left
+        assert dock.geometry().width()==end.width()
+        assert (start.left()<dock.x()<end.left()) if left else (end.left()<dock.x()<start.left())
+        button.click()
+        assert w.viewer_workspace.geometry()==middle
+        assert dock.isHidden()
+        closing=motion.previews[dock]
+        motion.setCurrentTime(motion.duration()//2)
+        assert middle.width()<w.viewer_workspace.width()<initial.width()
+        assert closing.isVisible()
+        motion.setCurrentTime(motion.duration())
+        assert w.viewer_workspace.geometry()==initial and not motion.previews and w.layout().isEnabled()
     assert application.focusWidget() is focus
 
 
-def test_read_header_is_one_row_and_timeline_enter_needs_no_poll(window,application):
-    from PySide6.QtCore import QCoreApplication,QPointF,QRect
+def test_read_header_is_one_row_and_transport_enter_needs_no_poll(window,application):
+    from PySide6.QtCore import QAbstractAnimation,QCoreApplication,QPointF,QRect
     from PySide6.QtGui import QEnterEvent
     w=window
     w.workspaces.switch('read')
@@ -196,14 +249,25 @@ def test_read_header_is_one_row_and_timeline_enter_needs_no_poll(window,applicat
         away=w.viewer.mapToGlobal(w.viewer.rect().center())
         c.headers.update_hover(away)
         c.headers.timer.stop()
+        finish_hide(c.timeline_bar)
         assert not c.timeline_bar.isVisible()
-        visible=QRect(w.timeline_panel.mapToGlobal(QPoint()),w.timeline_panel.size())
-        cursor=visible.intersected(QRect(w.timeline.mapToGlobal(QPoint()),w.timeline.size())).center()
-        here=w.timeline.mapFromGlobal(cursor)
-        event=QEnterEvent(QPointF(here),QPointF(w.mapFromGlobal(cursor)),QPointF(cursor))
+        track=w.timeline.mapToGlobal(w.timeline.rect().center())
+        event=QEnterEvent(QPointF(w.timeline.mapFromGlobal(track)),QPointF(w.mapFromGlobal(track)),QPointF(track))
         QCoreApplication.sendEvent(w.timeline,event)
+        assert not c.timeline_bar.isVisible()
+        strip=w.transport_widget.widget()
+        cursor=strip.mapToGlobal(strip.rect().center())
+        event=QEnterEvent(QPointF(strip.mapFromGlobal(cursor)),QPointF(w.mapFromGlobal(cursor)),QPointF(cursor))
+        QCoreApplication.sendEvent(strip,event)
         assert c.timeline_bar.isVisible()
-        c.headers.update_hover(c.timeline_bar.mapToGlobal(c.timeline_bar.rect().center()))
-        assert c.timeline_bar.isVisible()
-        c.headers.update_hover(away)
+        motion=c.timeline_bar.entrance
+        motion.setCurrentTime(motion.duration()//2)
+        midway=motion.currentTime()
+        c.headers.update_hover(track)
+        assert motion.direction()==QAbstractAnimation.Backward and motion.currentTime()==midway
+        c.headers.update_hover(cursor)
+        assert motion.direction()==QAbstractAnimation.Forward and motion.currentTime()==midway
+        motion.setCurrentTime(motion.duration())
+        c.headers.update_hover(track)
+        finish_hide(c.timeline_bar)
         assert not c.timeline_bar.isVisible()

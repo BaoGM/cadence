@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-only
-from PySide6.QtCore import QEasingCurve, QEvent, QObject, QPoint, QRect, QTimer, Qt, QVariantAnimation
+from PySide6.QtCore import QAbstractAnimation, QEasingCurve, QEvent, QObject, QPoint, QRect, QTimer, Qt, QVariantAnimation
 from PySide6.QtGui import QCursor, QRegion
 from PySide6.QtWidgets import QApplication, QFrame, QGraphicsOpacityEffect, QLayout, QVBoxLayout
 from shiboken6 import isValid
 
 
-class PanelEntrance(QVariantAnimation):
+class PanelSlide(QVariantAnimation):
     def __init__(self, widget, offset, window):
         super().__init__(widget)
         self.widget = widget
@@ -15,6 +15,7 @@ class PanelEntrance(QVariantAnimation):
         self.original_mask = widget.mask()
         self.offset = offset
         self.window = window
+        self.on_hidden = None
         self.effect = None
         if window is None:
             self.effect = QGraphicsOpacityEffect(widget)
@@ -44,9 +45,14 @@ class PanelEntrance(QVariantAnimation):
 
     def finish(self):
         widget = self.widget
+        on_hidden = self.on_hidden
+        self.on_hidden = None
+        widget.entrance = None
         self.stop()
         widget.removeEventFilter(self)
         self.container.removeEventFilter(self)
+        widget.move(self.origin)
+        if on_hidden is not None: on_hidden()
         if self.window is not None:
             self.window.setWindowOpacity(1.0)
         else:
@@ -55,27 +61,47 @@ class PanelEntrance(QVariantAnimation):
             widget.clearMask()
         else:
             widget.setMask(self.original_mask)
-        widget.move(self.origin)
         self.container.layout().invalidate()
         self.container.layout().activate()
-        widget.entrance = None
         self.deleteLater()
 
     def eventFilter(self, obj, event):
-        if (obj is self.widget and event.type() in (QEvent.Hide,QEvent.ParentAboutToChange)
-                or obj is self.container and event.type()==QEvent.Resize):
+        if obj is self.widget and event.type() in (QEvent.Hide,QEvent.ParentAboutToChange):
+            self.on_hidden = None
+            self.finish()
+        elif obj is self.container and event.type()==QEvent.Resize:
             self.finish()
         return False
+
+    def play(self, on_hidden=None):
+        self.on_hidden = on_hidden
+        self.setDirection(QAbstractAnimation.Backward if on_hidden else QAbstractAnimation.Forward)
+        if self.state() != QAbstractAnimation.Running:
+            self.start()
+        elif on_hidden is not None and self.currentTime()==0:
+            self.finish()
 
 
 def slide_in(widget, offset, window=None):
     if previous := getattr(widget, 'entrance', None):
-        previous.finish()
+        previous.play()
+        return
     if widget.graphicsEffect() is not None: return
-    entrance = PanelEntrance(widget,offset,window)
+    entrance = PanelSlide(widget,offset,window)
     widget.entrance = entrance
     entrance.advance(0.0)
-    entrance.start()
+    entrance.play()
+
+
+def slide_out(widget, offset, on_hidden, window=None):
+    motion = getattr(widget, 'entrance', None)
+    if motion is None:
+        if widget.graphicsEffect() is not None:
+            on_hidden()
+            return
+        motion = PanelSlide(widget,offset,window)
+        widget.entrance = motion
+    motion.play(on_hidden)
 
 
 def overlay(parent):
@@ -140,6 +166,8 @@ class HoverHeaders(QObject):
                 bar.show()
                 self.w.sync_timeline_scroll()
                 slide_in(bar,QPoint(0,18))
+            elif motion:=getattr(bar,'entrance',None):
+                motion.play()
         else:
             self.hide_docked_ruler()
             self.reveal(self.ruler,self.geometries()[1])
@@ -151,6 +179,19 @@ class HoverHeaders(QObject):
             self.ruler_docked=False
             bar.show()
             self.w.sync_timeline_scroll()
+
+    def conceal_ruler(self):
+        if self.ruler_docked:
+            slide_out(self.chrome.timeline_bar,QPoint(0,18),self.hide_docked_ruler)
+        elif self.ruler.isVisible():
+            slide_out(self.chrome.timeline_bar,QPoint(0,18),self.ruler.hide,self.ruler)
+
+    def conceal_top(self):
+        if self.top.isVisible():
+            def hidden():
+                self.top.hide()
+                self.reserve_top(0)
+            slide_out(self.chrome.top,QPoint(0,-18),hidden,self.top)
 
     def narrow_header(self):
         width=self.w.viewer_workspace.content.width()
@@ -200,7 +241,8 @@ class HoverHeaders(QObject):
         pos=panel.mapToGlobal(QPoint(0,0))
         ruler=QRect(pos.x(),pos.y()-c.timeline_bar.height(),panel.width(),c.timeline_bar.height())
         if self.inline_ruler():
-            ruler.moveTop(pos.y())
+            if self.ruler_docked:
+                ruler.moveTop(pos.y())
             return first,ruler
         ruler.moveBottom(min(ruler.bottom(),corner.y()+area.height()-1))
         ruler.setLeft(corner.x())
@@ -211,6 +253,17 @@ class HoverHeaders(QObject):
         dock=self.w.transport_widget
         return QRect(dock.mapToGlobal(QPoint()),dock.size()) if dock.isVisible() else QRect()
 
+    def lower_hover(self, point, bar):
+        if bar.contains(point):
+            return True
+        transport=self.transport_rect()
+        if transport.contains(point):
+            return True
+        # Include the dock separator only where it actually connects both strips.
+        return (not transport.isEmpty() and 0 < transport.top()-bar.bottom() <= 8
+                and bar.bottom()<point.y()<transport.top()
+                and max(bar.left(),transport.left())<=point.x()<=min(bar.right(),transport.right()))
+
     def reveal(self, host, rect):
         if host.geometry()!=rect: host.setGeometry(rect)
         if not host.isVisible():
@@ -220,11 +273,13 @@ class HoverHeaders(QObject):
             offset = QPoint(0,18 if host is self.ruler else -18)
             slide_in(host.layout().itemAt(0).widget(),offset,host)
             self.reposition.start(0)
+        elif motion:=getattr(host.layout().itemAt(0).widget(),'entrance',None):
+            motion.play()
 
     def show_reader(self):
         if not self.read or self.w.video_fullscreen: return
-        reserve=self.chrome.top.height() if self.narrow_header() else 0
-        self.reserve_top(reserve)
+        if not self.chrome.side_motion.paths:
+            self.reserve_top(self.chrome.top.height() if self.narrow_header() else 0)
         first,_=self.geometries()
         self.reveal(self.top,first)
         self.chrome.center_modes()
@@ -262,19 +317,15 @@ class HoverHeaders(QObject):
             approach=QRect(area.mapToGlobal(QPoint()),area.size())
             approach.setHeight(min(approach.height(),first.height()+8))
             reader_hover=approach.contains(point)
-        if self.read and reader_hover:
+        if self.read and (reader_hover or self.top.isVisible() and self.chrome.side_motion.paths):
             self.show_reader()
         else:
-            self.top.hide()
-            self.reserve_top(0)
-        timeline=QRect(w.timeline_panel.mapToGlobal(QPoint()),w.timeline_panel.size())
+            self.conceal_top()
         if self.auto_ruler and w.timeline_panel.isVisible() and (
-                bar.adjusted(0,-12,0,12).contains(point) or timeline.contains(point)
-                or self.transport_rect().contains(point) or self.ruler.isVisible() and keep(self.ruler)):
+                self.lower_hover(point,bar) or self.ruler.isVisible() and keep(self.ruler)):
             self.show_ruler()
         else:
-            self.ruler.hide()
-            self.hide_docked_ruler()
+            self.conceal_ruler()
 
     def eventFilter(self, obj, event):
         if not isValid(self.w): return False

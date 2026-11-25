@@ -46,6 +46,42 @@ def test_error_with_no_message_is_identified(application):
  task.wait();assert messages==['RuntimeError'];task.deleteLater()
 
 
+def test_successive_media_tasks_each_dispatch_once_on_ui_thread(window,application):
+    from PySide6.QtCore import QThread
+    outcomes=[]
+    worker=window.task_worker
+    def record(value):
+        assert QThread.currentThread() is application.thread()
+        outcomes.append(value)
+    def fail(progress,cancel): raise ValueError('failed')
+    def cancel_task(progress,cancel):
+        cancel.set()
+        return 'cancelled value'
+    for fn in (lambda p,c:'first',fail,cancel_task,lambda p,c:'last'):
+        window.begin_task('Test',fn,record,on_error=record)
+        assert window.job is worker
+        deadline=time.monotonic()+6
+        while window.job and time.monotonic()<deadline:
+            application.processEvents()
+            time.sleep(.005)
+        assert window.job is None
+    assert outcomes==['first','failed','last']
+
+
+def test_thumbnail_request_finishes_if_file_was_removed(application,tmp_path):
+    from PySide6.QtCore import QObject
+    from timeline_thumbnails import ClipThumbnails
+    owner=QObject()
+    provider=ClipThumbnails(owner,repaint=False)
+    key=(str(tmp_path/'missing.mov'),0,0,0,0,12,Fraction(24),0)
+    assert provider.request(key)==() and provider.pending
+    deadline=time.monotonic()+5
+    while provider.pending and time.monotonic()<deadline:
+        application.processEvents()
+        time.sleep(.005)
+    assert not provider.pending and provider.cache[(*key,1)]==()
+
+
 def test_playback_settings_independent_of_media(window):
  from playback_preferences import save,load,path
  w=window;w.volume.setValue(37);w.volume.setMuted(True);w.timeline.set_units('frames');save(w)

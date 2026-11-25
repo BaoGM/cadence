@@ -4,16 +4,17 @@ This procedure builds the hybrid Windows application. It has no dependency on a 
 
 ## Toolchain
 
-Use Python 3.12.14 x64, Qt 6.12.0 MSVC x64, MSVC 14.44.35207 and Windows SDK 10.0.26100.0. Exact Python package versions and Windows wheel hashes, including build/test dependencies, are in requirements-build.lock. Python, Qt and Inno Setup downloads are identified by SHA-256 in packaging/toolchain.lock.json; FFmpeg's binary and archive hashes are in packaging/fetch_ffmpeg.py.
+Use Python 3.12.14 x64, Qt 6.12.1 MSVC x64, MSVC 14.44.35207 and Windows SDK 10.0.26100.0. Exact Python package versions and Windows wheel hashes, including build/test dependencies, are in requirements-build.lock. Python, Qt and Inno Setup downloads are identified by SHA-256 in packaging/toolchain.lock.json; FFmpeg's binary and archive hashes are in packaging/fetch_ffmpeg.py.
 
 Run packaging/bootstrap_python.ps1 to obtain the verified Windows runtime from Astral's python-build-standalone distribution and create an isolated build environment. Python 3.12.14 has no Windows entry in the actions/python-versions manifest; do not substitute setup-python for this step. On a Windows runner, packaging/bootstrap_windows.ps1 prepares Qt and Inno Setup and verifies the MSVC installation. The pinned Visual Studio 2022 toolset and SDK must be installed separately if absent. The script fails rather than silently substituting another toolset.
 
-For a local build:
+For the two pinned OpenSSL DLLs, use the [portable distribution](https://github.com/BaoGM/cadence/releases/download/v2.0.12-windows-studio2/Cadence-2.0.12-Windows.zip) or rebuild from the OpenSSL-Cadence sources and recipe in the third-party bundle. A changed build requires independently verifying the resulting DLLs and updating packaging/windows-runtime.json. For a local build:
 
 ```powershell
 ./packaging/bootstrap_python.ps1
 .deps/build-venv/Scripts/python -m pip install --only-binary=:all: --require-hashes -r requirements-build.lock
 .deps/build-venv/Scripts/python packaging/fetch_ffmpeg.py
+.deps/build-venv/Scripts/python packaging/windows_runtime.py --tls <extracted-portable>/Cadence/_internal-2.0.12
 .deps/build-venv/Scripts/python packaging/build_windows.py --msvc-root "C:/path/to/Visual Studio" --qt-root "C:/path/to/Qt"
 ```
 
@@ -25,7 +26,7 @@ Application tests are grouped under `tests/`. The maintained CI selection is lis
 
 ## Distribution inputs
 
-Full packaging requires the matching third-party source and notice bundle. The bundle's complete file manifest and hashes are in packaging/third-party.lock.json. The approved input bundle is available in [Sources des dépendances 1.15.1](https://github.com/BaoGM/cadence/releases/tag/dependencies-1.15.1); its SHA-256 is `15aaffdf5f93cc95bb27ba6ebc47560670e33b426d199a3025dfcbcd950593ea`.
+Full packaging requires the matching third-party source and notice bundle. The bundle's complete file manifest and hashes are in packaging/third-party.lock.json. Use the [matching third-party sources](https://github.com/BaoGM/cadence/releases/download/v2.0.12-windows-studio2/Cadence-2.0.12-third-party-sources.zip) and its SHA-256 from the release checksums.
 
 ```powershell
 .deps/build-venv/Scripts/python packaging/fetch_release_inputs.py --archive "C:/path/to/third-party-sources.zip" --sha256 THE_VERIFIED_ARCHIVE_SHA256

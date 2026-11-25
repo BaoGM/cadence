@@ -87,7 +87,11 @@ def test_open_list_archives_complete_montage_and_restores(application, clips, tm
         assert window.doc.state.length == 96
         assert window.doc.media[locate(window.doc.state.segments, 0)[0]]['path'] == clips[1]['path']
         assert window.doc.media[locate(window.doc.state.segments, 48)[0]]['path'] == clips[0]['path']
-        panel.current = ('temporary', panel.temporary[0]['id']); panel.open_current()
+        panel.current = ('temporary', panel.temporary[0]['id']); panel.show_files()
+        listed=panel.all_paths()
+        panel.files.setCurrentRow(0); panel.remove_files()
+        assert panel.all_paths()==listed[1:] and all(Path(p).is_file() for p in listed)
+        panel.open_current()
         assert window.doc is old and old.state == state and old.undo_stack == undo
         assert len(panel.temporary) == 1
         panel.current = (identity, None); panel.store.set_files(identity, [tmp_path / 'missing.mp4'])
@@ -134,3 +138,36 @@ def test_delete_in_library_preserves_timeline(application, clips, tmp_path, monk
         assert Path(clips[0]['path']).exists()
     finally:
         window.doc.saved_signature = window.doc.signature(); window.close(); application.processEvents()
+
+
+def test_delete_nested_folders_and_entries_preserves_disk_and_refresh_restores(application,tmp_path,monkeypatch):
+    from app import MainWindow
+    from PySide6.QtTest import QTest
+    from playlist_store import folder_tree_files
+    monkeypatch.setenv('CADENCE_PREFS',str(tmp_path/'prefs.json'))
+    root=tmp_path/'watched'; folders=[root/name for name in ('A','B','C')]
+    for folder in folders:
+        folder.mkdir(parents=True); (folder/'clip.mp4').touch()
+    window=MainWindow(); panel=window.playlists_panel; window.show()
+    window.library.show(); window.library_tabs.setCurrentWidget(panel); window.activateWindow()
+    try:
+        watched=panel.store.create('Shots',root=root)
+        saved=panel.store.create('Saved list')
+        panel.rebuild((watched,str(root)))
+        tree=panel.tree; parent=tree.currentItem(); parent.setExpanded(True)
+        pump(application,lambda:not panel.scans)
+        tree.setCurrentItem(parent.child(0)); parent.child(1).setSelected(True)
+        tree.setFocus(); application.processEvents()
+        QTest.keyClick(tree,Qt.Key_Delete)
+        pump(application,lambda:not panel.scans)
+        assert [parent.child(i).text(0) for i in range(parent.childCount())]==['C']
+        persisted=PlaylistStore(panel.store.path)
+        assert folder_tree_files(root,persisted.entry(watched)['folders'],threading.Event())==[str(folders[2]/'clip.mp4')]
+        assert all((folder/'clip.mp4').exists() for folder in folders)
+        tree.setCurrentItem(parent); pump(application,lambda:not panel.scans)
+        panel.browse(refresh=True); pump(application,lambda:not panel.scans)
+        assert parent.childCount()==3
+        panel.rebuild((saved,None)); tree.setFocus(); QTest.keyClick(tree,Qt.Key_Delete)
+        assert [entry['id'] for entry in panel.store.entries]==[watched]
+    finally:
+        window.close(); application.processEvents()

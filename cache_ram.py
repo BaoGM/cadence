@@ -16,7 +16,7 @@ def physical_memory_mb():
     return 4096
 
 def maximum_cache_mb(): return max(64,physical_memory_mb()//2)
-def default_cache_mb(): return min(1024,max(64,physical_memory_mb()//8))
+def default_cache_mb(): return min(2048,maximum_cache_mb())
 
 class FrameCache:
     def __init__(self,budget=None):

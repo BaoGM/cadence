@@ -22,7 +22,7 @@ def isolate(tmp_path,monkeypatch):
 def test_options_tabs_persistence_and_legacy_shortcut(window,tmp_path,monkeypatch):
     w=window; dialog=ShortcutDialog(w.action_registry,w.preferences,w)
     assert [dialog.tabs.tabText(i) for i in range(3)]==['Préférences','Raccourcis','Vue et navigation']
-    assert not dialog.clear_on_exit.isChecked() and dialog.language.currentData()=='fr'
+    assert dialog.clear_on_exit.isChecked() and dialog.language.currentData()=='fr'
     old=defaults(w.action_registry); old['shortcuts'].pop('Fichier/Options…')
     old['shortcuts']['Édition/Raccourcis et navigation…']='Ctrl+Alt+P'
     assert validate(old,w.action_registry)['shortcuts']['Fichier/Options…']=='Ctrl+Alt+P'
@@ -143,3 +143,30 @@ def test_cleanup_on_exit_after_decoders_stop(application,tmp_path,monkeypatch):
         called.append(True)
     monkeypatch.setattr(cache_tools,'clear_cache',cleanup)
     w.close(); assert called==[True]
+
+
+def test_cleanup_skips_a_cache_used_by_another_process(tmp_path):
+    import os,subprocess,sys
+    from cache_access import CacheAccess
+    root=tmp_path/'cache'
+    entry=make_entry(root,'e'*24)
+    resident='''from cache_access import CacheAccess
+import sys
+lease=CacheAccess()
+assert lease.file is not None
+print("ready",flush=True)
+sys.stdin.readline()
+'''
+    process=subprocess.Popen([sys.executable,'-c',resident],cwd=Path(__file__).resolve().parents[1],
+        env=dict(os.environ,CADENCE_CACHE=str(root)),stdin=subprocess.PIPE,stdout=subprocess.PIPE,
+        text=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    try:
+        assert process.stdout.readline().strip()=='ready'
+        other=CacheAccess()
+        assert other.clean()[0]==0 and (entry/'audio.s16').exists()
+        assert other.clean(closing=True)[0]==0 and (entry/'audio.s16').exists()
+    finally:
+        process.communicate('\n',timeout=15)
+    assert process.returncode==0
+    final=CacheAccess()
+    assert final.clean(closing=True)[0]==1 and not entry.exists()

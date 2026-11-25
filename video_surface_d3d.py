@@ -14,6 +14,9 @@ class D3DSurface(QWidget):
     def __init__(self,viewer):
         super().__init__(viewer)
         self.viewer=viewer; self.overlay=None; self._fallback_key=None; self._fallback_packet=None
+        # Only the swap chain needs an HWND. Promoting the docks and toolbars as
+        # well allows Windows to present their positions independently of Qt.
+        self.setAttribute(Qt.WidgetAttribute.WA_DontCreateNativeAncestors)
         self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
         self.setAttribute(Qt.WidgetAttribute.WA_PaintOnScreen)
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
@@ -32,8 +35,29 @@ class D3DSurface(QWidget):
         image=QImage(pixels.data,pixels.shape[1],pixels.shape[0],pixels.strides[0],QImage.Format.Format_RGBA8888).copy()
         image.setDevicePixelRatio(self.devicePixelRatioF()); return image
     def paintEvent(self,event):
-        if not self.isValid(): return
-        ratio=self.devicePixelRatioF(); width=max(1,math.ceil(self.width()*ratio)); height=max(1,math.ceil(self.height()*ratio))
+        if not self.viewer.panel_raster:
+            self.render_frame()
+    def begin_panel_slide(self):
+        viewer=self.viewer
+        if viewer.panel_raster:
+            return
+        viewer.panel_raster=True
+        self.hide()
+        viewer.repaint()
+    def end_panel_slide(self):
+        if not self.viewer.panel_raster:
+            return
+        # Populate the final swap-chain dimensions before revealing its HWND.
+        self.setGeometry(self.viewer.rect())
+        self.viewer.repaint()
+        self.render_frame()
+        self.viewer.panel_raster=False
+        self.viewer.panel_frame=None
+        self.show()
+    def render_frame(self):
+        if self.viewer.layout_pending or not self.isValid(): return
+        ratio=self.devicePixelRatioF()
+        width=max(1,math.ceil(self.width()*ratio)); height=max(1,math.ceil(self.height()*ratio))
         if self.overlay is None or self.overlay.width()!=width or self.overlay.height()!=height:
             self.overlay=QImage(width,height,QImage.Format.Format_RGBA8888_Premultiplied)
         self.overlay.setDevicePixelRatio(ratio); self.overlay.fill(Qt.GlobalColor.transparent)
@@ -83,6 +107,11 @@ class D3DStartup(QObject):
         if not self.started and not self.closed and not self.timer.isActive(): self.timer.start(250)
     def activate(self):
         if self.closed or self.started: return
+        studio=getattr(self.viewer.window(),'studio',None)
+        motion=getattr(studio,'side_motion',None)
+        if motion and (motion.measuring or motion.paths):
+            self.timer.start(50)
+            return
         if QApplication.mouseButtons()!=Qt.MouseButton.NoButton or QApplication.activeModalWidget() or not self.viewer.isVisible(): self.timer.start(100); return
         self.started=True; surface=None; started=time.perf_counter()
         try:

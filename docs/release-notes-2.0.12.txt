@@ -1,0 +1,6 @@
+Cadence 2.0.12 pour Windows
+
+Le panneau Commentaires enregistre les fichiers OTIO dans le dossier choisi et retrouve ce dossier lors de l’export suivant. Le choix de la vidéo référencée est indépendant de la destination du fichier.
+Les boutons de mise en forme des commentaires suivent le texte sélectionné et la position du curseur. Le bouton d’insertion affiche une case blanche carrée. Dans le commentaire et au survol du marqueur, les cases vides et cochées prennent la couleur orange des marqueurs.
+
+Cadence 2 devient la version Windows principale. Elle comprend les espaces Lecture et Édition, la timeline simplifiée ou détaillée, les commentaires de marqueurs avec import et export CSV et OTIO et les derniers correctifs d’affichage des panneaux latéraux.

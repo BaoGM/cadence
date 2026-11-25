@@ -112,6 +112,31 @@ def test_automatic_disabled_no_network(gui):
     with patch.object(manager,'run') as start:
         manager.check_now(False); start.assert_not_called()
 
+def test_daily_timer_rechecks_in_session_and_stops(gui,tmp_path,monkeypatch):
+    import update_ui
+    from PySide6.QtCore import QSettings
+    from PySide6.QtTest import QSignalSpy
+    window=fake_window(gui); window.settings=QSettings(str(tmp_path/'updates.ini'),QSettings.IniFormat)
+    manager=update_ui.UpdateManager(window,'2.0.8'); manager.base=tmp_path/'Cadence.exe'
+    monkeypatch.setattr(update_ui.sys,'frozen',True,raising=False); monkeypatch.delenv('CADENCE_DISABLE_UPDATES',raising=False)
+    monkeypatch.setattr(update_ui,'shared_install',lambda base:False)
+    now=[200000.]; calls=[]
+    monkeypatch.setattr(update_ui.time,'time',lambda:now[0])
+    monkeypatch.setattr(update_ui,'check',lambda *args:calls.append(now[0]))
+    monkeypatch.setattr(manager,'run',lambda operation:manager.complete(operation(),''))
+    manager.start(); assert manager.check_timer.isActive() and manager.check_timer.interval()==8000
+    def tick():
+        fired=QSignalSpy(manager.check_timer.timeout)
+        manager.check_timer.start(1)
+        assert fired.wait(3000)
+    tick(); assert calls==[200000.]
+    now[0]+=86399; tick(); assert len(calls)==1 and manager.check_timer.interval()==1000
+    now[0]+=1; tick(); assert calls==[200000.,286400.]
+    now[0]+=86400; window.preferences['auto_update_check']=False; tick(); assert len(calls)==2
+    window.preferences['auto_update_check']=True; tick(); assert len(calls)==3
+    manager.stop(); assert not manager.check_timer.isActive()
+    manager.check_timer.timeout.emit(); assert len(calls)==3 and not manager.check_timer.isActive()
+
 def test_ready_does_not_restart_automatically(gui):
     from PySide6.QtWidgets import QMainWindow
     from update_ui import UpdateManager

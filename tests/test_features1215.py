@@ -17,11 +17,11 @@ from media import PreviewReader,prefetch_frames,DecodeSuperseded
 def test_markers_independent_undo_save_and_menu(window,tmp_path):
  w=window; w.doc.state=State((Segment(None,0,100),),position=12,selection=(10,20),drawings=(DrawingKey(10,20,(Mark(points=((.2,.2,1.),)),)),))
  original=w.doc.state.drawings; w.refresh(); w.drawing.add_marker()
- assert w.doc.state.frame_markers==(12,) and w.doc.state.drawings==original
+ assert w.doc.state.frame_markers==(10,) and w.doc.state.marker_notes==((10,10,''),) and w.doc.state.drawings==original
  w.doc.undo(); assert not w.doc.state.frame_markers; w.doc.redo()
  path=tmp_path/'markers.cadence'; w.doc.save(path); loaded=Document.load(path)
- assert loaded.state.frame_markers==(12,) and loaded.state.drawings==original
- assert loaded.to_data()['version']==12
+ assert loaded.state.frame_markers==(10,) and loaded.state.marker_notes==((10,10,''),) and loaded.state.drawings==original
+ assert loaded.to_data()['version']==18
  w.refresh()
  menu=w.timeline.context_menu(QPoint(round(w.timeline.x_for(12)),20))
  assert any(a.text()=='Supprimer les marqueurs' and a.isEnabled() for a in menu.actions())

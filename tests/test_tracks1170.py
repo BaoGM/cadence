@@ -61,6 +61,30 @@ def test_paste_at_global_cursor_pads_only_destination():
     assert doc.state.second_track.segments==(Segment('b',0,40),)
 
 
+def test_recopy_replaces_tracks_and_discontinuous_ranges():
+    from model import locate
+    doc,first,second=two_tracks(12,12)
+    doc.select_track(first,extend=True)
+    doc.select(0,3)
+    assert doc.copy()==3
+    doc.select_track(second)
+    doc.state=replace(doc.state,selection=(2,4),selected_clips=((second,2,4),(second,8,10)))
+    assert doc.cut()==4 and set(doc.track_clipboards)=={second}
+    assert doc.undo()
+    doc.select_track(first)
+    doc.state=replace(doc.state,position=0)
+    assert doc.paste()
+    assert [locate(doc.state.segments,i) for i in range(4)]==[('b',2),('b',3),('b',8),('b',9)]
+
+    doc.select_track(second,extend=True)
+    doc.select(6,8)
+    assert doc.copy()==2 and doc.active_track_id==second
+    assert doc.remove_media_track(second)
+    doc.state=replace(doc.state,position=0)
+    assert doc.paste()
+    assert locate(doc.state.segments,0)==('a',2)
+
+
 def test_track_order_removal_and_undo_preserve_identity():
     doc,first,second=two_tracks()
     assert doc.reorder_media_track(second,-1)

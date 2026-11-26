@@ -105,7 +105,10 @@ class DrawingTimeline(QObject):
         if kind==QEvent.Type.MouseButtonPress and e.button()==Qt.MouseButton.LeftButton:
             if not self.contains(e.position()):
                 t.selection_track='audio' if e.position().y()>=t.track_y('audio')-4 else 'video'; return False
-            t.setFocus(); t.selection_track='drawing'; self.key=self.hit(e.position().x()); self.source=t.state.drawings
+            t.setFocus(); self.key=self.hit(e.position().x()); self.source=t.state.drawings
+            # Editing a key does not transfer an existing media range to the drawing lane.
+            if e.modifiers() & Qt.ShiftModifier or not (self.key and t.state.selection):
+                t.selection_track='drawing'
             self.drag=ContinuousDrag(e.globalPosition()); self.scale=t.span()/t.track_width(); self.start_frame=t.frame_for(e.position().x()); self.preview=None; self.change=None; self.valid=True
             t.begin_range_drag(self.start_frame)
             if e.modifiers()&Qt.KeyboardModifier.AltModifier:
@@ -115,7 +118,9 @@ class DrawingTimeline(QObject):
                         t.selection_track='video'
                         return False
                     return True
-                self.mode='move'; self.span=t.state.selection if t.state.selection and t.state.selection[0]<=self.start_frame<t.state.selection[1] else (self.key.start,self.key.end)
+                self.mode='move'; self.span=(self.key.start,self.key.end)
+                if t.selection_track=='drawing' and t.state.selection and t.state.selection[0]<=self.start_frame<t.state.selection[1]:
+                    self.span=t.state.selection
             elif e.modifiers()&Qt.KeyboardModifier.ShiftModifier:
                 self.mode=t.update_range_drag(self.start_frame,e.modifiers())
             elif self.key:
@@ -136,6 +141,7 @@ class DrawingTimeline(QObject):
             delta=round(distance*self.scale); n=t.state.length
             if self.mode in ('scrub','select') or self.mode=='click' and e.modifiers()&Qt.KeyboardModifier.ShiftModifier:
                 frame=max(0,min(n-1,self.start_frame+delta)); t.ensure_visible(frame)
+                if e.modifiers() & Qt.ShiftModifier: t.selection_track='drawing'
                 self.mode=t.update_range_drag(frame,e.modifiers())
             elif self.mode=='move' or self.mode=='click' and abs(distance)>=3:
                 self.mode='move'
@@ -151,6 +157,7 @@ class DrawingTimeline(QObject):
         if kind in (QEvent.Type.KeyPress,QEvent.Type.KeyRelease) and e.key()==Qt.Key.Key_Shift and self.mode in ('scrub','select','click'):
             if not e.isAutoRepeat():
                 modifiers=e.modifiers()|Qt.KeyboardModifier.ShiftModifier if kind==QEvent.Type.KeyPress else e.modifiers()&~Qt.KeyboardModifier.ShiftModifier
+                if modifiers & Qt.ShiftModifier: t.selection_track='drawing'
                 self.mode=t.update_range_drag(t.range_frame,modifiers)
             e.accept(); return True
         if kind==QEvent.Type.MouseButtonRelease and e.button()==Qt.MouseButton.LeftButton and self.mode:
@@ -193,6 +200,11 @@ class DrawingTimeline(QObject):
         lane_height=10 if simple else t.drawing_lane_height
         if t.selection_track=='drawing' and t.state.selection:
             a,b=t.state.selection
+            if self.change and self.valid and self.span==(a,b):
+                if self.mode=='move':
+                    a,b=self.change[2],self.change[2]+b-a
+                elif self.mode in ('left','right','extend'):
+                    a,b=self.change[1:]
             left=max(t.track_left(),t.x_for(a)); right=min(t.track_right(),t.x_for(b))
             if right>left:
                 height=lane_height-1

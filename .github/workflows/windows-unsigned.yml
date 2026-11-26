@@ -56,6 +56,13 @@ jobs:
             }
           } finally { $zip.Dispose() }
           python packaging/windows_runtime.py --tls $folder
+      - name: Prepare pinned RIFE interpolation engine
+        shell: pwsh
+        run: |
+          $redist = Join-Path $env:CADENCE_MSVC_ROOT 'VC/Redist/MSVC/14.44.35112/x64/Microsoft.VC143.OpenMP/vcomp140.dll'
+          python packaging/fetch_rife.py --redist $redist
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          "CADENCE_RIFE_BUNDLE=$((Resolve-Path '.deps/rife').Path)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
       - name: Compile and verify current sources
         shell: pwsh
         run: python packaging/build_windows.py --msvc-root "$env:CADENCE_MSVC_ROOT" --qt-root "$env:CADENCE_QT_ROOT"

@@ -7,6 +7,7 @@ from PySide6.QtSvg import QSvgRenderer
 
 
 PATHS = {
+    'time-warp': 'M3.5 18.5L8 12.5H13.5L20.5 4.5 M6.5 11H9.5V14H6.5Z M12 11H15V14H12Z',
     'exposure': 'M3.5 8V16 M20.5 8V16 M4 12H20',
     'doc': 'M5 3.5H14L19 8.5V20.5H5Z M14 3.5V9H19',
     'film': 'M3.5 5H20.5V19H3.5Z M7.5 5V19 M16.5 5V19 M3.5 10H7.5 M3.5 14H7.5 M16.5 10H20.5 M16.5 14H20.5',

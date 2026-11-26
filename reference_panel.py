@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from fractions import Fraction
-from library_style import (icon, style_button, media_details, SourceRows, panel_strip, panel_heading,
+from library_style import (icon, style_button, media_details, SourceRows, LibrarySplitter, panel_strip, panel_heading,
                            TITLE_ROLE, DETAIL_ROLE, POSTER_ROLE, EmptyHint, set_preview)
 from PySide6.QtGui import QImage,QPixmap,QIcon
-from PySide6.QtCore import Qt,Signal,QEvent,QSignalBlocker
-from PySide6.QtWidgets import QWidget,QVBoxLayout,QListWidget,QListWidgetItem,QAbstractItemView,QPushButton,QMenu,QComboBox,QHBoxLayout,QLabel
+from PySide6.QtCore import Qt,Signal,QEvent,QSignalBlocker,QByteArray
+from PySide6.QtWidgets import QWidget,QVBoxLayout,QListWidget,QListWidgetItem,QAbstractItemView,QPushButton,QMenu,QLabel,QScrollArea
 from model import locate
 from reference_sequence import ReferenceSequence
 from ui_text import tr
@@ -30,13 +30,16 @@ class ReferenceList(QListWidget):
 
 
 class ReferenceQueueMixin:
-    def build_reference_list(self):
+    def build_reference_list(self, controls):
         page=QWidget(); page.setObjectName('studioPage'); layout=QVBoxLayout(page); layout.setContentsMargins(0,0,0,0); layout.setSpacing(0)
         self.ref_thumbnails={}
-        header=panel_strip(layout); header.addWidget(QLabel(tr('Source B')))
-        self.ref_panel_source=QComboBox()
-        header.addStretch(); header.addWidget(self.ref_panel_source)
-        self.ref_panel_source.activated.connect(self.pick_panel_source)
+        self.reference_split=split=LibrarySplitter(Qt.Vertical); split.setChildrenCollapsible(False); split.setHandleWidth(6)
+        layout.addWidget(split)
+        queue=QWidget(); split.addWidget(queue); layout=QVBoxLayout(queue); layout.setContentsMargins(0,0,0,0); layout.setSpacing(0)
+        header=panel_strip(layout)
+        source_label=QLabel('B'); source_label.setToolTip(tr('Source B')); source_label.setBuddy(self.reference_combo)
+        source_label.setAlignment(Qt.AlignCenter); source_label.setFixedWidth(18); header.addWidget(source_label)
+        self.reference_combo.setAccessibleName(tr('Source B')); header.addWidget(self.reference_combo,1)
         self.ref_caption,self.ref_count=panel_heading(panel_strip(layout,'heading'),tr('Ordre de comparaison'))
         self.reference_list=ReferenceList(); self.reference_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.reference_list.setItemDelegate(SourceRows(self.reference_list,ordered=True,thumbnails=self.source_previews))
@@ -52,10 +55,7 @@ class ReferenceQueueMixin:
         self.track_ref_readout=QListWidget(); self.track_ref_readout.setItemDelegate(SourceRows(self.track_ref_readout,ordered=True,thumbnails=self.source_previews))
         self.track_ref_readout.hide(); self.track_ref_signature=None; layout.addWidget(self.track_ref_readout,1)
         footer=panel_strip(layout,'footer')
-        self.ref_compare_button=style_button(QPushButton(tr('Comparer')),'ab'); self.ref_compare_button.setCheckable(True)
-        self.ref_compare_button.setToolTip(tr('Activer la comparaison')); footer.addWidget(self.ref_compare_button)
-        self.ref_compare_button.toggled.connect(self.compare_enabled.setChecked)
-        self.compare_enabled.toggled.connect(self.ref_compare_button.setChecked)
+        footer.addWidget(self.compare_enabled)
         footer.addStretch()
         add=style_button(QPushButton(tr('Ajouter des références…')),'plus',True); add.clicked.connect(self.open_reference); footer.addWidget(add)
         self.ref_buttons=[]
@@ -64,7 +64,16 @@ class ReferenceQueueMixin:
             button.clicked.connect(lambda checked=False, step=direction:self.move_reference_items(step)); footer.addWidget(button)
         self.reference_list.itemSelectionChanged.connect(self.ref_button_state)
         self.ref_button_state()
-        self.reference_tab=self.library_tabs.addTab(page,tr('Références'))
+        self.reference_list.setMinimumHeight(42); self.track_ref_readout.setMinimumHeight(42)
+        controls.setMinimumHeight(88)
+        split.addWidget(controls); split.setSizes([270,190]); split.setStretchFactor(0,1)
+        saved=self.settings.value('library/reference_split')
+        if isinstance(saved,QByteArray): split.restoreState(saved)
+        split.splitterMoved.connect(lambda *_:self.settings.setValue('library/reference_split',split.saveState()))
+        container=QScrollArea()
+        container.setFrameShape(QScrollArea.NoFrame); container.setWidgetResizable(True)
+        container.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff); container.setWidget(page)
+        self.reference_tab=self.library_tabs.addTab(container,tr('Références'))
         for i in range(self.library_tabs.count()):
             self.library_tabs.setTabToolTip(i,self.library_tabs.tabText(i))
             self.library_tabs.tabBar().setAccessibleTabName(i,self.library_tabs.tabText(i))
@@ -76,11 +85,6 @@ class ReferenceQueueMixin:
 
     def sync_panel_source(self):
         identity=getattr(self,'reference_track_id',None)
-        with QSignalBlocker(self.ref_panel_source):
-            self.ref_panel_source.clear()
-            self.ref_panel_source.addItem(tr('Fichiers de référence'),None)
-            for track in self.doc.state.tracks: self.ref_panel_source.addItem(tr(track.info.name),track.info.id)
-            self.ref_panel_source.setCurrentIndex(max(0,self.ref_panel_source.findData(identity)))
         self.reference_list.setVisible(not bool(identity))
         self.track_ref_readout.setVisible(bool(identity))
         self.refresh_track_reference(self.doc.state.position)
@@ -102,15 +106,10 @@ class ReferenceQueueMixin:
         if media:
             item=QListWidgetItem(icon('film'),media['name']); item.setToolTip(media['path'])
             set_preview(item,media)
-            item.setData(DETAIL_ROLE,self.ref_panel_source.currentText())
+            item.setData(DETAIL_ROLE,tr(track.info.name))
         else:
             item=QListWidgetItem(tr('Aucun média à cette image.'))
         self.track_ref_readout.addItem(item)
-
-    def pick_panel_source(self,index):
-        identity=self.ref_panel_source.itemData(index)
-        if identity: self.use_track_reference(identity)
-        else: self.set_reference_sequence(self.reference_entries())
 
     def remember_thumbnail(self,key,array):
         if key in self.ref_thumbnails or array is None: return

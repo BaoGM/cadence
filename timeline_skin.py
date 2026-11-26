@@ -125,6 +125,7 @@ def ruler(t, p):
         return
     p.setFont(font(10, True))
     metrics = p.fontMetrics()
+    readouts=t.frame_readouts(metrics)
     labels=[]
     ratio=t.devicePixelRatioF()
     for frame,major,large in ruler_ticks(t):
@@ -149,8 +150,10 @@ def ruler(t, p):
             line(p, x, top + 22, x, top + 25, '#475561')
     t.ruler_text_left=labels[0][0].left() if labels else left
     for area,text in labels:
+        if any(area.intersects(badge.adjusted(-2,0,2,0)) for _,badge,_ in readouts): continue
         p.fillRect(area,QColor(RULER))
         label(p,area,text,'#9cabb9',10,True,align=Qt.AlignCenter)
+    return readouts
 
 
 def cover(p, dest, image):
@@ -188,10 +191,10 @@ def card(p, t, rect, segment, meta, selected, lower, expanded):
         p.restore()
         return
     text_h = rect.height()
-    thumb_left = rect.left() + 5
+    thumb_left = rect.left() + min(5, max(2, rect.width() * .08))
     text_x = thumb_left
-    if not t.simple and rect.width() >= 68:
-        images = t.thumbnails.get(meta, segment, expanded)
+    if rect.width() >= 8:
+        images = t.thumbnails.get(meta, segment, expanded, resizing=t.clip_trim.preview_track is not None)
         if expanded:
             text_h = min(27, rect.height() / 2 + 1)
             if len(images)>1:
@@ -201,7 +204,8 @@ def card(p, t, rect, segment, meta, selected, lower, expanded):
                     target = QRectF(rect.left() + 2 + index * width, y, width - 1, rect.bottom() - y - 2)
                     cover(p, target, images[min(index, len(images)-1)])
         h = min(27, text_h - 4)
-        thumb = QRectF(thumb_left, rect.top() + (text_h - h) / 2, min(47, rect.width() * .3), h)
+        thumb_width = min(47, rect.width() - 4, max(22, rect.width() * .3))
+        thumb = QRectF(thumb_left, rect.top() + (text_h - h) / 2, thumb_width, h)
         if images:
             cover(p, thumb, images[0])
         else:
@@ -235,7 +239,8 @@ def waveform(p, t, segment, media, y, x1, x2, enabled):
     frames = max(1, media.get('frames', segment.end))
     path = QPainterPath()
     for x in range(math.ceil(left), math.ceil(right), 2):
-        frame = segment.start + (x - x1) / max(1, x2 - x1) * segment.length
+        offset = min(segment.length-1,(x - x1) / max(1, x2 - x1) * segment.length)
+        frame = segment.source_frame(offset)
         idx = max(0, min(len(wave) - 1, int(frame / frames * len(wave))))
         amp = min(9, float(wave[idx]) * 9)
         path.moveTo(x, mid - amp)
@@ -246,7 +251,7 @@ def waveform(p, t, segment, media, y, x1, x2, enabled):
 
 def simple_strip(t):
     bar=t.simple_track_rect()
-    segments=t.active_media.segments
+    segments=t.clip_trim.displayed_track(t.active_media).segments
     ratio=t.devicePixelRatioF()
     span=t.span()
     signature=(bar.width(),bar.height(),t.view_start,span,ratio)
@@ -336,10 +341,12 @@ def simple_ticks(t,p,spans):
 
 def tracks(t, p):
     for track, y, height in t.media_rows():
+        track=t.clip_trim.displayed_track(track)
         lower = track.info.id != t.state.tracks[0].info.id
         h = t.video_height(track) - 6
         selected_tracks = getattr(t, 'selected_media_ids', (t.active_media.info.id,))
         ranges = t.state.selection_ranges(track.info.id) if track.info.id in selected_tracks and t.selection_track != 'drawing' else ()
+        ranges = t.clip_trim.selection_ranges(track, ranges)
         kinds = [('video', track.segments)]
         if track.info.audio_expanded:
             kinds.append(('audio', track.audio))
@@ -475,7 +482,7 @@ def paint(t, p):
     p.setRenderHint(QPainter.SmoothPixmapTransform)
     p.fillRect(t.rect(), QColor(BASE))
     headers(t, p)
-    ruler(t, p)
+    readouts=ruler(t, p)
     if not t.state or not t.state.length:
         y=t.media_top()
         height=t.height()-y if t.simple else min(t.height()-y,t.video_height(t.active_media))
@@ -494,8 +501,9 @@ def paint(t, p):
     if t.state.loop_range:
         a, b = t.state.loop_range
         line(p, t.x_for(a), t.height()-2, t.x_for(b), t.height()-2, AMBER, 2)
-    x = t.x_for(t.state.position) + .5
+    x = t.x_for(t.state.position)
     if t.track_left() <= x <= t.track_right():
+        x=min(x+.5,t.track_right()-.5)
         y=t.media_top()-1 if t.simple else t.ruler_y()+16
         if not t.simple: line(p,x,0,x,t.ruler_y(),MINT,1.5)
         line(p, x, y, x, t.height(), MINT, 1.5)
@@ -503,8 +511,7 @@ def paint(t, p):
         p.setBrush(QColor(MINT))
         p.drawPolygon(QPolygonF([QPointF(x-5, y), QPointF(x+5, y), QPointF(x+5, y+5), QPointF(x, y+10), QPointF(x-5, y+5)]))
     markers(t, p)
-    if t.frame_indicator() is not None:
-        t.paint_frame_indicator(p)
+    t.paint_frame_indicator(p,readouts)
     p.restore()
     t.paint_selection_label(p)
     t.clip_preview.paint(p)

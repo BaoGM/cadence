@@ -7,7 +7,7 @@ from functools import wraps
 def selected_tracks(operation):
     @wraps(operation)
     def edit(document,*args,**kwargs):
-        from model import MediaTrack, Segment, with_tracks, track_state
+        from model import pad_to, with_tracks, track_state
         tracks=document.state.tracks
         targets=document.editable_tracks()
         clip_operation=bool(document.state.selected_clips and document.state.selection and operation.__name__ in ('copy','cut','delete'))
@@ -42,8 +42,7 @@ def selected_tracks(operation):
                 required=max(int(value) for value in args[:3] if isinstance(value,(int,float))) if args else 0
             missing=max(0,required-target.length)
             if missing:
-                gap=(Segment(None,0,missing),)
-                proxy.state=replace(proxy.state,segments=target.segments+gap,audio_segments=target.audio+gap)
+                proxy.state=replace(proxy.state,segments=pad_to(target.segments,required),audio_segments=pad_to(target.audio,required))
             result=operation(proxy,*args,**kwargs); results.append(result)
             if operation.__name__ in ('copy','cut') and result: copied[target.info.id]=proxy.clipboard_state()
             if proxy.undo_stack:

@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
-from PySide6.QtCore import Qt, QPoint
+import pytest
+from PySide6.QtCore import Qt, QPoint, QDeadlineTimer
 from PySide6.QtTest import QSignalSpy, QTest
 
 from test_drawing import application, window
@@ -16,11 +17,11 @@ def test_native_menus_modes_timeline_and_clock(window, application):
     chrome = w.studio
     assert w.windowTitle().removeprefix('● ').startswith('Cadence 2.0 - ')
     assert chrome.menu.actions() == w.menuBar().actions()
-    w.comparison_panel.show()
+    w.show_references()
     chrome.dock_button.click()
-    assert w.library.isHidden() and w.comparison_panel.isHidden()
+    assert w.library.isHidden() and not w.reference_combo.isVisible()
     chrome.dock_button.click()
-    assert w.library.isVisible() and w.comparison_panel.isVisible()
+    assert w.library.isVisible() and w.reference_combo.isVisible()
     w.drawing.panel.hide()
     chrome.right_button.click()
     assert w.drawing.panel.isVisible()
@@ -39,6 +40,12 @@ def test_native_menus_modes_timeline_and_clock(window, application):
     first,_=chrome.headers.geometries()
     chrome.headers.update_hover(QPoint(first.center().x(),first.top()+3))
     assert chrome.top.isVisible() and chrome.view.isVisible()
+    assert chrome.file_group.isVisible()
+    assert chrome.file_menu.isVisible() or all(button.isVisible() for button in chrome.file_buttons)
+    chrome.file_buttons[0].defaultAction().trigger()
+    assert w.workspaces.mode=='read' and w.doc.state.second_track is not None
+    application.processEvents()
+    chrome.headers.show_reader()
     assert abs(chrome.mode_group.mapToGlobal(chrome.mode_group.rect().center()).x()-w.mapToGlobal(w.rect().center()).x())<=2
     w.toggle_fullscreen()
     assert not chrome.top.isVisible() and not chrome.view.isVisible()
@@ -67,6 +74,29 @@ def test_menu_key_respects_custom_action(window, application):
     assert spy.count() == 1 and not w.studio.menu.isVisible()
 
 
+@pytest.mark.parametrize('floating', [False, True], ids=['docked', 'floating'])
+def test_edit_controls_and_inspector_toggles(window, application, floating):
+    if floating and application.platformName() == 'offscreen':
+        pytest.skip('Exercise the detached inspector on a windowing platform')
+    w = window
+    chrome = w.studio
+    assert 'header' not in w.panel_actions
+    assert w.drawing.panel.isAncestorOf(w.exp_spin)
+    assert chrome.view.isAncestorOf(w.editing_overflow)
+    assert chrome.file_menu.menu().actions() == [b.defaultAction() for b in chrome.file_buttons]
+    assert all(chrome.top.isAncestorOf(b) for b in chrome.file_buttons)
+    w.set_layout_editable(True)
+    w.drawing.panel.setFloating(floating)
+    w.drawing.panel.hide()
+    for index, visible in ((0, True), (1, True), (1, False), (1, True), (0, True), (0, False)):
+        chrome.inspector_buttons[index].click()
+        application.processEvents()
+        assert w.drawing.inspector_tabs.currentIndex() == index
+        assert w.drawing.panel.isVisible() == visible
+        assert [b.isChecked() for b in chrome.inspector_buttons] == [visible and i == index for i in range(2)]
+    w.drawing.panel.setFloating(False)
+
+
 def test_video_layout_applies_only_settled_sizes(window, application):
     from PySide6.QtCore import QEvent, QObject
     w=window
@@ -83,7 +113,9 @@ def test_video_layout_applies_only_settled_sizes(window, application):
     for fullscreen in (True,False):
         sizes.clear()
         w.toggle_fullscreen()
-        QTest.qWait(350)
+        deadline = QDeadlineTimer(2000)
+        while w.viewer.layout_pending and not deadline.hasExpired():
+            QTest.qWait(8)
         assert w.video_fullscreen==fullscreen and not w.viewer.layout_pending
         assert sizes and all(size==w.viewer.size() for size in sizes)
     assert w.isMaximized() and w.viewer.size()==original
@@ -95,49 +127,48 @@ def test_video_layout_applies_only_settled_sizes(window, application):
     assert all(size==original for size in sizes)
 
 
-def test_comparison_buttons_close_panel_when_disabled(window, application):
+def test_enabling_comparison_without_b_opens_references_and_disabling_keeps_them(window):
     w=window
     w.request_frame=lambda:None
+    w.library_tabs.setCurrentIndex(1)
+    w.library.hide()
     w.studio.compare_button.click()
-    assert w.comparison_panel.isVisible() and w.compare_enabled.isChecked()
-    w.comparison_panel.hide()
-    w.compare_offset.setValue(3)
-    assert w.comparison_panel.isHidden()
-    w.ref_compare_button.click()
+    assert w.reference_combo.isVisible() and w.compare_enabled.isChecked()
+    w.studio.compare_button.click()
+    assert w.library.isVisible() and w.library_tabs.currentIndex()==w.reference_tab
     assert not w.compare_enabled.isChecked()
-    w.ref_compare_button.click()
-    assert w.compare_enabled.isChecked() and w.comparison_panel.isVisible()
-    w.set_reference_sequence([w.doc.media['a']])
+
+
+@pytest.mark.parametrize('source',['file','track'])
+def test_ab_with_a_loaded_source_preserves_left_panel_and_fullscreen(window,application,source):
+    w=window
+    w.request_frame=lambda:None
+    if source=='file':
+        w.set_reference_sequence([w.doc.media['a']])
+    else:
+        w.use_track_reference(w.doc.active_track_id)
+    w.show_references()
+    w.compare_enabled.click()
+    assert w.reference_combo.isVisible() and not w.viewer.comparing
+    w.library_tabs.setCurrentIndex(1)
     w.studio.compare_button.click()
-    assert not w.compare_enabled.isChecked() and w.comparison_panel.isHidden()
-    w.ref_compare_button.click()
-    assert w.compare_enabled.isChecked() and w.comparison_panel.isHidden()
-    w.use_track_reference(w.doc.active_track_id)
-    w.comparison_panel.hide()
-    w.compare_offset.setValue(4)
-    w.studio.compare_button.click()
-    w.studio.compare_button.click()
-    assert w.viewer.comparing and w.comparison_panel.isHidden()
-    w.comparison_panel.setFloating(True)
-    w.comparison_panel.show()
-    w.comparison_panel.close()
-    assert w.viewer.comparing
-    w.comparison_panel.show()
+    assert w.library.isVisible() and w.library_tabs.currentIndex()==1 and w.viewer.comparing
     w.compare_action.trigger()
-    assert not w.viewer.comparing and w.comparison_panel.isHidden()
+    assert w.library.isVisible() and w.library_tabs.currentIndex()==1 and not w.viewer.comparing
+    w.library.hide()
+    w.compare_cycle_btn.click()
+    assert w.library.isHidden() and w.library_tabs.currentIndex()==1 and w.viewer.comparing
     w.compare_action.trigger()
-    assert w.viewer.comparing and w.comparison_panel.isHidden()
-    w.comparison_panel.show()
+    w.activateWindow()
+    w.setFocus()
+    application.processEvents()
+    QTest.keyClick(w,Qt.Key_X,Qt.ShiftModifier)
+    assert w.library.isHidden() and w.library_tabs.currentIndex()==1 and w.viewer.comparing
     w.toggle_fullscreen()
     w.compare_action.trigger()
     w.compare_action.trigger()
-    assert w.video_fullscreen and w.viewer.comparing
+    assert w.video_fullscreen and w.library.isHidden() and w.viewer.comparing
     w.toggle_fullscreen()
-    assert w.comparison_panel.isHidden()
-    w.set_reference_sequence([])
-    w.toggle_fullscreen()
-    w.compare_action.trigger()
-    assert not w.video_fullscreen and w.comparison_panel.isVisible()
 
 
 def test_sync_button_opens_existing_settings_action(window):
@@ -183,6 +214,8 @@ def test_reader_panels_slide_in_their_own_direction(window, application):
     w.viewer.setFocus()
     application.processEvents()
     c.headers.update_hover(QPoint(-100,-100))
+    finish_hide(c.top)
+    finish_hide(c.timeline_bar)
     c.headers.show_reader()
     c.headers.timer.stop()
     focus=application.focusWidget()

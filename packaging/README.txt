@@ -7,3 +7,5 @@ The build starts from pinned tools and a fresh build directory. release.py consu
 Third-party sources and original notices are explicit, hash-verified inputs. No developer parent directory or historical test report is required.
 
 Public update descriptors are signed separately. Windows executables are currently distributed without Authenticode signing.
+
+RIFE 4.6 packaging and the six pinned inputs are documented in docs/BUILD.md and packaging/rife-runtime.json.

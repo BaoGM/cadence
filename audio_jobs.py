@@ -25,7 +25,7 @@ class AudioJobs(QObject):
         path,data=next(iter(self.pending.items()))
         self.active=(path,self.worker)
         self.status.emit('Audio 0 %')
-        self.worker.start_work(lambda p,c:prepare_audio(data,p,c))
+        self.worker.start_work(lambda p,c:prepare_audio(data,p,c),'Audio preparation')
     @Slot(float,str)
     def progress_changed(self,value,message):
         if self.active and self.active[0] in self.pending: self.status.emit(f'Audio {round(value*100)} %')

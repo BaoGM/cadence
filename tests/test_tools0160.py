@@ -152,20 +152,20 @@ def test_shapes_export_exact_range_and_existing_projects(application,tmp_path):
 def test_reset_panel_layout_preserves_project_and_other_mode(window,application):
     w=window; original=w.doc.state; w.request_frame=lambda:None
     read_profile=dict(w.workspaces.profiles['read'])
-    w.layout_action.trigger(); w.library.show(); w.drawing.panel.show(); w.header.hide()
+    w.layout_action.trigger(); w.library.show(); w.drawing.panel.show(); w.transport_widget.hide()
     w.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea,w.timeline_panel)
-    w.comparison_panel.setFloating(True); application.processEvents()
+    w.library.setFloating(True); application.processEvents()
     assert not any(label.text()=='\u22ee\u22ee' for label in w.findChildren(QLabel))
     w.reset_layout_action.trigger(); application.processEvents()
-    assert not w.layout_editable and not w.comparison_panel.isFloating()
+    assert not w.layout_editable and not w.library.isFloating()
     assert w.dockWidgetArea(w.timeline_panel)==Qt.DockWidgetArea.BottomDockWidgetArea
-    assert w.dockWidgetArea(w.header)==Qt.DockWidgetArea.TopDockWidgetArea
+    assert w.toolBarArea(w.studio.bar)==Qt.ToolBarArea.TopToolBarArea
     assert all(not panel.isHidden() for panel in w.workspaces.panels.values())
     assert w.workspaces.profiles['read']==read_profile and w.doc.state==original
     view=next(a.menu() for a in w.menuBar().actions() if a.text()=='Affichage')
     assert view.actions()[-1] is w.reset_layout_action and view.actions()[-2].isSeparator()
-    w.workspaces.switch('read'); w.header.show(); w.timeline_panel.hide(); w.reset_panel_layout(); application.processEvents()
-    assert w.timeline.simple and not w.timeline_panel.isHidden() and w.header.isHidden()
+    w.workspaces.switch('read'); w.drawing.panel.show(); w.timeline_panel.hide(); w.reset_panel_layout(); application.processEvents()
+    assert w.timeline.simple and not w.timeline_panel.isHidden() and w.drawing.panel.isHidden()
 
 def test_new_tool_shortcuts_preserve_older_custom_keys(window):
     from preferences import defaults,validate

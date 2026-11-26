@@ -43,17 +43,17 @@ def test_handles_commit_cancel_and_shortcuts(window,application):
     QTest.keyClick(w.viewer,Qt.Key.Key_Escape); assert g.mode is None
 
 def test_reading_mode_restores_panels(window,application):
-    w=window; w.header.show(); w.library.show(); application.processEvents()
+    w=window; w.library.show(); application.processEvents()
     w.workspaces.switch('read'); application.processEvents()
     assert w.timeline.simple and w.timeline.height()==42
     assert w.timeline.x_for(0)==w.timeline.track_left()
     assert w.timeline.x_for(w.doc.state.length)==w.timeline.track_right()
     assert w.timeline.frame_for(w.timeline.x_for(0))==0
     assert w.timeline.frame_for(w.timeline.x_for(w.doc.state.length))==w.doc.state.length-1
-    assert w.header.isHidden() and w.library.isHidden() and w.edit_toolbar.isHidden()
+    assert w.studio.file_group.isHidden() and w.library.isHidden() and w.edit_toolbar.isHidden()
     assert w.timecode_overlay.isHidden() and not w.transport_widget.isHidden()
     w.workspaces.switch('edit'); application.processEvents()
-    assert not w.timeline.simple and not w.header.isHidden() and not w.library.isHidden()
+    assert not w.timeline.simple and not w.studio.file_group.isHidden() and not w.library.isHidden()
 
 def test_capture_temp_and_gif_without_file_dialog(window,tmp_path,monkeypatch):
     import capture
@@ -65,7 +65,8 @@ def test_capture_temp_and_gif_without_file_dialog(window,tmp_path,monkeypatch):
     d.begin(); assert d.path.parent==tmp_path/'Cadence' and d.path.suffix=='.gif'
     assert d.countdown==3
     args=capture.capture_args((0,0,320,180),24,True,d.path)
-    assert 'palettegen=stats_mode=single' in args[args.index('-filter_complex')+1]
+    assert args[args.index('-c:v')+1]=='libx264rgb'
+    assert args[args.index('-crf')+1]=='0' and args[-1]==str(capture.gif_recording_path(d.path))
     d.reject()
 
 def test_export_geometry_and_gif(application,tmp_path):

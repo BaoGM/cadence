@@ -56,7 +56,7 @@ class HoverTransport(QObject):
         with QSignalBlocker(self.toggle): self.toggle.setChecked(w.workspaces.mode == 'edit')
         area = self.zone(); self.overlay.setGeometry(area)
         point = w.mapFromGlobal(QCursor.pos()) if point is None else point
-        visible = tracking and area.contains(point)
+        visible = tracking and area.contains(point) and not w.timeline.marker_hover.covers(w.mapToGlobal(point))
         if QApplication.activeModalWidget() is not None: visible = False
         self.overlay.setVisible(visible)
         if visible: self.overlay.raise_()

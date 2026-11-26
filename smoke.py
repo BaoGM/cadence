@@ -122,10 +122,10 @@ def run(directory):
         while win.rendered_token!=win.token and time.time()<end: app.processEvents(); QTest.qWait(20)
         assert win.viewer.reference_rgb is not None and win.rendered_token==win.token
         from comparison import MODES
-        win.compare_enabled.setChecked(False); win.comparison_panel.hide()
+        win.compare_enabled.setChecked(False); win.library.hide()
         for index,(_,mode) in enumerate(MODES):
             win.compare_cycle_btn.click(); app.processEvents()
-            assert win.compare_mode.currentData()==mode and win.viewer.comparing and win.comparison_panel.isHidden()
+            assert win.compare_mode.currentData()==mode and win.viewer.comparing and win.library.isHidden()
             win.grab().save(str(output/f'comparison-{mode}.png'))
             win.compare_controls.grab().save(str(output/f'buttons-{mode}.png'))
         win.compare_swap_btn.click(); assert win.viewer.compare_swapped and win.compare_cycle_btn.symbol=='front_b'
@@ -175,7 +175,7 @@ def run(directory):
         win.drawing.finish(); assert 0 in win.drawing.selection.indices
         assert win.action_registry['Dessin/Ajouter un marqueur'][1]=='S'
         doc.save(output/'draw-over.cadence'); assert Document.load(output/'draw-over.cadence').state.drawings==doc.state.drawings
-        win.comparison_panel.hide(); app.processEvents(); win.grab().save(str(output/'draw-over.png'))
+        win.library.hide(); app.processEvents(); win.grab().save(str(output/'draw-over.png'))
         export_state=replace(doc.state,segments=(Segment(media['id'],0,12),),audio_segments=(Segment(media['id'],0,12),),drawings=(DrawingKey(3,8,(text,Mark(tool='group',points=((0,0,1),),children=(Mark(points=((.5,.5,1),),size=.2,pressure=False),Mark(tool='eraser',points=((.5,.5,1),),size=.1,pressure=False))))),),position=0,selection=None)
         export_video(export_state,doc.media,doc.fps,output/'draw-over.mp4',False)
         with av.open(str(output/'draw-over.mp4')) as c: assert sum(1 for f in c.decode(video=0))==12
@@ -222,8 +222,10 @@ def run(directory):
         assert tr('Supprimer les clés') in [a.text() for a in menu.actions()]; menu.deleteLater()
         win.studio.headers.show_reader()
         assert win.studio.compare_button.isVisible() and not win.compare_cycle_btn.isVisible()
+        reference_panel=(win.library.isVisible(),win.library_tabs.currentIndex())
         win.studio.compare_button.click(); app.processEvents()
-        assert win.viewer.comparing and win.comparison_panel.isHidden() and win.compare_cycle_btn.isVisible()
+        assert win.viewer.comparing and win.compare_cycle_btn.isVisible()
+        assert (win.library.isVisible(),win.library_tabs.currentIndex())==reference_panel
         from PySide6.QtCore import QPoint
         strip=win.transport_widget.widget()
         center=win.transport_buttons.mapTo(win,win.transport_buttons.rect().center()).x()
@@ -410,10 +412,12 @@ def run(directory):
         export_video(audio_doc.state,audio_doc.media,audio_doc.fps,output/'audio-only.mp4')
         with av.open(str(output/'audio-only.mp4')) as check:
             assert check.streams.audio and next(check.decode(video=0)).to_ndarray(format='rgb24').max()==0
-        from export_dialog import ExportDialog
+        from export_dialog import ExportDialog,FORMATS,PROFILES
         from model import sample_at
         audio_export_dialog=ExportDialog(win,audio_doc)
-        assert audio_export_dialog.defaultSuffix()=='wav' and len(audio_export_dialog.nameFilters())==5
+        assert audio_export_dialog.defaultSuffix()=='wav'
+        expected_filters={tr(label) for label in FORMATS.values()}|{tr(profile.label) for profile in PROFILES.values()}
+        assert set(audio_export_dialog.nameFilters())==expected_filters
         from PySide6.QtWidgets import QFileDialog,QLineEdit,QComboBox
         audio_export_dialog.show(); app.processEvents()
         assert audio_export_dialog.labelText(QFileDialog.DialogLabel.FileType)==tr('Type de fichier :')
@@ -939,7 +943,7 @@ def check_connector_installation(output):
 def check_navigation_shortcuts(window):
     from comparison import MODES
     window.viewer.setFocus()
-    cycle=window.action_registry['Comparaison/Mode de comparaison suivant'][0]
+    cycle=window.action_registry['Références/Mode de comparaison suivant'][0]
     toggle=window.action_registry['Lecture/Basculer le pas clé / image'][0]
     for entry in window.menuBar().actions():
         assert cycle not in entry.menu().actions() and toggle not in entry.menu().actions()

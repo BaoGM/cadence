@@ -7,19 +7,22 @@ from test_drawing import application,window
 
 
 @pytest.mark.parametrize('mode',['horizontal','vertical','overlay','difference','front'])
-def test_comparison_values_editable_in_every_mode(window,application,mode):
-    w=window; w.request_frame=lambda:None; w.comparison_panel.show()
+def test_comparison_exposes_relevant_controls_for_each_mode(window,application,mode):
+    w=window; w.request_frame=lambda:None; w.show_references()
     w.compare_mode.setCurrentIndex(w.compare_mode.findData(mode)); application.processEvents()
     for spin,text,value in ((w.compare_opacity,'41',41),(w.compare_gain,'2,50',2.5)):
+        relevant=mode==('overlay' if spin is w.compare_opacity else 'difference')
+        assert spin.isVisible()==relevant
+        if not relevant: continue
         spin.setLocale(QLocale('fr_FR')); assert spin.isEnabled()
         edit=spin.lineEdit(); QTest.mouseClick(edit,Qt.MouseButton.LeftButton,pos=QPoint(8,edit.height()//2))
         assert edit.hasFocus() and edit.hasSelectedText()
         QTest.keyClicks(edit,text); QTest.keyClick(edit,Qt.Key.Key_Return)
         assert spin.value()==pytest.approx(value)
     w.compare_mode.setCurrentIndex(w.compare_mode.findData('overlay'))
-    assert w.viewer.compare_opacity==.41
+    assert w.viewer.compare_opacity==(.41 if mode=='overlay' else .5)
     w.compare_mode.setCurrentIndex(w.compare_mode.findData('difference'))
-    assert w.viewer.compare_gain==2.5
+    assert w.viewer.compare_gain==(2.5 if mode=='difference' else 1.0)
 
 
 @pytest.mark.parametrize('field,text,value',[
@@ -32,7 +35,7 @@ def test_single_click_replaces_numeric_value_on_enter(window,application,field,t
     w.drawing.choose_tool('brush')
     if field in ('compare_opacity','compare_gain'):
         w.compare_mode.setCurrentIndex(w.compare_mode.findData('overlay' if field=='compare_opacity' else 'difference'))
-    w.drawing.panel.show(); w.comparison_panel.show(); w.header.show()
+    w.drawing.panel.show(); w.show_references()
     tabs=w.drawing.panel.findChild(QTabWidget)
     tabs.setCurrentIndex(0)
     spin=w

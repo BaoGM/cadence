@@ -3,6 +3,7 @@ from pathlib import Path
 import ssl
 import sys
 import re
+import os
 root = Path(SPECPATH)
 version = re.search(r"^VERSION='([0-9.]+)'", (root / 'app.py').read_text(encoding='utf-8'), re.M)[1]
 
@@ -16,6 +17,16 @@ datas += [(str(root / 'integrations' / name), 'integrations') for name in (
 datas += [(str(root / 'integrations' / name), 'integrations') for name in (
     'cadence_drawings.py', 'cadence_drawings_blender.py', 'cadence_drawings_maya.py')]
 datas += [(str(root/'vendor'/'ffmpeg.exe'),'vendor')]
+if os.environ.get('CADENCE_RIFE_BUNDLE'):
+    rife=Path(os.environ['CADENCE_RIFE_BUNDLE']).resolve()
+    import json
+    import hashlib
+    manifest=json.loads((root/'packaging/rife-runtime.json').read_text())['files']
+    for part,expected in manifest.items():
+        with (rife/part).open('rb') as handle:
+            if hashlib.file_digest(handle, 'sha256').hexdigest() != expected:
+                raise ValueError('Unexpected RIFE runtime file: '+part)
+        datas.append((str(rife/part),str(Path('vendor/interpolation/rife')/Path(part).parent)))
 if sys.platform == 'win32':
     import runpy
     build_tools = runpy.run_path(str(root / 'packaging/build_maintenance.py'))['build_maintenance']

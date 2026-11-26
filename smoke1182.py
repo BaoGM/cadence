@@ -13,7 +13,7 @@ def check(window, output, media=None):
     w.workspaces.switch('edit')
     if media is not None:
         doc = Document(); doc.append_media([media])
-        doc.state = replace(doc.state, segments=(Segment(media['id'], 0, 30), Segment(media['id'], 40, 70)))
+        doc.state = replace(doc.state, segments=(Segment(media['id'], 0, 30), Segment(media['id'], 40, 70)), audio_segments=None)
         w.install_doc(doc)
         for simple in (False, True):
             w.timeline.simple = simple; w.refresh(); QApplication.processEvents()
@@ -29,16 +29,17 @@ def check(window, output, media=None):
                 QTest.mouseRelease(t, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.ShiftModifier, point)
                 assert doc.state.selection == (0, 60)
                 t.grab().save(str(output/'double-click-track.png'))
-    w.set_layout_editable(False); w.library.show(); w.comparison_panel.show()
+    w.set_layout_editable(False); w.show_references()
     QApplication.processEvents()
-    before = w.library.height()
-    point = QPoint(w.library.geometry().center().x(), (w.library.geometry().bottom()+w.comparison_panel.y())//2)
-    QTest.mousePress(w, Qt.MouseButton.LeftButton, pos=point)
-    QTest.mouseMove(w, point+QPoint(0, -50), 20); QTest.qWait(60)
-    QTest.mouseRelease(w, Qt.MouseButton.LeftButton, pos=point+QPoint(0, -50))
-    assert w.library.height() < before-25
+    before = w.reference_split.sizes()[0]
+    handle = w.reference_split.handle(1)
+    point = handle.rect().center()
+    QTest.mousePress(handle, Qt.MouseButton.LeftButton, pos=point)
+    QTest.mouseMove(handle, point+QPoint(0, -50), 20); QTest.qWait(60)
+    QTest.mouseRelease(handle, Qt.MouseButton.LeftButton, pos=point+QPoint(0, -50))
+    assert w.reference_split.sizes()[0] < before-25
     w.grab().save(str(output/'resized-sidebar.png'))
-    w.library.hide(); w.comparison_panel.hide(); w.drawing.panel.hide()
+    w.library.hide(); w.drawing.panel.hide()
     QApplication.processEvents()
     assert w.edit_toolbar.width() <= 64
     w.set_panel('transport', False); QTest.qWait(40)

@@ -48,6 +48,7 @@ def main():
     parser.add_argument('--output', type=Path, default=SOURCE / 'dist/unsigned')
     parser.add_argument('--compiler', type=Path)
     parser.add_argument('--sign-update', choices=('preview','stable'), help='Sign the portable update descriptor with the release operator’s Windows key.')
+    parser.add_argument('--web-demo', type=Path, help='Public standalone HTML demo archive with bundled demonstration media.')
     args = parser.parse_args()
     directory, output = args.build_dir.resolve(), args.output.resolve()
     payload = directory / 'dist/Cadence'
@@ -85,6 +86,14 @@ def main():
     archive(portable, {f'Cadence/{f.relative_to(stage).as_posix()}': f for f in stage.rglob('*') if f.is_file()})
     installer = build(version, stage, output, args.compiler)
     artifacts = {f.name: sha256(f) for f in (sources, third, portable, installer)}
+    if args.web_demo:
+        demonstration = output / f'Cadence-{version}-demo-web.zip'
+        with zipfile.ZipFile(args.web_demo) as web:
+            if 'index.html' not in web.namelist() or web.testzip() is not None:
+                raise ValueError('Invalid web demonstration archive')
+        if args.web_demo.resolve() != demonstration.resolve():
+            shutil.copyfile(args.web_demo, demonstration)
+        artifacts[demonstration.name] = sha256(demonstration)
     if args.sign_update:
         from sign_update import sign_package
         sign_package(portable, version, args.sign_update == 'preview', output)

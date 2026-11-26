@@ -13,6 +13,70 @@ from test_review_comments import opened_comments
 from timeline_skin import marker_areas
 
 
+def test_popup_fifteen_lines_then_scroll_and_keep_boxes_out_of_copy(window,application):
+    from PySide6.QtCore import QRect,QPointF,QEvent
+    from PySide6.QtGui import QMouseEvent
+    from marker_popup import MarkerPopup
+    view=MarkerPopup(window.timeline)
+    anchor=QRect(window.screen().availableGeometry().center(),window.size()/20)
+    try:
+        lines=['☐ Pose']+['Suite']*14
+        view.present('\n'.join(lines),anchor)
+        application.processEvents()
+        assert not view.verticalScrollBar().isVisible() and view.verticalScrollBar().maximum()==0
+        view.present('\n'.join(lines+['☑ Fin']),anchor)
+        application.processEvents()
+        assert view.verticalScrollBar().isVisible() and view.verticalScrollBar().maximum()>0
+        assert view.cursorRect(QTextCursor(view.document().findBlockByNumber(14))).bottom()<view.viewport().height()
+        cursor=QTextCursor(view.document())
+        left=view.cursorRect(cursor).center()
+        cursor.movePosition(QTextCursor.NextCharacter)
+        box=(left+view.cursorRect(cursor).center())/2
+        application.sendEvent(view.viewport(),QMouseEvent(QEvent.MouseMove,QPointF(box),QPointF(view.viewport().mapToGlobal(box)),Qt.NoButton,Qt.NoButton,Qt.NoModifier))
+        assert view.viewport().cursor().shape()==Qt.PointingHandCursor
+        before=view.viewport().grab().toImage()
+        view.selectAll()
+        application.processEvents()
+        selected=view.viewport().grab().toImage()
+        assert before.pixelColor(box)==selected.pixelColor(box)
+        assert view.createMimeDataFromSelection().text()=='\n'.join(lines+['☑ Fin']).replace('☐','').replace('☑','')
+    finally:
+        view.close()
+
+
+def test_comment_row_wraps_to_two_lines_and_renames_without_seeking(window,application,monkeypatch):
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QInputDialog
+    window.request_frame=lambda:None
+    panel=opened_comments(window,application)
+    window.seek(7)
+    window.doc.set_marker_note(2,1,'A')
+    window.doc.rename_marker(2,'Un titre de marqueur assez long pour apparaître sur une deuxième ligne du panneau')
+    window.refresh(); application.processEvents()
+    items=panel.items
+    rect=items.visualItemRect(items.item(0))
+    assert items.fontMetrics().height()*1.5<=rect.height()<=items.fontMetrics().lineSpacing()*2+6
+    image=items.viewport().grab().toImage()
+    scale=image.devicePixelRatio()
+    for top,bottom in [(rect.top()+3,rect.center().y()),(rect.center().y()+2,rect.bottom()-2)]:
+        colors={image.pixelColor(x,y).rgb()
+                for y in range(round(top*scale),round(bottom*scale))
+                for x in range(round((rect.left()+50)*scale),round((rect.right()-6)*scale))}
+        assert len(colors)>4, 'Le titre doit être dessiné sur chacune des deux lignes.'
+    icon_colors={image.pixelColor(x,y).rgb()
+                 for y in range(round((rect.center().y()-8)*scale),round((rect.center().y()+8)*scale))
+                 for x in range(round((rect.left()+5)*scale),round((rect.left()+21)*scale))}
+    assert len(icon_colors)>4
+    monkeypatch.setattr(QInputDialog,'getText',lambda *a,**kw:('Pose finale',True))
+    def choose_rename():
+        menu=QApplication.activePopupWidget()
+        action=next(a for a in menu.actions() if a.text()=='Renommer le marqueur…')
+        QTest.mouseClick(menu,Qt.LeftButton,pos=menu.actionGeometry(action).center())
+    QTimer.singleShot(30,choose_rename)
+    panel.marker_menu(rect.center())
+    assert window.doc.state.marker_names==((2,'Pose finale'),) and window.doc.state.position==7
+
+
 def test_comments_follow_range_without_overwriting_a_marker_or_draft(window,application):
     panel=opened_comments(window,application)
     w=window

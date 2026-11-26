@@ -25,7 +25,7 @@ class VolumeShortcut(QObject):
                 return True
             if isinstance(widget,QAbstractButton) and widget.autoExclusive(): return True
             if isinstance(widget,QDockWidget):
-                return widget in (self.window.library,self.window.comparison_panel,self.window.drawing.panel,
+                return widget in (self.window.library,self.window.drawing.panel,
                                   self.window.edit_toolbar)
             widget=widget.parentWidget()
         return False

@@ -140,7 +140,10 @@ class HoverHeaders(QObject):
         self.reposition.timeout.connect(self.position_visible)
         self.pointer_surfaces=(self.w.timeline_panel,self.w.timeline_panel.widget(),self.w.timeline,
                                self.w.transport_widget,self.w.transport_widget.widget(),self.ruler)
-        for widget in (self.w,self.w.viewer_workspace.content,*self.pointer_surfaces):
+        self.hover_surfaces=(self.w,self.w.viewer_workspace,self.w.viewer_workspace.content,
+                             self.w.viewer,*self.pointer_surfaces)
+        for widget in self.hover_surfaces:
+            widget.setAttribute(Qt.WA_Hover)
             widget.installEventFilter(self)
 
     def position_visible(self):
@@ -253,16 +256,22 @@ class HoverHeaders(QObject):
         dock=self.w.transport_widget
         return QRect(dock.mapToGlobal(QPoint()),dock.size()) if dock.isVisible() else QRect()
 
-    def lower_hover(self, point, bar):
-        if bar.contains(point):
-            return True
-        transport=self.transport_rect()
-        if transport.contains(point):
-            return True
-        # Include the dock separator only where it actually connects both strips.
-        return (not transport.isEmpty() and 0 < transport.top()-bar.bottom() <= 8
-                and bar.bottom()<point.y()<transport.top()
-                and max(bar.left(),transport.left())<=point.x()<=min(bar.right(),transport.right()))
+    def over_separator(self, point, upper, lower):
+        if (upper.isEmpty() or lower.isEmpty() or not upper.bottom()<point.y()<lower.top()
+                or not max(upper.left(),lower.left())<=point.x()<=min(upper.right(),lower.right())):
+            return False
+        w=self.w
+        if w.timeline_panel.isFloating() or w.transport_widget.isFloating():
+            return False
+        # Between the two dock layouts the pointer can land on either main window.
+        return w.childAt(w.mapFromGlobal(point)) in (None,w.viewer_workspace,w.timeline_panel,w.timeline_panel.widget())
+
+    def highlight(self, point=None):
+        timeline=self.w.timeline
+        x=timeline.mapFromGlobal(point).x() if point is not None else None
+        if timeline.transport_hover_x!=x:
+            timeline.transport_hover_x=x
+            timeline.update()
 
     def reveal(self, host, rect):
         if host.geometry()!=rect: host.setGeometry(rect)
@@ -290,17 +299,22 @@ class HoverHeaders(QObject):
         if tracking and not self.timer.isActive(): self.timer.start()
         elif not tracking: self.timer.stop()
         if not tracking or QApplication.activeModalWidget():
+            self.highlight()
             for frame in (self.top,self.ruler): frame.hide()
             self.reserve_top(0)
             self.hide_docked_ruler()
             return
-        if QApplication.activePopupWidget(): return
+        if QApplication.activePopupWidget():
+            self.highlight()
+            return
         if point is None:
             # A floating strip appearing during a drag can take capture from the timeline.
             if QApplication.mouseButtons() or w.timeline.gesture or w.timeline.external_scrubbing:
                 return
             active=QApplication.activeWindow()
-            if not w.isActiveWindow() and active not in (self.top,self.ruler,w.timeline_panel,w.transport_widget):
+            if not w.isActiveWindow() and active not in (self.top,self.ruler,w.timeline_panel,w.transport_widget) and (
+                    active is None or active is not w.timeline.marker_hover.popup):
+                self.highlight()
                 for frame in (self.top,self.ruler): frame.hide()
                 self.reserve_top(0)
                 self.hide_docked_ruler()
@@ -321,18 +335,26 @@ class HoverHeaders(QObject):
             self.show_reader()
         else:
             self.conceal_top()
-        if self.auto_ruler and w.timeline_panel.isVisible() and (
-                self.lower_hover(point,bar) or self.ruler.isVisible() and keep(self.ruler)):
+        transport=self.transport_rect()
+        over_controls=(bar.contains(point) or transport.contains(point) or self.over_separator(point,bar,transport))
+        available=w.timeline_panel.isVisible() and not w.timeline.marker_hover.covers(point)
+        if self.read and available:
+            timeline=QRect(w.timeline.mapToGlobal(QPoint()),w.timeline.size())
+            last=bar if transport.isEmpty() else transport
+            self.highlight(point if over_controls or self.over_separator(point,last,timeline) else None)
+        else:
+            self.highlight()
+        if self.auto_ruler and available and (over_controls or self.ruler.isVisible() and keep(self.ruler)):
             self.show_ruler()
         else:
             self.conceal_ruler()
 
     def eventFilter(self, obj, event):
         if not isValid(self.w): return False
-        if obj in self.pointer_surfaces and self.auto_ruler:
-            if event.type() in (QEvent.Enter,QEvent.MouseMove) and not QApplication.mouseButtons():
+        if obj in self.hover_surfaces and (self.auto_ruler or self.read):
+            if event.type() in (QEvent.Enter,QEvent.HoverMove) and not QApplication.mouseButtons():
                 if not self.w.timeline.gesture and not self.w.timeline.external_scrubbing:
-                    self.update_hover(event.globalPosition().toPoint())
+                    self.update_hover(obj.mapToGlobal(event.position().toPoint()))
             elif event.type()==QEvent.Leave:
                 self.update_hover()
         if event.type() in (QEvent.Move,QEvent.Resize,QEvent.LayoutRequest):

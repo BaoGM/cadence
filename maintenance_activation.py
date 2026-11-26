@@ -6,7 +6,6 @@ from pathlib import Path
 import sys
 
 from update_machine import install_paths,service_pid
-from update_store import elevated_process
 from updates import version_tuple
 
 
@@ -80,7 +79,7 @@ def setup_executable(base,version):
     runtime=app.parent/('_internal-'+version)
     folder=runtime/'maintenance'
     setup=folder/'CadenceMaintenanceSetup.exe'
-    if (not getattr(sys,'frozen',False) or elevated_process() or Path(base)!=app or
+    if (not getattr(sys,'frozen',False) or Path(base)!=app or
             Path(sys.executable)!=app or Path(getattr(sys,'_MEIPASS',''))!=runtime or service_exists()):
         raise PermissionError('Maintenance activation is not available')
     with ExitStack() as opened:

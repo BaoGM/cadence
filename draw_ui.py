@@ -70,16 +70,32 @@ class DrawController(QObject):
         self.size_drag=None; self.shape_drag=None; self.sampling=False; self.temporary_picker=False; self.last_tool='brush'
         self.visible=QCheckBox(tr('Afficher le calque de dessins')); self.visible.setChecked(True); self.visible.toggled.connect(self.invalidate); col.addWidget(self.visible)
         self.export=QCheckBox(tr('Inclure les dessins à l’export')); self.export.setChecked(True); col.addWidget(self.export)
-        gamma_row=QHBoxLayout()
+        adjustments=QGridLayout()
+        adjustments.setColumnStretch(1,1)
+        window.exposure_button=adjustment_button('Exposition')
+        window.exposure_button.clicked.connect(window.toggle_exposure)
+        window.exp_spin=ScrubDoubleSpinBox()
+        window.exp_spin.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Fixed)
+        window.exp_spin.setRange(-10,10)
+        window.exp_spin.setSingleStep(.25)
+        window.exp_spin.setSuffix(tr(' EV'))
+        window.exp_spin.setAccessibleName(tr('Exposition'))
+        window.exp_spin.valueChanged.connect(window.exposure_spin)
+        window.exp_spin.editingFinished.connect(window.commit_exposure)
+        adjustments.addWidget(window.exposure_button,0,0)
+        adjustments.addWidget(window.exp_spin,0,1)
         self.gamma_button=adjustment_button('Gamma')
         self.gamma_button.clicked.connect(self.toggle_gamma)
         self.gamma_dirty=False
         self.gamma=ScrubDoubleSpinBox()
+        self.gamma.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Fixed)
         self.gamma.setRange(-10.,10.); self.gamma.setSingleStep(.1)
         self.gamma.setAccessibleName(tr('Gamma'))
         self.gamma.valueChanged.connect(self.edit_gamma)
         self.gamma.editingFinished.connect(self.commit_gamma)
-        gamma_row.addWidget(self.gamma_button); gamma_row.addWidget(self.gamma,1); col.addLayout(gamma_row)
+        adjustments.addWidget(self.gamma_button,1,0)
+        adjustments.addWidget(self.gamma,1,1)
+        col.addLayout(adjustments)
         outer=col; tabs=QTabWidget(); outer.addWidget(tabs)
         tools_page=QWidget(); keys_page=QWidget()
         tabs.addTab(tools_page,icon('pen'),tr('Outils')); tabs.addTab(keys_page,icon('key'),tr('Clés'))
@@ -146,8 +162,33 @@ class DrawController(QObject):
         inset=self.inspector_tabs.style().pixelMetric(QStyle.PM_DefaultFrameWidth,None,self.inspector_tabs)
         dock_inset=self.panel.style().pixelMetric(QStyle.PM_DockWidgetFrameWidth,None,self.panel)
         self.panel.setMinimumWidth(max(200,content.minimumSizeHint().width()+scroll.verticalScrollBar().sizeHint().width()+2*(inset+dock_inset)))
+        self.full_panel_width=self.panel.minimumWidth()
+        self.adjustment_grid=adjustments
+        self.drawing_sections=tabs
+        self.drawing_layout=outer
         window.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea,self.panel); self.panel.hide()
         self.viewer.installEventFilter(self); self.viewer.draw_controller=self
+
+    def fit_inspector(self,compact):
+        if compact==getattr(self,'compact_inspector',False):
+            return
+        self.compact_inspector=compact
+        margin=5 if compact else 10
+        self.drawing_layout.setContentsMargins(margin,6,margin,10)
+        self.adjustment_grid.setHorizontalSpacing(2 if compact else -1)
+        for button in (self.win.exposure_button,self.gamma_button):
+            button.setProperty('compact',compact)
+            button.style().unpolish(button)
+            button.style().polish(button)
+            button.updateGeometry()
+        self.drawing_sections.setSizePolicy(QSizePolicy.Ignored if compact else QSizePolicy.Preferred,QSizePolicy.Preferred)
+        self.drawing_sections.tabBar().setStyleSheet('QTabBar::tab {padding:5px 3px;}' if compact else '')
+        self.wheel.setMinimumWidth(145 if compact else 180)
+        for box,short,full in ((self.visible,'Afficher les dessins','Afficher le calque de dessins'),
+                               (self.export,'Dessins à l’export','Inclure les dessins à l’export')):
+            box.setText(tr(short if compact else full))
+            box.setAccessibleName(tr(full))
+        self.panel.setMinimumWidth(200 if compact else self.full_panel_width)
     def menus(self):
         w=self.win; menu=w.menuBar().addMenu(tr('Dessin'))
         self.visibility_action=w.action(menu,'Afficher le calque de dessins',lambda checked:self.visible.setChecked(checked)); self.visibility_action.setCheckable(True); self.visibility_action.setChecked(self.visible.isChecked())
@@ -566,6 +607,14 @@ class DrawController(QObject):
         if self.text_editor: self.text_editor.finish(False)
         if self.size_drag: self.size.setValue(self.size_base)
         self.finish_size_drag(); self.text_drag=None; self.shape_drag=None; self.selection.clear(); self.stroke=None; self.tablet_down=False; self.invalidate()
+    def cancel_pointer_edit(self):
+        if getattr(self,'sampling',False):
+            self.sampling=False
+            self.wheel.set_color(self.sample_before)
+        elif not (self.stroke or self.text_drag or self.text_editor or self.selection.gesture or self.size_drag):
+            return False
+        self.cancel()
+        return True
     def eventFilter(self,obj,e):
         if not self.enabled or not self.viewer.loaded: return False
         if self.text_editor and self.text_editor.pointer(e):
@@ -575,7 +624,7 @@ class DrawController(QObject):
         pointer_press=kind in (QEvent.Type.MouseButtonPress,QEvent.Type.MouseButtonDblClick,QEvent.Type.TabletPress) and e.button()==Qt.MouseButton.LeftButton
         if pointer_press and (self.tool.currentData()=='picker' or self.picker_available(e.modifiers())):
             self.update_picker_cursor(e.modifiers())
-            self.finish(); self.win.pause(); self.sampling=True; self.sample(e.position()); e.accept(); return True
+            self.finish(); self.win.pause(); self.sample_before=self.wheel.color(); self.sampling=True; self.sample(e.position()); e.accept(); return True
         if getattr(self,'sampling',False):
             if kind in (QEvent.Type.MouseMove,QEvent.Type.TabletMove): self.sample(e.position()); e.accept(); return True
             if kind in (QEvent.Type.MouseButtonRelease,QEvent.Type.TabletRelease): self.sampling=False; e.accept(); return True

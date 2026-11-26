@@ -5,7 +5,7 @@ from ui_text import tr
 
 def install(window):
     for key,callback,shortcut in (
-        ('Comparaison/Mode de comparaison suivant',window.cycle_comparison,'Shift+X'),
+        ('Références/Mode de comparaison suivant',window.cycle_comparison,'Shift+X'),
         ('Lecture/Basculer le pas clé / image',lambda:toggle_step(window),'K'),
     ):
         action=QAction(tr(key.split('/',1)[1]),window)

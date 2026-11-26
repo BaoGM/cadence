@@ -18,6 +18,34 @@ def test_encoding_preserves_odd_region_and_existing_file():
     assert '-n' in args and args[args.index('-draw_mouse')+1]=='0'
     assert args[args.index('-video_size')+1]=='151x77'
     assert 'pad=ceil(iw/2)*2:ceil(ih/2)*2' in args and args[-1]=='space name.mp4'
+
+def test_gif_recorder_preserves_odd_pixels_and_recovers_on_cancel(tmp_path):
+    import av
+    from media import ffmpeg
+    from capture import gif_recording_path
+    app=QApplication.instance() or QApplication([])
+    parent=QDialog()
+    for cancelled in (True,False):
+        d=CaptureDialog(parent); d.path=tmp_path/'screen.gif'
+        original=gif_recording_path(d.path)
+        capture=capture_args((0,0,151,77),24,False,d.path)
+        encode=capture[capture.index('-c:v'):]
+        subprocess.run([ffmpeg(),'-v','error','-n','-f','lavfi','-i','testsrc=size=151x77:rate=24:duration=0.5',*encode],
+                       check=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        if cancelled: d.gif_cancel.set()
+        d.finish_gif()
+        assert d.mux_done.is_set() and not list(tmp_path.glob('*.partial.gif'))
+        if cancelled:
+            assert d.mux_error and original.is_file() and not d.path.exists()
+            original.unlink()
+        else:
+            assert not d.mux_error and not original.exists()
+            with av.open(str(d.path)) as c:
+                frames=list(c.decode(video=0))
+                assert len(frames)==12 and (frames[0].width,frames[0].height)==(151,77)
+                assert abs(float(frames[-1].time)-11/24)<.011
+        d.deleteLater()
+    parent.deleteLater();app.processEvents()
 def test_cancel_countdown_releases_hotkey(monkeypatch):
     app=QApplication.instance() or QApplication([])
     parent=QDialog(); d=CaptureDialog(parent); d.countdown=3; d.timer.start()

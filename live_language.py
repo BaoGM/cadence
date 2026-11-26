@@ -66,8 +66,6 @@ def retranslate(window, wanted):
                 widget.setTabToolTip(index,translated(widget.tabToolTip(index)))
 
     # Combo boxes containing paths, references, fonts and user-created names are data.
-    window.ref_compare_button.setText(ui_text.tr('Comparer'))
-    window.ref_compare_button.setAccessibleName(ui_text.tr('Comparer'))
     from draw_ui import TOOL_SPECS
     for combo in (window.drawing.tool,window.compare_mode):
         with QSignalBlocker(combo):

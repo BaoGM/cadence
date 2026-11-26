@@ -69,6 +69,220 @@ def test_known_installation_is_independent_of_environment(monkeypatch):
     assert not machine.configured(Path('Cadence.exe'))
 
 
+@pytest.fixture
+def elevated_portable(gui,tmp_path,monkeypatch):
+    import update_ui
+    window=fake_window(gui)
+    window.settings=QSettings(str(tmp_path/'settings.ini'),QSettings.IniFormat)
+    manager=update_ui.UpdateManager(window,'2.0.12')
+    manager.base=tmp_path/'portable'/'Cadence.exe'
+    manager.base.parent.mkdir()
+    manager.base.touch()
+    monkeypatch.setattr(update_ui.sys,'frozen',True,raising=False)
+    monkeypatch.delenv('CADENCE_DISABLE_UPDATES',raising=False)
+    monkeypatch.setattr(update_ui,'shared_install',lambda base:True)
+    monkeypatch.setattr(update_ui,'elevated_process',lambda:True)
+    monkeypatch.setattr(machine,'install_paths',lambda:(tmp_path/'installed'/'Cadence.exe',None))
+    monkeypatch.setattr(update_ui,'spawn',lambda *args:pytest.fail('Relaunch inherited elevation'))
+    monkeypatch.setattr(update_ui,'prepare_package',lambda *args:pytest.fail('Staging inherited elevation'))
+    monkeypatch.setattr(manager,'run',lambda operation:manager.complete(operation(),''))
+    try:
+        yield manager
+    finally:
+        manager.stop()
+        if manager.ready_button: manager.ready_prompt.close()
+        window.close()
+
+
+@pytest.mark.parametrize('manual',[True,False],ids=['manual','automatic'])
+def test_elevated_portable_can_check_without_staging(elevated_portable,monkeypatch,manual):
+    import update_ui
+    from ui_text import tr
+    manager=elevated_portable
+    checked=[]; messages=[]
+    monkeypatch.setattr(update_ui,'check',lambda version,installed,previews:checked.append((version,previews)))
+    monkeypatch.setattr(update_ui.QMessageBox,'information',lambda parent,title,text:messages.append(text))
+    manager.start()
+    assert manager.check_timer.isActive()
+    manager.check_now(manual)
+    assert checked==[(manager.version,False)]
+    assert messages==([tr('Aucune nouvelle version disponible.')] if manual else [])
+    assert float(manager.window.settings.value('updates/last_check',0))>0
+    assert list(manager.base.parent.iterdir())==[manager.base]
+
+
+@pytest.mark.parametrize('can_close',[True,False],ids=['confirmed','window-veto'])
+def test_elevated_portable_prepares_and_restarts_as_desktop_user(elevated_portable,monkeypatch,can_close):
+    import update_ui
+    from updates import Release
+    from unittest.mock import Mock
+    manager=elevated_portable
+    release=Release('2.0.13',False,'unused.zip',1,'0'*64)
+    monkeypatch.setattr(update_ui,'check',lambda version,installed,previews:release)
+    prepare=Mock(return_value=release.version)
+    restart=Mock()
+    monkeypatch.setattr(update_ui,'prepare_as_desktop_user',prepare)
+    monkeypatch.setattr(update_ui,'launch_as_desktop_user',restart)
+    manager.check_now()
+    prepare.assert_called_once_with(manager.base,release,False,manager.cancel)
+    assert manager.ready_button is not None and manager.ready_prompt.isVisible()
+    restart.assert_not_called()
+    manager.window.confirm_discard=lambda:False
+    manager.restart()
+    restart.assert_not_called()
+    manager.window.confirm_discard=lambda:True
+    monkeypatch.setattr(manager.window,'close',lambda:can_close)
+    manager.restart()
+    restart.assert_called_once_with(manager.base,suspended=True)
+    child=restart.return_value
+    if can_close:
+        child.resume.assert_called_once_with()
+        child.terminate.assert_not_called()
+    else:
+        child.terminate.assert_called_once_with()
+        child.resume.assert_not_called()
+    child.close.assert_called_once_with()
+    assert list(manager.base.parent.iterdir())==[manager.base]
+
+
+def test_restart_without_standard_desktop_keeps_admin_window(elevated_portable,monkeypatch):
+    import update_ui
+    from unittest.mock import Mock
+    manager=elevated_portable
+    manager.user_session_update=True
+    manager.window.show()
+    monkeypatch.setattr(update_ui,'launch_as_desktop_user',Mock(side_effect=PermissionError))
+    warning=Mock()
+    monkeypatch.setattr(update_ui.QMessageBox,'warning',warning)
+    manager.restart()
+    warning.assert_called_once()
+    assert manager.window.isVisible() and not getattr(manager.window,'_update_close_approved',False)
+
+
+@pytest.mark.parametrize('relaunch_ok',[True,False],ids=['recover','report-failure'])
+def test_failed_resume_cleans_up_and_retries_standard_launch(elevated_portable,monkeypatch,relaunch_ok):
+    import update_ui
+    from unittest.mock import Mock,call
+    manager=elevated_portable
+    manager.user_session_update=True
+    child,replacement=Mock(),Mock()
+    child.resume.side_effect=OSError('resume failed')
+    launch=Mock(side_effect=[child,replacement if relaunch_ok else OSError('launch failed')])
+    monkeypatch.setattr(update_ui,'launch_as_desktop_user',launch)
+    warning=Mock()
+    monkeypatch.setattr(update_ui.QMessageBox,'warning',warning)
+    manager.window.show()
+    manager.restart()
+    assert launch.call_args_list==[call(manager.base,suspended=True),call(manager.base)]
+    assert child.method_calls==[call.resume(),call.terminate(),call.close()]
+    assert not manager.window.isVisible()
+    if relaunch_ok:
+        replacement.close.assert_called_once_with()
+        warning.assert_not_called()
+    else:
+        warning.assert_called_once()
+        assert warning.call_args.args[0] is None
+
+
+def test_elevated_custom_machine_install_does_not_use_portable_worker(elevated_portable,monkeypatch):
+    import update_ui
+    from updates import Release
+    from unittest.mock import Mock
+    manager=elevated_portable
+    release=Release('2.0.13',False,'unused.zip',1,'0'*64)
+    message=Mock()
+    monkeypatch.setattr(update_ui,'machine_install_location',lambda base:True)
+    monkeypatch.setattr(update_ui,'check',lambda *args:release)
+    monkeypatch.setattr(update_ui,'prepare_as_desktop_user',lambda *args:pytest.fail('Shared installation'))
+    monkeypatch.setattr(update_ui.QMessageBox,'information',message)
+    manager.check_now()
+    assert message.call_count==1 and release.version in message.call_args.args[-1]
+    assert manager.ready_button is None and not manager.window.settings.value(manager.portable_hint_key())
+
+
+@pytest.mark.parametrize('available',[True,False],ids=['still-ready','stale-hint'])
+def test_elevated_portable_recovers_deferred_update(elevated_portable,monkeypatch,available):
+    import update_ui
+    from unittest.mock import Mock
+    from updates import Release
+    first=elevated_portable
+    release=Release('2.0.13',False,'unused.zip',1,'0'*64)
+    monkeypatch.setattr(update_ui,'check',lambda *args:release)
+    monkeypatch.setattr(update_ui,'prepare_as_desktop_user',lambda *args:release.version)
+    first.check_now()
+    settings=first.window.settings
+    key=first.portable_hint_key()
+    assert settings.value(key)=='2.0.13'
+    settings.setValue('updates/last_check',time.time())
+    first.ready_prompt.close()
+    first.stop()
+    manager=update_ui.UpdateManager(first.window,first.version)
+    manager.base=first.base.parent/'other'/'Cadence.exe'
+    assert manager.portable_hint_key()!=key
+    manager.base=first.base
+    probe=Mock(return_value=available)
+    monkeypatch.setattr(update_ui,'prepared_as_desktop_user',probe)
+    monkeypatch.setattr(update_ui,'check',lambda *args:pytest.fail('Unexpected network check on startup'))
+    monkeypatch.setattr(manager,'run',lambda operation:manager.complete(operation(),''))
+    try:
+        manager.start()
+        probe.assert_called_once_with(first.base,'2.0.13',manager.cancel)
+        if available:
+            assert manager.ready_button is not None and manager.ready_prompt.isVisible()
+            assert '2.0.13' in manager.ready_prompt.text()
+        else:
+            assert manager.ready_button is None
+            assert not settings.value(key)
+            assert manager.seconds_until_check()==0 and manager.check_timer.isActive()
+    finally:
+        manager.stop()
+        if manager.ready_button: manager.ready_prompt.close()
+
+
+@pytest.mark.parametrize('already_downloaded',[False,True],ids=['normal-download','existing-pending'])
+def test_standard_portable_download_remains_available_offline_as_admin(elevated_portable,monkeypatch,already_downloaded):
+    import update_ui
+    import update_user
+    from update_store import STORE,write_state
+    from updates import Release
+    admin=elevated_portable
+    base=admin.base
+    settings_path=admin.window.settings.fileName()
+    release=Release('2.0.13',False,'unused.zip',1,'0'*64)
+    store=base.parent/STORE
+    def prepare(*args):
+        store.mkdir(exist_ok=True)
+        write_state(store,{'pending':release.version})
+        return release.version
+    normal=update_ui.UpdateManager(admin.window,admin.version)
+    normal.base=base
+    with monkeypatch.context() as standard:
+        standard.setattr(update_ui,'shared_install',lambda path:False)
+        standard.setattr(update_ui,'elevated_process',lambda:False)
+        standard.setattr(update_ui,'check',lambda *args:release)
+        standard.setattr(update_ui,'prepare_package',prepare)
+        standard.setattr(normal,'run',lambda task:normal.complete(task(),''))
+        if already_downloaded: prepare()
+        normal.start()
+        if not already_downloaded: normal.check_now()
+        assert normal.ready_button is not None
+        normal.ready_prompt.close()
+        normal.stop()
+    admin.window.settings.sync()
+    admin.window.settings=QSettings(settings_path,QSettings.IniFormat)
+    monkeypatch.setattr(update_ui,'check',lambda *args:pytest.fail('No network offline'))
+    monkeypatch.setattr(update_user,'base_executable',lambda:base)
+    monkeypatch.setattr(update_user.sys,'executable',str(base))
+    monkeypatch.setattr(update_user,'shared_install',lambda path:False)
+    def probe(path,version,cancel):
+        assert path==base
+        return update_user.prepare_requested(admin.version,['--probe-user-update',version])==0
+    monkeypatch.setattr(update_ui,'prepared_as_desktop_user',probe)
+    admin.start()
+    assert admin.user_session_update and admin.ready_button is not None
+    assert release.version in admin.ready_prompt.text()
+
+
 @pytest.mark.parametrize('reply,server_matches,succeeds',[
     (b'{"state":"ready","version":"2.0.9","progress":100}\n',True,True),
     (b'{"state":"unexpected","version":"","progress":0}\n',True,False),
@@ -107,14 +321,16 @@ def test_native_pipe_validates_server_and_status(monkeypatch,reply,server_matche
     with pytest.raises(ValueError): machine.request('APPLY C:/file')
 
 
-def test_managed_user_ready_restart_and_other_sessions(gui,tmp_path,monkeypatch):
+@pytest.mark.parametrize('elevated',[False,True],ids=['standard','administrator'])
+def test_managed_user_ready_restart_and_other_sessions(gui,tmp_path,monkeypatch,elevated):
     import update_ui
     window=fake_window(gui); window.settings=QSettings(str(tmp_path/'settings.ini'),QSettings.IniFormat)
     manager=update_ui.UpdateManager(window,'2.0.8'); manager.base=tmp_path/'Cadence.exe'
     monkeypatch.setattr(update_ui.sys,'frozen',True,raising=False); monkeypatch.delenv('CADENCE_DISABLE_UPDATES',raising=False)
     monkeypatch.setattr(update_ui,'shared_install',lambda base:True)
-    monkeypatch.setattr(update_ui,'elevated_process',lambda:False)
+    monkeypatch.setattr(update_ui,'elevated_process',lambda:elevated)
     monkeypatch.setattr(machine,'configured',lambda path:True)
+    monkeypatch.setattr(manager,'run',lambda operation:pytest.fail('Machine updates must use the service'))
     commands=[]; messages=[]; restarted=[]; blocked=[True]
     def send(command):
         commands.append(command)
@@ -143,7 +359,9 @@ def test_managed_user_ready_restart_and_other_sessions(gui,tmp_path,monkeypatch)
         window.close()
 
 
-def test_missing_service_requests_initial_admin_setup(gui,tmp_path,monkeypatch):
+@pytest.mark.parametrize('installed',[False,True],ids=['missing','unavailable'])
+def test_missing_service_requests_initial_admin_setup(gui,tmp_path,monkeypatch,installed):
+    import maintenance_activation as activation
     import update_ui
     window=fake_window(gui); manager=update_ui.UpdateManager(window,'2.0.8')
     manager.base=tmp_path/'Cadence.exe'; messages=[]
@@ -151,11 +369,83 @@ def test_missing_service_requests_initial_admin_setup(gui,tmp_path,monkeypatch):
     monkeypatch.setattr(update_ui,'elevated_process',lambda:False)
     monkeypatch.setattr(machine,'configured',lambda path:False)
     monkeypatch.setattr(machine,'install_paths',lambda:(manager.base,None))
+    monkeypatch.setattr(activation,'available',lambda base,version:False)
+    monkeypatch.setattr(activation,'service_exists',lambda:installed)
     monkeypatch.setattr(update_ui.QMessageBox,'information',lambda parent,title,text:messages.append(text))
     monkeypatch.setattr(manager,'run',lambda task:pytest.fail('User updater must not run on protected installation'))
     manager.check_now(True)
-    assert len(messages)==1 and 'maintenance' in messages[0].lower()
+    from ui_text import tr
+    expected=(tr('Le service de maintenance est indisponible. Réessayez plus tard.') if installed else
+              tr('Cette installation est protégée. Demandez à votre administrateur d’activer la maintenance dans l’installateur de Cadence.'))
+    assert messages==[expected]
     manager.stop(); window.close()
+
+
+@pytest.mark.parametrize('installed',[False,True],ids=['missing','unavailable'])
+@pytest.mark.parametrize('new_release',[False,True],ids=['up-to-date','update-available'])
+def test_elevated_install_without_service_checks_release_read_only(elevated_portable,monkeypatch,installed,new_release):
+    import maintenance_activation as activation
+    import update_ui
+    from unittest.mock import Mock
+    from updates import Release
+    from ui_text import tr
+    manager=elevated_portable
+    monkeypatch.setattr(machine,'configured',lambda base:False)
+    monkeypatch.setattr(machine,'install_paths',lambda:(manager.base,None))
+    monkeypatch.setattr(activation,'available',lambda base,version:False)
+    monkeypatch.setattr(activation,'service_exists',lambda:installed)
+    monkeypatch.setattr(update_ui,'prepare_as_desktop_user',lambda *args:pytest.fail('Protected machine installation'))
+    release=Release('2.0.13',False,'unused.zip',1,'0'*64)
+    check=Mock(return_value=release if new_release else None)
+    message=Mock()
+    monkeypatch.setattr(update_ui,'check',check)
+    monkeypatch.setattr(update_ui.QMessageBox,'information',message)
+    manager.start()
+    assert manager.check_timer.isActive()
+    manager.check_now(False)
+    check.assert_called_once_with(manager.version,False,False)
+    message.assert_not_called()
+    manager.check_now(True)
+    assert check.call_count==2 and message.call_count==1
+    text=message.call_args.args[-1]
+    if new_release:
+        assert release.version in text and 'maintenance' in text.lower()
+    else:
+        assert tr('Aucune nouvelle version disponible.') in text
+    assert manager.ready_button is None and not manager.user_session_update
+    assert list(manager.base.parent.iterdir())==[manager.base]
+
+
+@pytest.mark.parametrize('elevated',[False,True],ids=['standard','administrator'])
+def test_machine_watcher_restarts_with_standard_rights(gui,tmp_path,monkeypatch,elevated):
+    import update_ui
+    from unittest.mock import Mock
+    window=fake_window(gui)
+    manager=update_ui.UpdateManager(window,'2.0.12')
+    manager.base=tmp_path/'Cadence.exe'
+    helper=tmp_path/'CadenceRestart.exe'
+    machine_updates=machine.MachineUpdates(manager)
+    monkeypatch.setattr(machine,'configured',lambda app:app==manager.base)
+    monkeypatch.setattr(machine,'install_paths',lambda:(manager.base,helper))
+    monkeypatch.setattr(machine,'elevated_process',lambda:elevated)
+    desktop_launch,standard_launch=Mock(),Mock()
+    monkeypatch.setattr(machine,'launch_as_desktop_user',desktop_launch)
+    monkeypatch.setattr(machine.subprocess,'Popen',standard_launch)
+    try:
+        child=machine_updates.watcher()
+        if elevated:
+            desktop_launch.assert_called_once_with(helper)
+            standard_launch.assert_not_called()
+            assert child is desktop_launch.return_value
+        else:
+            standard_launch.assert_called_once()
+            desktop_launch.assert_not_called()
+            assert child is standard_launch.return_value
+        monkeypatch.setattr(machine,'configured',lambda app:False)
+        with pytest.raises(OSError): machine_updates.watcher()
+        assert desktop_launch.call_count+standard_launch.call_count==1
+    finally:
+        manager.stop(); window.close()
 
 
 def test_activation_rejects_user_writable_handles_and_user_build(tmp_path):
@@ -176,7 +466,6 @@ def test_activation_requires_matching_runtime_and_absent_service(tmp_path,monkey
     monkeypatch.setattr(activation,'install_paths',lambda:(app,None))
     monkeypatch.setattr(activation.sys,'executable',str(app)); monkeypatch.setattr(activation.sys,'frozen',True,raising=False)
     monkeypatch.setattr(activation.sys,'_MEIPASS',str(runtime),raising=False)
-    monkeypatch.setattr(activation,'elevated_process',lambda:False)
     monkeypatch.setattr(activation,'service_exists',lambda:False)
     checked=[]
     monkeypatch.setattr(activation,'protected_handle',lambda path,is_dir:checked.append((path,is_dir)) or nullcontext())
@@ -187,7 +476,8 @@ def test_activation_requires_matching_runtime_and_absent_service(tmp_path,monkey
     monkeypatch.setattr(activation,'service_exists',lambda:True); assert not activation.available(app,'2.0.8')
 
 
-def test_manual_confirmation_and_cancel_are_the_only_activation_path(gui,tmp_path,monkeypatch):
+@pytest.mark.parametrize('elevated',[False,True],ids=['standard','administrator'])
+def test_manual_confirmation_and_cancel_are_the_only_activation_path(gui,tmp_path,monkeypatch,elevated):
     import maintenance_activation as activation
     import update_ui
     from PySide6.QtCore import QTimer
@@ -196,16 +486,24 @@ def test_manual_confirmation_and_cancel_are_the_only_activation_path(gui,tmp_pat
     manager=update_ui.UpdateManager(window,'2.0.8'); manager.base=tmp_path/'Cadence.exe'
     calls=[]
     monkeypatch.setattr(update_ui,'shared_install',lambda base:True)
-    monkeypatch.setattr(update_ui,'elevated_process',lambda:False)
+    monkeypatch.setattr(update_ui,'elevated_process',lambda:elevated)
     monkeypatch.setattr(machine,'configured',lambda path:False)
     monkeypatch.setattr(machine,'install_paths',lambda:(manager.base,None))
     monkeypatch.setattr(activation,'available',lambda base,version:True)
     monkeypatch.setattr(activation,'activate',lambda base,version,hwnd:calls.append((base,version)) or False)
+    from updates import Release
+    release=Release('2.0.13',False,'unused.zip',1,'0'*64)
+    monkeypatch.setattr(update_ui,'check',lambda *args:release)
+    monkeypatch.setattr(manager,'run',lambda operation:manager.complete(operation(),''))
+    prompts=[]
     def click(role):
         box=QApplication.activeModalWidget()
+        prompts.append(box.text())
         next(button for button in box.buttons() if box.buttonRole(button)==role).click()
     manager.check_now(False); assert not calls
     QTimer.singleShot(0,lambda:click(QMessageBox.RejectRole)); manager.check_now(True); assert not calls
     QTimer.singleShot(0,lambda:click(QMessageBox.AcceptRole)); manager.check_now(True)
     assert calls==[(manager.base,'2.0.8')] and not manager.activation_pending
+    assert len(prompts)==2
+    if elevated: assert all(release.version in text for text in prompts)
     manager.stop(); window.close()

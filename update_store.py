@@ -52,10 +52,8 @@ def elevated_process():
         kernel.CloseHandle(token)
 
 
-def shared_install(base):
+def machine_install_location(base):
     import winreg
-    from ctypes import wintypes
-    if elevated_process(): return True
     base=Path(base).resolve()
     roots={os.environ.get(name) for name in ('ProgramFiles','ProgramW6432','ProgramFiles(x86)')}
     common=r'SOFTWARE\Microsoft\Windows\CurrentVersion'
@@ -74,7 +72,13 @@ def shared_install(base):
                 if folder and base.parent==Path(folder).resolve(): return True
         except FileNotFoundError: pass
         except OSError: return True
-    if any(folder and base.is_relative_to(Path(folder).resolve()) for folder in roots): return True
+    return any(folder and base.is_relative_to(Path(folder).resolve()) for folder in roots)
+
+
+def shared_install(base):
+    from ctypes import wintypes
+    if elevated_process() or machine_install_location(base): return True
+    base=Path(base).resolve()
     # Ask the kernel whether this token can add files and subdirectories, without writing a probe.
     kernel=ctypes.WinDLL('kernel32',use_last_error=True)
     open_dir=kernel.CreateFileW

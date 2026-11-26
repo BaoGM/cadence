@@ -6,7 +6,7 @@ from math import floor
 import numpy as np
 from PySide6.QtCore import Qt,QSignalBlocker,QRectF,QPointF
 from PySide6.QtGui import QImage,QPainter,QPainterPath
-from PySide6.QtWidgets import QWidget,QDockWidget,QVBoxLayout,QHBoxLayout,QGridLayout,QLabel,QComboBox,QPushButton,QCheckBox,QFileDialog,QScrollArea
+from PySide6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QGridLayout,QLabel,QComboBox,QPushButton,QFileDialog,QScrollArea
 from widgets import ScrubSpinBox,ScrubDoubleSpinBox,TransportButton
 from engine import Decoder
 from media import prepare_media
@@ -88,36 +88,39 @@ class ComparisonMixin(ReferenceQueueMixin):
     def build_comparison(self):
         self.compare_media=None; self.reference_order=[]; self.reference_index=ReferenceSequence(); self.reference_sources={}; self.reference_signature=None; self.comparison_pending=None
         self.reference_decoder=Decoder(self); self.reference_decoder.ready.connect(self.reference_ready); self.reference_decoder.failed.connect(self.reference_failed); self.reference_decoder.start()
-        self.comparison_panel=QDockWidget(tr('Comparaison'),self); self.comparison_panel.setObjectName('comparison'); self.comparison_panel.setMinimumWidth(200)
+        self.reference_return=None
         from library_style import INSPECTOR_STYLE, inspector_heading, style_button
         body=QWidget(); body.setObjectName('studioInspector'); body.setStyleSheet(INSPECTOR_STYLE)
         col=QVBoxLayout(body); col.setContentsMargins(10,6,10,10); col.setSpacing(5)
-        inspector_heading(col,'Source B','refs')
-        self.compare_enabled=QCheckBox(tr('Activer la comparaison')); col.addWidget(self.compare_enabled)
-        self.reference_combo=QComboBox(); self.reference_combo.setMinimumContentsLength(11); self.reference_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon); col.addWidget(self.reference_combo)
-        open_button=style_button(QPushButton(tr('Ajouter des références B…')),'plus'); open_button.clicked.connect(self.open_reference); col.addWidget(open_button)
+        self.compare_enabled=style_button(QPushButton('A/B'),'ab')
+        self.compare_enabled.setAccessibleName(tr('Activer la comparaison'))
+        self.compare_enabled.setToolTip(tr('Activer la comparaison')); self.compare_enabled.setCheckable(True)
+        self.reference_combo=QComboBox(); self.reference_combo.setMinimumContentsLength(6); self.reference_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         inspector_heading(col,'Affichage','ab')
         self.compare_mode=QComboBox()
         for title,mode in MODES: self.compare_mode.addItem(tr(title),mode)
-        col.addWidget(self.compare_mode)
-        swap=style_button(QPushButton(tr('Intervertir A / B')),'swap'); swap.clicked.connect(self.swap_comparison); col.addWidget(swap)
+        mode_row=QHBoxLayout(); mode_row.addWidget(self.compare_mode,1)
+        swap=style_button(QPushButton(tr('Intervertir A / B')),'swap',True); swap.clicked.connect(self.swap_comparison); mode_row.addWidget(swap); col.addLayout(mode_row)
         self.compare_opacity=ScrubSpinBox(); self.compare_opacity.setRange(0,100); self.compare_opacity.setValue(50); self.compare_opacity.setSuffix(tr(' %'))
         self.compare_gain=ScrubDoubleSpinBox(); self.compare_gain.setRange(1,20); self.compare_gain.setValue(1); self.compare_gain.setSingleStep(.5); self.compare_gain.setSuffix(tr(' ×'))
         self.compare_offset=ScrubSpinBox(); self.compare_offset.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu); self.compare_offset.lineEdit().setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu); self.compare_offset.setRange(-1000000,1000000); self.compare_offset.setValue(0); self.compare_offset.setToolTip(tr('Image B lue au temps du montage + décalage. Les cadences différentes sont synchronisées en secondes.'))
         values=QGridLayout(); values.setColumnStretch(1,1); values.setHorizontalSpacing(10); values.setVerticalSpacing(6)
-        for row,(title,field) in enumerate((('Opacité',self.compare_opacity),('Gain',self.compare_gain))):
-            label=QLabel(tr(title)); label.setBuddy(field); values.addWidget(label,row,0); values.addWidget(field,row,1)
+        self.mode_fields={}
+        for mode,title,field in (('overlay','Opacité',self.compare_opacity),('difference','Gain',self.compare_gain)):
+            label=QLabel(tr(title)); label.setBuddy(field); values.addWidget(label,0,0); values.addWidget(field,0,1)
+            self.mode_fields[mode]=(label,field)
         col.addLayout(values)
         inspector_heading(col,'Synchronisation','sync')
         offset_row=QHBoxLayout(); offset_label=QLabel(tr('Décalage référence')); offset_label.setBuddy(self.compare_offset)
         offset_row.addWidget(offset_label); offset_row.addWidget(self.compare_offset,1); col.addLayout(offset_row)
         align=style_button(QPushButton(tr('Début de B au curseur actuel')),'time'); align.clicked.connect(lambda:self.compare_offset.setValue(-self.doc.state.position)); col.addWidget(align)
         col.addStretch()
-        scroll=QScrollArea(); scroll.setFrameShape(QScrollArea.Shape.NoFrame); scroll.setWidget(body); scroll.setWidgetResizable(True); self.comparison_panel.setWidget(scroll); self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea,self.comparison_panel); self.comparison_panel.hide()
+        scroll=QScrollArea(); scroll.setFrameShape(QScrollArea.Shape.NoFrame); scroll.setWidget(body); scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff); scroll.setMinimumHeight(40)
         self.compare_enabled.toggled.connect(self.comparison_changed); self.reference_combo.currentIndexChanged.connect(self.choose_reference)
         self.compare_enabled.toggled.connect(self.update_comparison_panel)
         self.compare_mode.currentIndexChanged.connect(self.comparison_visual_changed); self.compare_opacity.valueChanged.connect(self.comparison_visual_changed); self.compare_gain.valueChanged.connect(self.comparison_visual_changed); self.compare_offset.valueChanged.connect(self.comparison_changed)
-        self.build_comparison_controls(); self.build_reference_list()
+        self.build_comparison_controls(); self.build_reference_list(scroll)
         self.refresh_reference_choices(); self.comparison_visual_changed()
     def build_comparison_controls(self):
         self.compare_controls=QWidget(); row=QHBoxLayout(self.compare_controls); row.setContentsMargins(3,0,0,0); row.setSpacing(1)
@@ -128,7 +131,8 @@ class ComparisonMixin(ReferenceQueueMixin):
     def cycle_comparison(self):
         if self.editing_text(): return
         if not self.compare_enabled.isChecked():
-            self.compare_mode.setCurrentIndex(0); self.compare_enabled.setChecked(True)
+            self.compare_mode.setCurrentIndex(0)
+            self.compare_enabled.setChecked(True)
         else:
             self.compare_mode.setCurrentIndex((self.compare_mode.currentIndex()+1)%self.compare_mode.count())
     def sync_comparison_controls(self):
@@ -145,13 +149,13 @@ class ComparisonMixin(ReferenceQueueMixin):
         order='B / A' if swapped else 'A / B'; tip=f'Intervertir A / B · ordre actuel : {order}'
         self.compare_swap_btn.setToolTip(tr(tip)); self.compare_swap_btn.setAccessibleName(tr(tip))
     def comparison_menu(self):
-        menu=self.menuBar().addMenu(tr('Comparaison'))
+        menu=self.menuBar().addMenu(tr('Références'))
         self.compare_action=self.action(menu,'Activer la comparaison',lambda checked:self.compare_enabled.setChecked(checked),'Shift+C'); self.compare_action.setCheckable(True)
         self.action(menu,'Ajouter des références B…',self.open_reference,'Ctrl+Shift+B')
         self.action(menu,'Intervertir A / B',self.swap_comparison,'Alt+X')
         for index,(title,mode) in enumerate(MODES): self.action(menu,title,lambda checked=False,i=index:self.set_compare_mode(i))
     def set_compare_mode(self,index):
-        self.compare_mode.setCurrentIndex(index); self.compare_enabled.setChecked(True); self.comparison_panel.show()
+        self.compare_mode.setCurrentIndex(index); self.compare_enabled.setChecked(True)
     def refresh_reference_choices(self):
         sources={**self.reference_sources,**self.doc.media}
         tracks=tuple((track.info.id,track.info.name) for track in self.doc.state.tracks)
@@ -175,13 +179,13 @@ class ComparisonMixin(ReferenceQueueMixin):
         media=({**self.reference_sources,**self.doc.media}).get(key)
         self.set_reference_sequence([media] if media else [])
     def use_reference(self,media):
-        self.set_reference_sequence([media]); self.comparison_panel.show()
+        self.set_reference_sequence([media]); self.show_references()
     def use_track_reference(self,identity):
         if identity not in {track.info.id for track in self.doc.state.tracks}: return
         self.reference_track_id=identity
         self.compare_media=None; self.viewer.reference_rgb=None
         self.reference_signature=None; self.refresh_reference_choices()
-        self.compare_enabled.setChecked(True); self.comparison_panel.show(); self.comparison_changed()
+        self.compare_enabled.setChecked(True); self.show_references(); self.comparison_changed()
     def open_reference(self):
         if self.job: return
         paths,_=QFileDialog.getOpenFileNames(self,tr('Ajouter des références B'),'',tr('Vidéos (*.mp4 *.mov *.mkv *.avi *.webm *.m4v *.mpg *.mpeg *.mts);;Tous les fichiers (*)'))
@@ -195,31 +199,41 @@ class ComparisonMixin(ReferenceQueueMixin):
                 result.append(media)
             return result
         def ready(entries):
-            self.set_reference_sequence(entries,append=True); self.library.show(); self.library_tabs.setCurrentIndex(self.reference_tab)
+            self.set_reference_sequence(entries,append=True); self.show_references()
         self.begin_task('Préparation des références B',prepare,ready)
     def comparison_active(self):
         identity=getattr(self,'reference_track_id',None)
         return self.compare_enabled.isChecked() and (self.compare_media is not None or identity in {track.info.id for track in self.doc.state.tracks})
     def comparison_visual_changed(self,*args):
         self.viewer.compare_mode=self.compare_mode.currentData(); self.viewer.compare_opacity=self.compare_opacity.value()/100; self.viewer.compare_gain=self.compare_gain.value()
+        for mode,fields in self.mode_fields.items():
+            for field in fields: field.setVisible(mode==self.viewer.compare_mode)
         self.viewer.apply_effect()
         self.sync_comparison_controls()
+    def show_references(self):
+        if self.video_fullscreen: self.toggle_fullscreen()
+        tab=self.library_tabs.currentIndex()
+        if self.reference_return is None or self.library.isHidden() or tab!=self.reference_tab:
+            self.reference_return=(not self.library.isHidden(),tab)
+        self.library_tabs.setCurrentIndex(self.reference_tab)
+        self.library.show()
+        self.library.raise_()
+
+    def close_references(self):
+        previous,self.reference_return=self.reference_return,None
+        if self.library_tabs.currentIndex()!=self.reference_tab: return
+        if previous and previous[0] and previous[1]!=self.reference_tab:
+            self.library_tabs.setCurrentIndex(previous[1])
+        else:
+            if self.video_fullscreen: self.library_was_visible=False
+            self.library.hide()
+
     def update_comparison_panel(self,enabled):
-        if not enabled:
-            self.comparison_panel.hide()
-            if self.video_fullscreen:
-                self.before_fullscreen['comparison']=False
-                with QSignalBlocker(self.panel_actions['comparison']):
-                    self.panel_actions['comparison'].setChecked(False)
-        elif not self.comparison_active():
-            if self.video_fullscreen:
-                self.toggle_fullscreen()
-            self.comparison_panel.show()
-            self.comparison_panel.raise_()
+        if enabled and not self.comparison_active():
+            self.show_references()
 
     def comparison_changed(self,*args):
         active=self.comparison_active(); self.viewer.comparing=active
-        if hasattr(self,'ref_compare_button'): self.ref_compare_button.setChecked(self.compare_enabled.isChecked())
         if hasattr(self,'compare_action'):
             with QSignalBlocker(self.compare_action): self.compare_action.setChecked(self.compare_enabled.isChecked())
         self.comparison_visual_changed(); self.request_frame()
@@ -298,6 +312,6 @@ class ComparisonMixin(ReferenceQueueMixin):
         self.viewer.comparing=self.comparison_active(); self.comparison_visual_changed()
         if hasattr(self,'compare_action'):
             with QSignalBlocker(self.compare_action): self.compare_action.setChecked(self.compare_enabled.isChecked())
-        if self.comparison_active(): self.comparison_panel.show()
+        if self.comparison_active(): self.show_references()
         warning=getattr(doc,'reference_warning','')
-        if warning: self.comparison_panel.show(); self.error('Référence B indisponible : '+warning)
+        if warning: self.show_references(); self.error('Référence B indisponible : '+warning)

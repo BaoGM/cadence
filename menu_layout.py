@@ -25,14 +25,14 @@ GROUPS={
         ['Clé précédente','Clé suivante'],
         ['Augmenter le volume','Diminuer le volume']],
     'Affichage':[
-        ['Afficher la timeline','Afficher le bandeau supérieur',
-         'Afficher les commandes de lecture','Afficher le time code','Afficher la liste de lecture','Afficher la barre d’outils','Afficher les outils de dessin','Commentaires','Afficher les réglages de comparaison'],
+        ['Afficher la timeline',
+         'Afficher les commandes de lecture','Afficher le time code','Afficher la liste de lecture','Afficher la barre d’outils','Afficher les outils de dessin','Commentaires'],
         # Preserve the requested usage order: zoom/reset, fullscreen, mirrors, units.
         ['Réinitialiser le canvas','Zoom vidéo +','Zoom vidéo −','Plein écran vidéo','Dupliquer l’image vidéo','Flip - miroir vertical','Flop - miroir horizontal','Timecode / frames','Basculer entre les vues de la timeline'],
         ['Mode Lecture / Édition','Options des modes Lecture / Édition…'],
         ['Modifier la disposition des panneaux'],
         ['Réinitialiser la disposition des panneaux']],
-    'Comparaison':[
+    'Références':[
         ['Activer la comparaison','Ajouter des références B…'],
         ['Côte à côte','Dessus / dessous','Overlay - transparence','Différence - négatif','A devant B - bascule','Révélateur'],
         ['Intervertir A / B']],
@@ -68,9 +68,9 @@ def organize_menus(window):
             for action in group: menu.addAction(tr(action))
 
 PANEL_NAMES={
-    'timeline':'Timeline','header':'Bandeau supérieur',
+    'timeline':'Timeline',
     'transport':'Commandes de lecture','timecode':'Time code',
-    'comparison':'Comparaison','drawing':'Dessin','comments':'Commentaires','tools':'Barre d’outils','library':'Liste de lecture',
+    'drawing':'Dessin','comments':'Commentaires','tools':'Barre d’outils','library':'Liste de lecture',
 }
 
 def panel_menu(window):
@@ -83,7 +83,7 @@ def panel_menu(window):
     def trigger(command):
         if window.video_fullscreen: window.toggle_fullscreen()
         command.trigger()
-    for key in sorted(commands,key=lambda k:alphabetical(PANEL_NAMES[k])):
+    for key in sorted(PANEL_NAMES,key=lambda k:alphabetical(PANEL_NAMES[k])):
         command=commands[key]; action=menu.addAction(tr(PANEL_NAMES[key])); action.setData(key)
         action.setCheckable(True); action.setChecked(command.isChecked()); action.setEnabled(command.isEnabled())
         action.triggered.connect(lambda checked=False,a=command:trigger(a))
@@ -100,6 +100,7 @@ def panel_menu(window):
 class BackgroundPanelMenu(QObject):
     def __init__(self,window):
         super().__init__(window); self.window=window
+        self.cancelled_right_click=False
         QApplication.instance().installEventFilter(self)
     def belongs(self,widget):
         # QWidget.isAncestorOf stops at floating windows; ownership does not.
@@ -107,10 +108,46 @@ class BackgroundPanelMenu(QObject):
             if widget is self.window: return True
             widget=widget.parentWidget()
         return False
+    def cancel_pointer_edit(self,obj):
+        w=self.window; t=w.timeline; v=w.viewer
+        band=getattr(t,'band_scrub',None)
+        if obj is t or (band and band.pressed is not None):
+            return t.cancel_pointer_edit()
+        compact=w.compact_transport
+        if compact.scrub_owner is not None:
+            if compact.scrubbing: w.restore_scrub()
+            compact.finish_scrub(True)
+            return True
+        if obj is not v and not v.isAncestorOf(obj): return False
+        overlay=w.timecode_overlay
+        if overlay.drag:
+            overlay.set_position(overlay.drag[2]); overlay.cancel_drag()
+        elif w.wipe_interaction.dragging:
+            w.wipe_interaction.cancel_drag()
+        elif w.clip_tools.mode:
+            w.clip_tools.cancel(); v.update()
+        elif not w.drawing.cancel_pointer_edit():
+            if v.origin is not None: w.restore_scrub()
+            return v.cancel_navigation()
+        return True
     def eventFilter(self,obj,event):
-        if event.type()!=QEvent.Type.ContextMenu or not isinstance(obj,QWidget): return False
+        kind=event.type()
+        if kind not in (QEvent.MouseButtonPress,QEvent.TabletPress,QEvent.MouseButtonRelease,QEvent.TabletRelease,QEvent.ContextMenu):
+            return False
+        if kind!=QEvent.ContextMenu and event.button()!=Qt.RightButton: return False
+        if not isinstance(obj,QWidget) or not self.belongs(obj): return False
+        if kind in (QEvent.MouseButtonPress,QEvent.TabletPress):
+            self.cancelled_right_click=self.cancel_pointer_edit(obj)
+            if self.cancelled_right_click: event.accept()
+            return self.cancelled_right_click
+        if kind in (QEvent.MouseButtonRelease,QEvent.TabletRelease):
+            if self.cancelled_right_click: event.accept()
+            return self.cancelled_right_click
+        # Qt sends a separate mouse context event, on release on Windows.
+        if self.cancelled_right_click and event.reason()==event.Reason.Mouse:
+            event.accept()
+            return True
         w=self.window
-        if not self.belongs(obj): return False
         plain=(QWidget,QFrame,QLabel,QDockWidget,QToolBar,QStatusBar)
         if type(obj) not in plain and obj not in (w,w.viewer): return False
         # Use the original hit widget even when Qt propagates an ignored context event.

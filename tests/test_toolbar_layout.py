@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from PySide6.QtCore import Qt,QPoint
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QToolBar
+from PySide6.QtWidgets import QDockWidget,QToolBar
 from test_drawing import application,window
 from workspace_modes import encoded
 
@@ -35,21 +35,23 @@ def test_tools_leave_bottom_panels_full_width(window,application):
 
 def test_old_toolbar_layout_migrates_once(window,application):
     w=window; modes=w.workspaces; tools=w.edit_toolbar
-    modes.profiles['edit']['comparison']=True; w.comparison_panel.show()
+    comparison=QDockWidget(w); comparison.setObjectName('comparison')
+    w.addDockWidget(Qt.LeftDockWidgetArea,comparison)
     w.removeDockWidget(tools); tools.hide()
     legacy=QToolBar(w); legacy.setObjectName('edit_toolbar')
     w.addToolBar(Qt.ToolBarArea.LeftToolBarArea,legacy)
     w.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea,w.library)
-    w.splitDockWidget(w.library,w.comparison_panel,Qt.Orientation.Vertical)
+    w.splitDockWidget(w.library,comparison,Qt.Orientation.Vertical)
     application.processEvents()
     modes.layouts['edit']=encoded(w.saveState()); modes.layout_versions.pop('edit',None)
+    w.removeDockWidget(comparison); comparison.setObjectName(''); comparison.deleteLater()
     w.removeToolBar(legacy); legacy.setObjectName('discarded_toolbar'); legacy.deleteLater()
     w.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea,tools)
     modes.apply('edit')
     assert_full_width_playback(w,application)
     assert w.library.geometry().right()<tools.mapTo(w,tools.rect().topLeft()).x()
-    assert w.comparison_panel.x()==w.library.x()
-    assert w.library.y()<w.comparison_panel.y()
+    assert w.dockWidgetArea(w.library)==Qt.LeftDockWidgetArea
+    assert 'comparison' not in modes.panels
     assert modes.layout_versions['edit']==2
     modes.capture(); state=modes.layouts['edit']
     modes.switch('read'); modes.switch('edit')

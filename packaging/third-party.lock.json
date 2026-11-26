@@ -1969,6 +1969,21 @@
     "Qt/qttools-everywhere-src-6.12.0.tar.xz": "8dab8f3611496486a470ad5f115ceea584f36bc22a2b8b6f6ebdbafbb8160693",
     "Qt/qttranslations-everywhere-src-6.12.0.tar.xz": "85929c0c30d6f273f23bd879bb69803ea17b010ab73cab2f8abf95357f6f6bbb",
     "Qt/qtvirtualkeyboard-everywhere-src-6.12.0.tar.xz": "2aae3628f4648f86959d7853e7e1f50ee96a7f1bb5497afb62b7deff6c350170",
-    "Qt/zlib-1.3.1.tar.gz": "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
+    "Qt/zlib-1.3.1.tar.gz": "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23",
+    "Notices/RIFE/glslang-LICENSE.txt": "adb783e734e906d1f46db5df29991dbde84bdb0ceab502ac2febb44fe3c2b5f4",
+    "Notices/RIFE/libwebp-COPYING.txt": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf",
+    "Notices/RIFE/libwebp-PATENTS.txt": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c",
+    "Notices/RIFE/ncnn-LICENSE.txt": "6495f972a09ad7f64ccd953e79adba91a93d862edc7135e6d95210bbf4002a01",
+    "Notices/RIFE/NOTICE.txt": "35e08e8cefa8719969dfd4a06caa9b0541fadf8b8799cfcbd8312e69cdb7eb31",
+    "Notices/RIFE/Practical-RIFE-LICENSE": "7932fb49341512b959b1744a6d9cbb39e5a1ec89da438a34d0454d5d8df9fecd",
+    "Notices/RIFE/Practical-RIFE-README.md": "b695ac5d4a69c2f551512678883f8234d784c286d805ca546f4873cb465959b4",
+    "Notices/RIFE/rife-ncnn-vulkan-LICENSE.txt": "a73beab18143600af0b10c6050a953ec233775ce31c2bf3373a794db535329fd",
+    "Notices/RIFE/stb_image.h.txt": "53de0ea65f363893feb648076c377b3950238b9b09fbc0841ab82069bc64ad27",
+    "Notices/RIFE/stb_image_write.h.txt": "53de0ea65f363893feb648076c377b3950238b9b09fbc0841ab82069bc64ad27",
+    "Notices/RIFE/win32dirent.h.txt": "34aa8b7d522a8fe30ada916cb7df21b286d5947e5ce73d57e5d805c4f6a8563e",
+    "Sources/RIFE/glslang-86ff4bca1ddc7e2262f119c16e7228d0efb67610.tar.gz": "cec9ac581a18e4a2bc8709c714644ed486fb2ac34495ad34b4155f9bcf900f74",
+    "Sources/RIFE/libwebp-5abb55823bb6196a918dd87202b2f32bbaff4c18.tar.gz": "b01b5e23f85606ffb311b15d00a3162da3f6a0187478694d3907bea43291c2b0",
+    "Sources/RIFE/ncnn-b4ba207c18d3103d6df890c0e3a97b469b196b26.tar.gz": "b7ca5b58bf65a7069c9473dd2fd6b83a2ae7a12e634464d7a11df3c866160dbf",
+    "Sources/RIFE/rife-ncnn-vulkan-20221029.zip": "0080f65604f5069fd7995d7d50335c112003fcc81fef946243f661bf8cbf88e1"
   }
 }

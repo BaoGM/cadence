@@ -25,16 +25,22 @@ def test_audio_index_matches_full_scan_at_every_edit(tmp_path):
     data=np.random.default_rng(19).integers(-32768,32767,(RATE*2,2),dtype=np.int16)
     path=tmp_path/'audio.s16'; data.tofile(path)
     fps=Fraction(30000,1001)
-    segments=tuple(Segment(None if i%7==0 else 'a',i%9,i%9+1,muted=i%11==0) for i in range(1000))
+    segments=tuple(Segment(None if i%7==0 else 'a',i%9,i%9+1,muted=i%11==0,reversed=i%3==0) for i in range(1000))
     pcm=TimelinePCM(segments,{'a':{'audio':str(path)}},fps)
+    regions=[]
+    for timeline_frame, segment in enumerate(segments):
+        if segment.media and not segment.muted:
+            a,b=sample_at(timeline_frame,fps),sample_at(timeline_frame+1,fps)
+            sa,sb=sample_at(segment.start,fps),sample_at(segment.end,fps)
+            indices=sa+np.arange(b-a,dtype=np.int64)*(sb-sa)//(b-a)
+            regions.append((a,b,data[indices[::-1] if segment.reversed else indices]))
     try:
         for frame in range(-1,1002):
             start=max(0,sample_at(frame,fps)-5); count=min(4000,max(0,pcm.samples-start))
             expected=np.zeros((count,2),dtype='<i2')
-            for a,b,key,sa,sb in pcm.regions:
+            for a,b,samples in regions:
                 l,r=max(a,start),min(b,start+count)
                 if r>l:
-                    indices=sa+(np.arange(l,r,dtype=np.int64)-a)*(sb-sa)//(b-a)
-                    expected[l-start:r-start]=data[indices]
+                    expected[l-start:r-start]=samples[l-a:r-a]
             assert pcm.read(start,count)==expected.tobytes()
     finally: pcm.close()

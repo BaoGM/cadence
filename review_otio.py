@@ -7,7 +7,7 @@ from review_csv import ReviewRow, save_bytes
 from review_format import style_runs
 
 
-def write_otio(path, doc, movie):
+def write_otio(path, doc, movie, *, image_sequence=False):
     rate=float(doc.fps)
     def span(start,duration):
         def time(value):
@@ -17,7 +17,16 @@ def write_otio(path, doc, movie):
         return dict(OTIO_SCHEMA=schema,name=name,metadata={},**fields)
     length=span(0,doc.state.length)
     movie=Path(movie).resolve()
-    source=item('ExternalReference.1','',target_url=movie.as_uri(),available_range=length)
+    if image_sequence:
+        from urllib.parse import quote
+        name,separator,number=movie.stem.rpartition('.')
+        if not separator or not number.isdecimal(): raise ValueError('Nom de séquence invalide.')
+        source=item('ImageSequenceReference.1','',target_url_base=movie.parent.as_uri()+'/',
+                    name_prefix=quote(name+'.'),name_suffix=movie.suffix,start_frame=int(number),
+                    frame_step=1,rate=rate,frame_zero_padding=len(number),missing_frame_policy='error',
+                    available_image_bounds=None,available_range=length)
+    else:
+        source=item('ExternalReference.1','',target_url=movie.as_uri(),available_range=length)
     clip=item('Clip.2',movie.stem,effects=[],markers=[],source_range=length,
               media_references={'DEFAULT_MEDIA':source},active_media_reference_key='DEFAULT_MEDIA')
     notes={f:(d,text) for f,d,text in doc.state.marker_notes}

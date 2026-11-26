@@ -24,7 +24,7 @@ def test_hidden_shortcut_and_reset_both_mirrors(window,application):
     w.redo(); assert not w.doc.state.flip_h and not w.doc.state.flip_v
     w.reset_canvas(); assert len(w.doc.undo_stack)==count+1
     # Reordering must retain the live QAction instances and their shortcuts.
-    hidden={'Comparaison/Mode de comparaison suivant','Lecture/Basculer le pas clé / image','Affichage/Toute la timeline','Lecture/Marquer entrée','Lecture/Marquer sortie','Édition/Insérer un vide…'}
+    hidden={'Références/Mode de comparaison suivant','Lecture/Basculer le pas clé / image','Affichage/Toute la timeline','Affichage/Afficher les références','Lecture/Marquer entrée','Lecture/Marquer sortie','Édition/Insérer un vide…'}
     shown=[action for menu in menus.values() for action in menu.actions() if not action.isSeparator()]
     assert len(shown)==len(set(shown))==len(w.action_registry)-len(hidden)
     assert set(shown)=={action for key,(action,_) in w.action_registry.items() if key not in hidden}
@@ -38,9 +38,18 @@ def test_renamed_library_preserves_custom_shortcut(window):
     window.apply_preferences(loaded); assert window.library_action.shortcut()==QKeySequence('Ctrl+Alt+8')
     assert validate(loaded,registry)['shortcuts'][new]=='Ctrl+Alt+8'
 
+def test_merged_reference_commands_preserve_custom_shortcuts(window):
+    commands={'Comparaison/Intervertir A / B':('Références/Intervertir A / B','Ctrl+Alt+J'),
+              'Affichage/Afficher les réglages de comparaison':('Affichage/Afficher les références','Ctrl+Alt+8')}
+    data=defaults(window.action_registry)
+    for legacy,(current,stroke) in commands.items():
+        data['shortcuts'].pop(current)
+        data['shortcuts'][legacy]=stroke
+    assert {path:validate(data,window.action_registry)['shortcuts'][path] for path,_ in commands.values()}==dict(commands.values())
+
 def test_background_panel_menu_works_with_locked_and_floating_panels(window,application):
     w=window; w.request_frame=lambda:None; assert not w.layout_editable
-    w.library.hide(); w.comparison_panel.hide()
+    w.library.hide()
     def choose(target,key,point=None):
         found=[]
         def trigger():
@@ -48,6 +57,7 @@ def test_background_panel_menu_works_with_locked_and_floating_panels(window,appl
             if not isinstance(menu,QMenu): found.append('no popup'); return
             try:
                 found.append(menu.objectName())
+                assert 'references' not in [a.data() for a in menu.actions()]
                 action=next((a for a in menu.actions() if a.data()==key),None)
                 if action is None or not action.isEnabled(): found.append('unavailable')
                 else: action.trigger()
@@ -62,7 +72,8 @@ def test_background_panel_menu_works_with_locked_and_floating_panels(window,appl
     choose(w.viewer,'tools'); assert w.edit_toolbar.isVisible() and w.toolbar_action.isChecked()
     w.layout_action.trigger(); w.library.show(); w.library.setFloating(True); application.processEvents()
     # A detached panel's empty background offers the same menu.
-    choose(w.library.titleBarWidget(),'comparison',QPoint(12,8)); assert w.comparison_panel.isVisible() and w.panel_actions['comparison'].isChecked()
+    choose(w.library.titleBarWidget(),'library',QPoint(12,8)); assert w.library.isHidden()
+    choose(w.viewer,'library'); assert w.library.isVisible()
     w.layout_action.trigger(); application.processEvents()
     assert not w.layout_editable and w.library.isFloating() and w.library.isVisible()
     tabs=w.library_tabs.tabBar()
@@ -72,5 +83,5 @@ def test_background_panel_menu_works_with_locked_and_floating_panels(window,appl
     assert w.library_tabs.currentWidget() is w.playlists_panel
     w.workspaces.switch('read'); w.workspaces.switch('edit'); application.processEvents()
     assert w.library.isFloating() and w.library.isVisible()
-    w.header.hide(); w.toggle_fullscreen(); application.processEvents()
-    choose(w.viewer,'header'); assert not w.video_fullscreen and not w.header.isHidden()
+    w.transport_widget.hide(); w.toggle_fullscreen(); application.processEvents()
+    choose(w.viewer,'transport'); assert not w.video_fullscreen and not w.transport_widget.isHidden()

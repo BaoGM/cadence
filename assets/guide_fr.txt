@@ -1,4 +1,4 @@
-Cadence 2.0.12 - Guide rapide
+Cadence 2.0.18 - Guide rapide
 
 Les exemples de touches correspondent au profil QWERTY d’origine. Les raccourcis actifs de votre disposition, y compris vos personnalisations, figurent à la fin du guide.
 
@@ -9,7 +9,9 @@ Fichier > Ouvrir des médias ajoute des vidéos ou des pistes WAV et MP3 à la s
 
 Ctrl+S enregistre le montage, les dessins et les références dans un projet .cadence. Conservez les fichiers médias à leur emplacement. Enregistrer sous crée un autre projet. Ctrl+N démarre un montage vide.
 
-Ctrl+E exporte en MP4, MOV, GIF, WAV ou MP3. WAV (48 kHz, 16 bits, stéréo) et MP3 (192 kbit/s) reproduisent le mixage des pistes. Le GIF est muet. Si une source est supprimée du disque pendant que le montage est ouvert, Cadence peut encore utiliser le fichier ouvert ou son aperçu en cache. Cochez « Inclure les dessins à l’export » pour exporter les dessins et les pelures actives.
+Ctrl+E ouvre l’export. MP4 et MOV H.264 conviennent à la revue. Pour le montage, choisissez MOV ProRes 422 HQ, ProRes 4444 avec alpha ou DNxHR HQ. Ces trois profils conservent la cadence du montage et son mixage en PCM stéréo à 48 kHz. WAV et MP3 exportent le son seul. Le GIF est muet et peut récupérer une source supprimée depuis son fichier encore ouvert ou l’aperçu en cache.
+
+Les séquences PNG, Targa RLE et OpenEXR créent un dossier numéroté, par exemple plan-png/plan.1001.png. Choisissez le numéro de la première image. « Dessins seuls » conserve la transparence et la durée des clés en séquence ou en ProRes 4444. Les PNG, Targa et ProRes 4444 ont un alpha droit. L’OpenEXR demi-précision ZIP16 convertit le rendu sRGB de Cadence en RVB linéaire prémultiplié. La précision de départ est celle du rendu de revue. « Inclure les dessins à l’export » ajoute les dessins et les pelures actives au montage.
 
 ----------------------------------------
 Lecture, affichage et panneaux
@@ -18,7 +20,7 @@ Espace lance ou suspend la lecture. Gauche et Droite avancent d’une image dans
 
 Pour faire défiler les images, glissez sur la timeline, dans l’espace libre de son bandeau ou des commandes de lecture, ou sur la vidéo avec l’outil Curseur. Dans la vidéo, Maj affine le déplacement. Sur la timeline, Maj + glisser sélectionne une plage et affiche sa durée. Relâchez la souris avant Maj pour conserver la plage. I et O placent ses bornes. Échap efface la sélection.
 
-En mode Lecture, survolez le haut de la vidéo pour retrouver le bandeau supérieur. Survolez la bande juste au-dessus des graduations pour afficher les commandes du bas. En Édition, tous les panneaux sont activés par défaut. Affichage > Options des modes Lecture / Édition personnalise chaque mode. F10 ouvre le menu général lorsque cette touche est libre.
+En Lecture comme en Édition, le bandeau supérieur permet d’ajouter une piste, d’ouvrir des médias, d’enregistrer et d’exporter. En Lecture, survolez le haut de la vidéo pour le faire apparaître. Survolez la bande juste au-dessus des graduations pour afficher les commandes du bas. En Édition, tous les panneaux sont activés par défaut. Affichage > Options des modes Lecture / Édition personnalise chaque mode. F10 ouvre le menu général lorsque cette touche est libre.
 
 Redimensionnez les panneaux par leurs séparateurs. Affichage > Modifier la disposition des panneaux permet de les déplacer ou détacher. Réinitialiser la disposition restaure le mode courant. Fichier > Options > Préférences > Restaurer l’interface réinitialise les deux modes.
 
@@ -44,11 +46,21 @@ Chaque piste média réunit vidéo et audio. Ajoutez une seconde piste avec « +
 
 Double-cliquez sur un titre pour déployer ou replier son audio, ou sur un clip pour sélectionner sa durée. Maj + double-clic sélectionne toute la piste. Ctrl + double-clic ajoute ou retire un clip. Ctrl + Maj + double-clic étend la sélection depuis le dernier clip choisi jusqu’au clip visé, inclus. Sans sélection préalable, la plage part de la tête de lecture. La lecture et les commandes de montage respectent les sélections discontinues.
 
+Survolez un bord du clip pour voir sa première ou sa dernière image. Tirez ce bord pour masquer ou retrouver des images, même entre deux clips. En tirant le bord gauche, l’espace dégagé reste visible jusqu’au relâchement, puis les clips se rejoignent. Le menu Montage de l’en-tête vidéo regroupe les réglages de liaison et de copie. Sous la couleur du crayon, les boutons Dessin et Commentaires ouvrent le panneau correspondant. Recliquez sur le bouton actif pour le fermer.
+
+Lorsque l’audio et la vidéo sont déliés, la voie la plus longue continue seule. La sauvegarde d’un tel montage avec des durées différentes sur la même piste nécessite Cadence 2.0.16 ou une version compatible pour sa réouverture.
+
+Au clic droit sur un clip, cochez « Lecture inversée » pour lire ses images de la dernière à la première. Sa position et sa durée restent les mêmes, et son audio lié suit l’inversion. Décochez l’option pour retrouver le sens initial.
+
+Dans le volet déplié de la timeline, Time Warp ouvre la courbe du clip sélectionné ou du clip sous la tête de lecture sur la piste active. L’axe horizontal représente les images du montage et l’axe vertical celles de la source. Double-cliquez pour créer un point, puis déplacez-le. Une pente descendante inverse le mouvement et un palier tient la pose. Le menu d’interpolation règle l’intervalle sous le curseur. A/B affiche l’original à côté du résultat. Appliquer conserve la durée du clip et le calage audio. Ctrl+Z annule. Les projets avec une courbe nécessitent Cadence 2.0.17 ou une version compatible.
+
+RIFE utilise Vulkan. Pour choisir une installation locale de RIFE ou de NVIDIA NvOFFRUC, sélectionnez le moteur puis « … ». Pour NVIDIA, choisissez NVEncC64.exe dans un dossier contenant les bibliothèques NvOFFRUC adaptées à votre carte. La courbe est enregistrée dans le projet. Le cache des images intermédiaires peut être recalculé à partir du média source avec le même moteur.
+
 Maintenez Alt pendant tout le glissement pour déplacer un clip ou une plage. Ajoutez Maj pour copier. En vue détaillée, déposez sur la piste cible. En vue simplifiée, sur le titre de piste à gauche pour changer de piste. Les clips suivants de la piste d’origine se rapprochent lors du transfert entre pistes. Échap annule le geste. Sur une même piste, « Laisser un vide » conserve la place quittée. Un dépôt dans un vide remplit cet espace avant de décaler la suite.
 
 Sur la timeline, Ctrl+C ou Ctrl+X copie ou coupe la sélection, y compris les clips discontinus. Sans sélection, la commande prend l’image courante. Ctrl+V colle la dernière copie au curseur. Suppr retire la plage. « Copier/coller le son » et les liaisons audio/vidéo et dessins/vidéo règlent les éléments qui suivent. Les dessins et marqueurs sont communs aux pistes. Les dessins liés suivent le montage lorsque les deux pistes sont sélectionnées.
 
-Le clic droit permet de scinder, dupliquer ou désactiver un clip, retirer uniquement la vidéo ou l’audio, ou supprimer le média et refermer le vide. Sur le titre, il permet de couper le son de toute la piste, y compris à l’export, de réordonner ou de supprimer la piste. Ctrl+Z annule.
+Pendant un glissement ou un tracé, le clic droit annule le geste en cours. Au repos, le clic droit permet de scinder, dupliquer ou désactiver un clip, retirer uniquement la vidéo ou l’audio, ou supprimer le média et refermer le vide. Sur le titre, il permet de couper le son de toute la piste, y compris à l’export, de réordonner ou de supprimer la piste. Ctrl+Z annule.
 
 La molette zoome dans la timeline. Ctrl + glissement du bouton central ou la barre de défilement déplace la vue. Ctrl+0 affiche toute la timeline. Le menu contextuel choisit les unités (images ou temps) et la vue simplifiée ou détaillée. En vue simplifiée, les marqueurs occupent la bande média et les clés le bas de la règle.
 
@@ -70,9 +82,9 @@ S ajoute ou retire un marqueur à l’image courante. Sur une sélection, S ou l
 ----------------------------------------
 Comparer A et B
 
-A est le montage. Dans Comparaison > Ajouter des références B, chargez une ou plusieurs vidéos. Le clic droit sur un titre de piste permet aussi d’utiliser cette piste en B. L’autre devient A dans l’aperçu. L’export conserve le montage complet et son mixage.
+A est le montage. Dans Références > Ajouter des références B, chargez une ou plusieurs vidéos. Le clic droit sur un titre de piste permet aussi d’utiliser cette piste en B. L’autre devient A dans l’aperçu. L’export conserve le montage complet et son mixage.
 
-A/B active ou désactive la comparaison. Une activation sans source B ouvre le panneau pour en choisir une. Décocher A/B ferme le panneau, même détaché. Fermer le panneau seul permet de continuer la comparaison. Maj+X parcourt Côte à côte, Dessus / dessous, Superposition, Différence, Révélateur et Premier plan. Alt+X intervertit A et B.
+A/B active ou désactive la comparaison. Si aucune source B n’est chargée, l’activation ouvre l’onglet Références. Ctrl+9 ouvre cet onglet à tout moment. Choisissez la source B, son décalage et son affichage au même endroit. Superposition propose l’opacité et Différence le gain. Maj+X parcourt les modes et Alt+X intervertit A et B.
 
 Opacité règle la superposition, Gain amplifie les différences et Décalage référence aligne B en images de la timeline. Glissez la séparation du Révélateur. Au clavier, cliquez sur la poignée ou atteignez la vidéo avec Tab puis Entrée. Les flèches déplacent la séparation de 2 %. Entrée ou Tab valide, Échap rétablit sa position initiale.
 
@@ -102,12 +114,12 @@ Fichier > Options regroupe les préférences, les raccourcis et les gestes de na
 
 Le profil de raccourcis est QWERTY par défaut. Au premier passage en AZERTY, les commandes suivent la position physique des touches. Chaque profil conserve ensuite ses réglages. Cliquez dans une case pour réattribuer la touche. Importer, Exporter et Réinitialiser gèrent ces réglages. Le défilement vidéo est réglé à 25 pixels par image, les infobulles sont désactivées par défaut. Dans un champ numérique, glissez horizontalement. Maj affine le réglage.
 
-Cadence recherche les mises à jour Windows 2.0 au démarrage et chaque jour si vous laissez l’application ouverte. Les préversions sont incluses par défaut. Ces deux options se règlent dans Préférences. Aide > Rechercher des mises à jour lance une vérification immédiate. Les copies portables et par utilisateur téléchargent et vérifient la mise à jour en arrière-plan. Choisissez Redémarrer maintenant ou Plus tard. Au redémarrage, la nouvelle version remplace l’exécutable au même emplacement et conserve les associations de fichiers. Si elle ne démarre pas, Cadence restaure la version précédente. Pour une installation partagée dans Program Files\Cadence 2.0, activez la maintenance dans l’installateur ou choisissez Aide > Rechercher des mises à jour > Activer les mises à jour… depuis Cadence déjà installé. Windows demande une autorisation administrateur à l’activation. Les utilisateurs reçoivent ensuite la même invitation à redémarrer. Fermez les autres instances de Cadence avant d’appliquer la mise à jour.
+Cadence recherche les mises à jour Windows 2.0 au démarrage et chaque jour si vous laissez l’application ouverte. Les préversions sont incluses par défaut. Ces deux options se règlent dans Préférences. Aide > Rechercher des mises à jour lance une vérification immédiate, même si Cadence est ouvert en tant qu’administrateur. Les copies portables et par utilisateur téléchargent et vérifient la mise à jour en arrière-plan. Choisissez Redémarrer maintenant ou Plus tard. Au redémarrage, la nouvelle version remplace l’exécutable au même emplacement et conserve les associations de fichiers. Si elle ne démarre pas, Cadence restaure la version précédente. Pour une installation partagée dans Program Files\Cadence 2.0, activez la maintenance dans l’installateur ou choisissez Aide > Rechercher des mises à jour > Activer les mises à jour… depuis Cadence déjà installé. L’activation nécessite les droits administrateur. Les utilisateurs reçoivent ensuite la même invitation à redémarrer. Après la mise à jour, Cadence se rouvre avec les droits habituels de la session Windows. Fermez les autres instances de Cadence avant d’appliquer la mise à jour.
 
 Commentaires de revue
 Dans le panneau droit, ouvrez Commentaires. Cliquez sur un marqueur ou parcourez la liste avec ↑ et ↓ pour aller à son image. Suppr ou le menu contextuel supprime le marqueur et sélectionne le suivant en gardant la tête de lecture en place. En cas de chevauchement, le panneau affiche le dernier marqueur commencé.
 
-Vous pouvez écrire un commentaire avant de créer son marqueur. Sélectionnez une plage sur la timeline ou saisissez-la dans le panneau, puis validez avec Entrée. Un clic droit sur Image ou Durée (images) propose Plages d’images. Saisissez 52-320 pour inclure les deux bornes, ou 5, 8, 10-20, 9 pour placer le commentaire à plusieurs endroits. Au survol du marqueur, vous pouvez cocher les cases et sélectionner du texte pour le copier avec Ctrl+C.
+Vous pouvez écrire un commentaire avant de créer son marqueur. Sélectionnez une plage sur la timeline ou saisissez-la dans le panneau, puis validez avec Entrée. Un clic droit sur Image ou Durée (images) propose Plages d’images. Saisissez 52-320 pour inclure les deux bornes, ou 5, 8, 10-20, 9 pour placer le commentaire à plusieurs endroits. Dans le panneau Commentaires, un clic droit sur le titre permet de renommer le marqueur. Au survol du marqueur, vous pouvez cocher les cases et sélectionner du texte pour le copier avec Ctrl+C.
 
 Après un export vidéo ou audio, Cadence propose d’enregistrer les marqueurs du montage en CSV ou en OpenTimelineIO dans le dossier du rendu. Le fichier OpenTimelineIO référence directement le média exporté.
 

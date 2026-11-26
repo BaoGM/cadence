@@ -26,7 +26,10 @@ def fake_video(monkeypatch):
             for index in range(self.start,1000):
                 decoded.append(index); yield Frame(index)
         def close(self): pass
-    monkeypatch.setattr(av,'open',lambda path:Container())
+    def open_fixture(path, *, options):
+        assert options['protocol_whitelist'] == 'file'
+        return Container()
+    monkeypatch.setattr(av,'open',open_fixture)
     return dict(proxy='fake',fps='24'),converted,seeks,decoded
 
 

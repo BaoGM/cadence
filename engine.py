@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Qt audio transport and latest-request-wins preview decoding."""
 import threading, time, logging
+from itertools import count
 from PySide6.QtCore import QThread, Signal, QIODevice
 from PySide6.QtMultimedia import QAudioFormat, QAudioSink, QMediaDevices
 from model import RATE, sample_at, TimelinePCM
@@ -10,6 +11,7 @@ def preview_source(media):
     return media.get('proxy') or media.get('path') or media.get('id') or id(media)
 
 class Task(QThread):
+    _sequence = count(1)
     progress = Signal(float,str)
     result = Signal(object)
     failed = Signal(str)
@@ -17,22 +19,38 @@ class Task(QThread):
     def __init__(self,fn=None,parent=None):
         super().__init__()
         self.fn=fn
+        self.label='Media'
         self.cancel=threading.Event()
         if parent is not None:
             self.setParent(parent)
-    def start_work(self,fn):
+    def start_work(self,fn,label='Media'):
         self.cancel=threading.Event()
         self.fn=fn
+        self.label=label
         self.start()
     def run(self):
+        number = next(self._sequence)
+        start = time.monotonic()
+        phase = None
+        def progress(value, message):
+            nonlocal phase
+            phase = message
+            self.progress.emit(value, message)
+        logging.info('Task %d started: %s',number,self.label)
+        outcome = 'cancelled'
         try:
-            value=self.fn(lambda p,m:self.progress.emit(p,m),self.cancel)
+            value=self.fn(progress,self.cancel)
             if self.cancel.is_set(): self.cancelled.emit()
-            else: self.result.emit(value)
+            else:
+                outcome='completed'
+                self.result.emit(value)
         except Cancelled: self.cancelled.emit()
         except Exception as e:
-            logging.exception('Media task failed'); self.failed.emit(str(e).strip() or type(e).__name__)
+            outcome='failed'
+            logging.exception('Task %d error: %s',number,self.label)
+            self.failed.emit(str(e).strip() or type(e).__name__)
         finally:
+            logging.info('Task %d %s: %s elapsed=%.3fs last_phase=%r',number,outcome,self.label,time.monotonic()-start,phase)
             self.fn=None
 
 class Decoder(QThread):

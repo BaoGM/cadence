@@ -91,7 +91,7 @@ def test_restore_maximized_legacy_layout_without_reparenting_live_docks(applicat
         assert w.transport_widget.parentWidget() is w.viewer_workspace
         assert w.dockWidgetArea(w.edit_toolbar) == Qt.RightDockWidgetArea
         assert w.dockWidgetArea(w.transport_widget) == Qt.BottomDockWidgetArea
-        assert w.dockWidgetArea(w.comparison_panel) == Qt.LeftDockWidgetArea
+        assert w.dockWidgetArea(w.library) == Qt.LeftDockWidgetArea
         assert w.toolBarArea(w.studio.bar) == Qt.TopToolBarArea
         migrated = w.saveState()
         raw = bytes(migrated)

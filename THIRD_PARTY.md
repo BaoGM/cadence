@@ -22,3 +22,5 @@ Qt, PyAV and FFmpeg source archives, build recipes and patches are supplied in t
 The Windows package must retain all notices, Cadence's exact source archive and instructions for accessing the third-party bundle. Do not replace notices with this summary. GPL-3.0-only applies to Cadence's original code, not as a blanket relicensing of these dependencies.
 
 The current source bundles have been hash-checked locally. Complete independent rebuilds of all upstream binaries and SignPath eligibility remain to be verified; in particular, included Microsoft runtime binaries need to be considered in that review.
+
+RIFE ncnn Vulkan 20221029 and the RIFE 4.6 model are MIT-licensed independent components. Their notices, ncnn, libwebp, glslang and Windows OpenMP information accompany the binaries under Licences/RIFE. Consult the matching third-party source bundle for the source and build information.

@@ -249,9 +249,9 @@ def test_view_controls_and_scrub(prepared,tmp_path):
         while win.rendered_token!=win.token and time.time()<deadline: app.processEvents(); QTest.qWait(10)
         assert win.viewer.image is not None
         assert not any(b.text() in ('Copier','Coller','Supprimer','↶ Annuler','↷ Rétablir') for b in win.findChildren(QPushButton))
-        win.set_panel('header',True); app.processEvents()
+        win.set_panel('transport',True); app.processEvents()
         width=win.viewer.width(); height=win.viewer.height()
-        win.panel_actions['header'].trigger(); win.timeline_action.trigger(); app.processEvents()
+        win.panel_actions['transport'].trigger(); win.timeline_action.trigger(); app.processEvents()
         assert win.viewer.width()>=width and win.viewer.height()>height
         win.timeline.set_units('frames'); assert win.timeline.tick_label(24)=='24'
         win.timeline.set_units('time'); assert win.timeline.tick_label(24)=='00:01.000'
@@ -266,8 +266,8 @@ def test_view_controls_and_scrub(prepared,tmp_path):
         win.toggle_fullscreen(); app.processEvents(); assert win.isFullScreen() and win.transport_widget.isHidden()
         # Shortcuts must stay active even with menus hidden.
         QTest.keyClick(win,Qt.Key.Key_Escape); app.processEvents()
-        assert not win.video_fullscreen and win.header.isHidden() and win.timeline_panel.isHidden()
-        win.panel_actions['header'].trigger(); win.timeline_action.trigger(); app.processEvents()
+        assert not win.video_fullscreen and win.transport_widget.isHidden() and win.timeline_panel.isHidden()
+        win.panel_actions['transport'].trigger(); win.timeline_action.trigger(); app.processEvents()
         win.grab().save(str(Path(__file__).resolve().parents[1]/'ui-preview.png'))
     finally:
         win.viewer.scrub_pixels=original_scrub; win.doc.saved_signature=win.doc.signature(); win.close(); app.processEvents()
@@ -350,11 +350,10 @@ def test_timeline_gestures_and_numeric_scrub(prepared):
         win.expand_media_audio(d.active_track_id,True)
         drag(5,48,t.track_y('audio')+9,Qt.KeyboardModifier.AltModifier)
         assert expanded(d.state.audio)==list(range(48,72))+list(range(24))
-        for name in ('header','transport'):
-            if win.panel_actions[name].isChecked(): win.panel_actions[name].trigger()
-            assert win.panel_widgets()[name].isHidden()
+        if win.panel_actions['transport'].isChecked(): win.panel_actions['transport'].trigger()
+        assert win.transport_widget.isHidden()
         win.toggle_fullscreen(); win.escape()
-        assert win.header.isHidden() and win.transport_widget.isHidden()
+        assert win.transport_widget.isHidden()
         edit=win.exp_spin.lineEdit(); before=len(d.undo_stack)
         QTest.mousePress(edit,Qt.MouseButton.LeftButton,pos=QPoint(10,10))
         QTest.mouseMove(edit,QPoint(50,10)); QTest.mouseRelease(edit,Qt.MouseButton.LeftButton,pos=QPoint(50,10))
@@ -623,7 +622,7 @@ def test_movable_panels_and_unified_open(monkeypatch):
     app=QApplication.instance() or QApplication([]); win=MainWindow(); win.show()
     try:
         win.layout_action.trigger()
-        for key in ('header','transport','timeline'):
+        for key in ('drawing','transport','timeline'):
             dock=win.panel_widgets()[key]; assert isinstance(dock,QDockWidget)
             assert dock.features() & QDockWidget.DockWidgetFeature.DockWidgetMovable
             dock.setFloating(True); app.processEvents(); assert dock.isFloating()
@@ -843,18 +842,19 @@ def test_compact_timeline_when_panels_hidden(prepared):
     doc=Document(); doc.append_media([m]); win.install_doc(doc)
     try:
         app.processEvents(); before=win.viewer.height(); timeline_height=win.timeline_panel.height()
-        for key in ('header','transport'): win.set_panel(key,False)
+        win.set_panel('transport',False)
         win.resize(1600,1000); app.processEvents()
         assert win.viewer.height()>before
         assert win.timeline.height()==win.timeline.media_height() and win.timeline_panel.height()==timeline_height
         slot_height=win.timeline_scroll_slot.height()
         assert slot_height==win.timeline_scroll.sizeHint().height()
         assert abs(win.timeline_panel.height()-win.timeline.height()-win.studio.timeline_bar.height()-slot_height)<=2
-        for control in (win.copy_audio,win.leave_gap,win.link_tracks):
-            assert win.header.isAncestorOf(control) and not win.timeline_panel.isAncestorOf(control)
+        assert win.studio.view.isAncestorOf(win.editing_overflow)
+        assert all(action in win.editing_overflow.menu().actions() for action in (win.copy_audio,win.leave_gap,win.link_tracks))
         for simple in (True,False):
             win.workspaces.set_timeline_simple(simple)
             app.processEvents()
+            win.layout().activate()
             geometry=win.timeline_panel.geometry()
             assert not win.timeline_scroll.isVisible()
             inactive=win.timeline_scroll_slot.grab().toImage()
@@ -945,14 +945,14 @@ def test_comparison_playback_modes_sync_and_save(prepared,tmp_path,monkeypatch):
         while win.rendered_token!=win.token and time.time()<end: app.processEvents(); QTest.qWait(10)
         assert win.rendered_token==win.token and not errors,errors
     try:
-        win.compare_cycle_btn.click(); assert win.comparison_panel.isVisible() and not win.compare_swap_btn.isEnabled()
+        win.compare_cycle_btn.click(); assert win.reference_combo.isVisible() and not win.compare_swap_btn.isEnabled()
         win.seek(24); win.use_reference(m); rendered(); assert win.viewer.comparing; assert win.reference_combo.currentData()==m['id']
         assert win.windowTitle().startswith('● Cadence 2.0 -')
         win.workspaces.switch('read'); app.processEvents(); assert win.compare_cycle_btn.isVisible()
-        win.compare_enabled.setChecked(False); win.comparison_panel.hide()
+        win.compare_enabled.setChecked(False); win.library.hide()
         for index,(_,mode) in enumerate(MODES):
             QTest.mouseClick(win.compare_cycle_btn,Qt.MouseButton.LeftButton); rendered()
-            assert win.compare_mode.currentData()==mode and win.viewer.comparing and win.comparison_panel.isHidden()
+            assert win.compare_mode.currentData()==mode and win.viewer.comparing and win.library.isHidden()
             image=win.viewer.cpu_preview(); h,w=win.viewer.rgb.shape[:2]
             assert (image.width(),image.height())==((w*2,h) if mode=='horizontal' else (w,h*2) if mode=='vertical' else (w,h))
             if mode=='difference': assert image.pixelColor(w//2,h//2).red()==0
@@ -962,13 +962,13 @@ def test_comparison_playback_modes_sync_and_save(prepared,tmp_path,monkeypatch):
         win.compare_action.trigger(); rendered(); assert not win.viewer.comparing and win.compare_cycle_btn.symbol=='off'
         assert not win.compare_swap_btn.isEnabled() and win.viewer.image.width()==w
         win.compare_cycle_btn.click(); rendered(); assert win.viewer.compare_mode=='horizontal' and win.viewer.comparing
-        win.workspaces.switch('edit'); win.comparison_panel.show()
+        win.workspaces.switch('edit'); win.show_references()
         win.compare_offset.setValue(5); rendered()
         assert not np.array_equal(win.viewer.rgb,win.viewer.reference_rgb)
         win.swap_comparison(); assert win.viewer.compare_swapped
         win.compare_mode.setCurrentIndex(2); win.compare_opacity.setValue(35); win.compare_gain.setValue(2)
-        win.toggle_fullscreen(); app.processEvents(); assert win.comparison_panel.isHidden() and win.viewer.comparing
-        win.swap_comparison(); win.toggle_fullscreen(); app.processEvents(); assert win.comparison_panel.isVisible()
+        win.toggle_fullscreen(); app.processEvents(); assert win.library.isHidden() and win.viewer.comparing
+        win.swap_comparison(); win.toggle_fullscreen(); app.processEvents(); assert win.reference_combo.isVisible()
         path=tmp_path/'review.cadence'; monkeypatch.setattr(QFileDialog,'getSaveFileName',lambda *a,**k:(str(path),'')); assert win.save_project()
         saved=Document.load(path); assert saved.review['reference']==m['path'] and saved.review['offset']==5 and saved.review['opacity']==35
         # Reload through the actual async project preparation, retaining reference metadata.
@@ -1110,8 +1110,9 @@ def test_default_panels_match_requested_layout():
     app=QApplication.instance() or QApplication([]); win=MainWindow(); win.show(); app.processEvents()
     try:
         for key in ('timeline','transport'): assert not win.panel_widgets()[key].isHidden() and win.panel_actions[key].isChecked()
-        for key in ('header','comparison','drawing','timecode'): assert win.panel_widgets()[key].isHidden() and not win.panel_actions[key].isChecked()
-        assert not {'inspector','meta','status'} & win.panel_widgets().keys()
+        for key in ('drawing','timecode'): assert win.panel_widgets()[key].isHidden() and not win.panel_actions[key].isChecked()
+        assert not {'header','comparison','inspector','meta','status'} & win.panel_widgets().keys()
+        assert not win.panel_actions['references'].isChecked()
         assert win.library.isHidden() and not win.library_action.isChecked()
         assert not win.layout_editable and not win.layout_action.isChecked()
     finally: win.close(); app.processEvents()

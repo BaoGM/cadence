@@ -10,6 +10,7 @@ class CompactTransport(QObject):
         super().__init__(strip)
         self.strip, self.left, self.center, self.right = strip, left, center, right
         self.window = window
+        strip.setAttribute(Qt.WA_Hover)
         self.scrub_owner = None
         self.scrubbing = False
         self.parts = (left,center,right)

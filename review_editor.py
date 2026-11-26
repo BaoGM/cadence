@@ -49,6 +49,7 @@ class ReviewEditor(QTextEdit):
         self.setTabChangesFocus(True)
         self._box_press = None
         self._box_highlighter = CommentBoxHighlighter(self.document())
+        self.viewport().setMouseTracking(True)
 
     def style_runs(self):
         runs = []
@@ -200,11 +201,19 @@ class ReviewEditor(QTextEdit):
 
     def mousePressEvent(self,event):
         self._box_press=self.box_at(event.position().toPoint()) if event.button()==Qt.LeftButton else None
+        if self._box_press is not None and self.isReadOnly():
+            event.accept()
+            return
         super().mousePressEvent(event)
+
+    def mouseMoveEvent(self,event):
+        if self._box_press is None or not self.isReadOnly(): super().mouseMoveEvent(event)
+        self.viewport().setCursor(Qt.PointingHandCursor if self.box_at(event.position().toPoint()) is not None else Qt.IBeamCursor)
 
     def mouseReleaseEvent(self,event):
         pos=self._box_press
         self._box_press=None
-        super().mouseReleaseEvent(event)
+        if pos is None or not self.isReadOnly(): super().mouseReleaseEvent(event)
+        else: event.accept()
         if pos is not None and event.button()==Qt.LeftButton and self.box_at(event.position().toPoint())==pos:
             self.toggle_box(pos)

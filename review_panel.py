@@ -7,13 +7,14 @@ from heapq import heappop, heappush
 from pathlib import Path
 from weakref import ref
 
-from PySide6.QtCore import Qt, QSignalBlocker, QEvent, QByteArray, QSize
+from PySide6.QtCore import Qt, QSignalBlocker, QEvent, QByteArray, QRect, QSize
+from PySide6.QtGui import QIcon, QPalette, QTextLayout, QTextOption
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout,
                                QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QToolButton,
-                               QStackedWidget, QSizePolicy, QToolTip,
+                               QStackedWidget, QSizePolicy, QToolTip, QListView, QStyledItemDelegate, QStyle, QStyleOptionViewItem,
                                QPushButton, QSpinBox, QVBoxLayout, QWidget, QInputDialog, QMessageBox)
 
-from library_style import LibrarySplitter, icon, style_button
+from library_style import DETAIL_ROLE, TITLE_ROLE, LibrarySplitter, icon, style_button
 from model import State
 from review_editor import BOLD, ITALIC, UNDERLINE, STRIKE, ReviewEditor
 from review_format import frame_ranges
@@ -138,11 +139,77 @@ def offer_rendered_markers(window,media_path,state,fps):
             if path.exists() and path.samefile(media_path):
                 raise ValueError(tr('Choisissez un fichier différent du média exporté.'))
             if path.suffix.lower()=='.otio':
-                write_otio(path,rendered,movie)
+                if media_path.suffix.lower() in ('.png','.tga','.exr'):
+                    write_otio(path,rendered,movie,image_sequence=True)
+                else:
+                    write_otio(path,rendered,movie)
             else:
                 write_csv(path,rendered)
         except (OSError,ValueError,csv.Error) as error:
             window.error(tr('Le média a été exporté. L’enregistrement des marqueurs a échoué.')+'\n'+str(error))
+
+
+class MarkerRows(QStyledItemDelegate):
+    def row_text(self,option,index,width):
+        metrics=option.fontMetrics
+        span=index.data(DETAIL_ROLE) or ''
+        title=index.data(TITLE_ROLE) or ''
+        left=27
+        content_width=max(0,width-left-5)
+        span_width=min(metrics.horizontalAdvance(span),content_width//2 if title else content_width)
+        title_left=left+span_width+9
+        title_width=max(1,width-title_left-5)
+        if not title:
+            return span_width,title_left,[]
+        layout=QTextLayout(title,option.font)
+        wrap=QTextOption()
+        wrap.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+        layout.setTextOption(wrap)
+        layout.beginLayout()
+        first=layout.createLine()
+        first.setLineWidth(title_width)
+        first_length=first.textLength()
+        layout.endLayout()
+        # QTextLine positions count UTF-16 units, including two units for emoji.
+        encoded=title.encode('utf-16-le')
+        split=2*first_length
+        lines=[encoded[:split].decode('utf-16-le').rstrip()]
+        if split<len(encoded):
+            remainder=encoded[split:].decode('utf-16-le').lstrip()
+            if remainder:
+                lines.append(metrics.elidedText(remainder,Qt.ElideRight,title_width))
+        return span_width,title_left,lines
+
+    def sizeHint(self,option,index):
+        _,_,lines=self.row_text(option,index,self.parent().viewport().width())
+        return QSize(0,max(16,max(1,len(lines))*option.fontMetrics.lineSpacing())+6)
+
+    def paint(self,painter,option,index):
+        opt=QStyleOptionViewItem(option)
+        self.initStyleOption(opt,index)
+        symbol=QIcon(opt.icon)
+        opt.text=''
+        opt.icon=QIcon()
+        opt.showDecorationSelected=True
+        painter.save()
+        painter.setClipRect(opt.rect)
+        self.parent().style().drawControl(QStyle.CE_ItemViewItem,opt,painter,self.parent())
+        painter.translate(opt.rect.topLeft())
+        width,height=opt.rect.width(),opt.rect.height()
+        symbol.paint(painter,QRect(5,(height-16)//2,16,16))
+        selected=bool(opt.state & QStyle.State_Selected)
+        painter.setPen(opt.palette.color(QPalette.HighlightedText if selected else QPalette.Text))
+        painter.setFont(opt.font)
+        span_width,title_left,lines=self.row_text(opt,index,width)
+        align=Qt.AlignLeft|Qt.AlignVCenter
+        span=opt.fontMetrics.elidedText(index.data(DETAIL_ROLE) or '',Qt.ElideRight,span_width)
+        painter.drawText(QRect(27,0,span_width,height),align,span)
+        line_height=opt.fontMetrics.lineSpacing()
+        y=(height-len(lines)*line_height)//2
+        for line in lines:
+            painter.drawText(QRect(title_left,y,max(0,width-title_left-5),line_height),align,line)
+            y+=line_height
+        painter.restore()
 
 
 class ReviewPanel(QWidget):
@@ -172,6 +239,9 @@ class ReviewPanel(QWidget):
         self.items.setMinimumSize(0,30)
         self.items.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.items.setTextElideMode(Qt.ElideRight)
+        self.items.setWordWrap(True)
+        self.items.setResizeMode(QListView.Adjust)
+        self.items.setItemDelegate(MarkerRows(self.items))
         self.items.currentItemChanged.connect(lambda item,_previous:self.seek_item(item))
         self.items.itemClicked.connect(self.seek_item)
         self.items.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -253,6 +323,7 @@ class ReviewPanel(QWidget):
                 button.clicked.connect(lambda checked=False,style=mask:self.text.toggle_style(style))
             else:
                 self.checkbox=button
+                button.setCursor(Qt.PointingHandCursor)
                 button.setIcon(icon('checkbox', color='#ffffff'))
                 button.setIconSize(QSize(16,16))
                 button.clicked.connect(self.text.add_box)
@@ -304,9 +375,13 @@ class ReviewPanel(QWidget):
         if item is None: return
         with QSignalBlocker(self.items): self.items.setCurrentItem(item)
         menu=QMenu(self)
-        action=menu.addAction(tr('Supprimer le marqueur'))
-        if menu.exec(self.items.viewport().mapToGlobal(point))==action:
+        remove=menu.addAction(tr('Supprimer le marqueur'))
+        rename=menu.addAction(tr('Renommer le marqueur…'))
+        action=menu.exec(self.items.viewport().mapToGlobal(point))
+        if action==remove:
             self.remove_item(item)
+        elif action==rename:
+            self.host.drawing.rename_marker(item.data(Qt.UserRole))
         else:
             self.refresh()
 
@@ -427,6 +502,8 @@ class ReviewPanel(QWidget):
                     span=str(f) if duration==1 else f'{f}–{f+duration-1}'
                     item.setText(f'{span}   {label}' if label else span)
                     item.setData(Qt.UserRole,f)
+                    item.setData(DETAIL_ROLE,span)
+                    item.setData(TITLE_ROLE,label)
                 while self.items.count()>len(state.frame_markers):
                     self.items.takeItem(self.items.count()-1)
             i=bisect_right(self.times,state.position)-1

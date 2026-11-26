@@ -15,6 +15,26 @@ RATE = 48000
 CHANNELS = 2
 SAMPLE_BYTES = 4
 
+def project_fields(items):
+    # Older project readers reject unknown Segment fields even when they are false.
+    return {key:value for key,value in items if key not in ('reversed','warp') or value}
+
+def project_version(state,media,review,*,all_media=False):
+    segments=state.all_segments
+    if any(s.warp for s in segments): return 23
+    if state.independent_ends: return 22
+    if any(s.reversed for s in segments): return 21
+    if state.has_image_adjustments: return 20
+    if state.marker_styles: return 19
+    if state.marker_notes: return 18
+    if state.marker_names: return 17
+    if state.second_track is not None or not state.track_info.audio_enabled or review.get('reference_track'): return 16
+    if len(review.get('references',[]))>1: return 15
+    used=media.keys() if all_media else {s.media for s in segments}
+    if review.get('reference_cadence') or any(m.get('cadence') for k,m in media.items() if k in used): return 14
+    if any(m.get('has_video') is False for m in media.values()): return 13
+    return 12 if state.frame_markers else 11
+
 def sample_at(frame: int, fps: Fraction) -> int:
     value = Fraction(frame * RATE, 1) / fps
     return (2 * value.numerator + value.denominator) // (2 * value.denominator)
@@ -29,8 +49,15 @@ class Segment:
     crop: tuple = (0.,0.,1.,1.)
     placement: tuple = (0.,0.,1.,1.)
     rotation: float = 0.
+    reversed: bool = False
+    warp: tuple = ()
     def __post_init__(self):
         import math
+        if self.warp != ():
+            from time_warp import points
+            if self.media is None: raise ValueError('Courbe temporelle invalide.')
+            object.__setattr__(self, 'warp', points(self.warp))
+        if type(self.reversed) is not bool: raise ValueError('Sens de lecture invalide.')
         if not isinstance(self.rotation,(int,float)) or not math.isfinite(self.rotation) or not -180<=self.rotation<=180: raise ValueError('Rotation de clip invalide.')
         for key in ('crop','placement'):
             value=tuple(getattr(self,key))
@@ -42,6 +69,14 @@ class Segment:
             object.__setattr__(self,key,value)
     @property
     def length(self): return self.end - self.start
+
+    def source_frame(self,offset):
+        return self.end-1-offset if self.reversed else self.start+offset
+
+    def sliced(self,first,stop):
+        if self.reversed:
+            return replace(self,start=self.end-stop,end=self.end-first)
+        return replace(self,start=self.start+first,end=self.start+stop)
 
 
 @dataclass(frozen=True)
@@ -67,8 +102,15 @@ class MediaTrack:
     @property
     def audible(self): return self.audio if self.info.audio_enabled else tuple(replace(s,muted=True) for s in self.audio)
 
+    @cached_property
+    def video_length(self): return sum(s.length for s in self.segments)
+
+    @cached_property
+    def audio_length(self):
+        return self.video_length if self.audio_segments is None else sum(s.length for s in self.audio_segments)
+
     @property
-    def length(self): return sum(s.length for s in self.segments)
+    def length(self): return max(self.video_length, self.audio_length)
 
 
 @dataclass(frozen=True)
@@ -129,6 +171,9 @@ class State:
     @property
     def all_segments(self): return tuple(seg for track in self.tracks for seg in track.segments+track.audio)
 
+    @property
+    def independent_ends(self): return any(track.video_length != track.audio_length for track in self.tracks)
+
 
 def with_tracks(state,tracks):
     first=tracks[0]
@@ -146,9 +191,18 @@ def slice_segments(segments, start, end):
     for seg in segments:
         left, right = max(start, at), min(end, at + seg.length)
         if right > left:
-            result.append(replace(seg,start=seg.start + left-at,end=seg.start + right-at))
+            result.append(seg.sliced(left-at,right-at))
         at += seg.length
     return tuple(result)
+
+
+def pad_to(segments, length):
+    missing = length - sum(segment.length for segment in segments)
+    return segments + (Segment(None, 0, missing),) if missing > 0 else segments
+
+
+def slice_window(segments, start, end):
+    return pad_to(slice_segments(segments, start, end), end - start)
 
 
 def compact(segments):
@@ -157,19 +211,30 @@ def compact(segments):
         if seg.length <= 0: continue
         if out and out[-1].media is None and seg.media is None:
             out[-1] = Segment(None,0,out[-1].length+seg.length)
-        elif out and not seg.cut_before and out[-1].muted==seg.muted and out[-1].crop==seg.crop and out[-1].placement==seg.placement and out[-1].rotation==seg.rotation and out[-1].media == seg.media and out[-1].end == seg.start:
-            out[-1] = replace(out[-1], end=seg.end)
+        elif (out and not seg.cut_before and out[-1].media==seg.media and out[-1].reversed==seg.reversed
+              and out[-1].source_frame(out[-1].length)==seg.source_frame(0)
+              and out[-1].muted==seg.muted and out[-1].crop==seg.crop and out[-1].warp==seg.warp
+              and out[-1].placement==seg.placement and out[-1].rotation==seg.rotation):
+            out[-1] = replace(out[-1], start=min(out[-1].start,seg.start),end=max(out[-1].end,seg.end))
         else: out.append(seg)
     return tuple(out)
 
 
-def locate(segments, index):
+def clip_at(segments, frame):
     at = 0
-    for seg in segments:
-        if at <= index < at + seg.length:
-            return seg.media, seg.start + index - at
+    for index,seg in enumerate(segments):
+        if at <= frame < at + seg.length:
+            return index,at,seg
         at += seg.length
-    raise IndexError(index)
+
+def locate(segments, index):
+    hit=clip_at(segments,index)
+    if hit is not None:
+        _,at,seg=hit
+        return seg.media,seg.source_frame(index-at)
+    if index < 0:
+        raise IndexError(index)
+    return None, 0
 
 
 def empty_duration(segments,frame):
@@ -185,13 +250,11 @@ def empty_duration(segments,frame):
 
 def insert_track_media(track, destination, video_block, audio_block):
     size = sum(segment.length for segment in video_block)
-    missing = max(0, destination - track.length)
-    padding = (Segment(None, 0, missing),) if missing else ()
-    video, audio = track.segments + padding, track.audio + padding
-    filled = min(size, empty_duration(video, destination), empty_duration(audio, destination))
+    video, audio = track.segments, track.audio
+    filled = min(size, *(empty_duration(pad_to(lane,track.length), destination) for lane in (video,audio)))
 
     def insert(segments, block):
-        left = slice_segments(segments, 0, destination)
+        left = slice_window(segments, 0, destination)
         right = slice_segments(segments, destination + filled, max(destination, track.length))
         if right:
             right = (replace(right[0], cut_before=True),) + right[1:]
@@ -398,7 +461,7 @@ class Document:
         start,end,destination=int(start),int(end),int(destination)
         if not 0<=start<end<=source.length or not 0<=destination<=self.state.length: return False
         size=end-start
-        tracks[target_id]=insert_track_media(target,destination,slice_segments(source.segments,start,end),slice_segments(source.audio,start,end))
+        tracks[target_id]=insert_track_media(target,destination,slice_window(source.segments,start,end),slice_window(source.audio,start,end))
         if not copy:
             def remove(segments): return compact(slice_segments(segments,0,start)+slice_segments(segments,end,source.length))
             tracks[source_id]=replace(source,segments=remove(source.segments),audio_segments=remove(source.audio))
@@ -418,11 +481,11 @@ class Document:
     @property
     def dirty(self): return self.signature() != self.saved_signature
 
-    def commit(self, label, new):
+    def commit(self, label, new, *, preserve_clip_selection=False):
         if new.bypassed_exposures:
             track_ids = {track.info.id for track in new.tracks}
             new = replace(new, bypassed_exposures=tuple(item for item in new.bypassed_exposures if item[0] in track_ids))
-        if new.selected_clips and (new.selection!=self.state.selection or new.tracks!=self.state.tracks):
+        if new.selected_clips and not preserve_clip_selection and (new.selection!=self.state.selection or new.tracks!=self.state.tracks):
             new=replace(new,selected_clips=())
         markers={f for f in new.frame_markers if 0<=f<new.length}
         notes=tuple((f,min(duration,new.length-f),text) for f,duration,text in new.marker_notes if f in markers and (text or min(duration,new.length-f)>1))
@@ -464,10 +527,10 @@ class Document:
     @selected_tracks
     def copy(self, include_audio=True):
         ranges=self.state.selection_ranges() or (self.selected(),)
-        segments=tuple(seg for a,b in ranges for seg in slice_segments(self.state.segments,a,b))
+        segments=tuple(seg for a,b in ranges for seg in slice_window(self.state.segments,a,b))
         if not segments: return 0
         self.clipboard=segments
-        self.audio_clipboard=tuple(seg for a,b in ranges for seg in slice_segments(self.state.audio,a,b)) if include_audio else ()
+        self.audio_clipboard=tuple(seg for a,b in ranges for seg in slice_window(self.state.audio,a,b)) if include_audio else ()
         keys=[]; length=0
         for a,b in ranges:
             if self.state.drawings_linked: keys.extend(slice_keys(self.state.drawings,a,b,length-a))
@@ -492,16 +555,17 @@ class Document:
         a,b = self.selected()
         if b <= a: return False
         segs = compact(slice_segments(self.state.segments,0,a)+slice_segments(self.state.segments,b,self.state.length))
-        length = sum(s.length for s in segs)
-        return self.commit(label,replace(self.state,drawings=remove_key_range(self.state.drawings,a,b,True) if self.state.drawings_linked else self.state.drawings,segments=segs,audio_segments=compact(slice_segments(self.state.audio,0,a)+slice_segments(self.state.audio,b,self.state.length)),position=min(a,max(0,length-1)),selection=None,loop_range=None))
+        audio = compact(slice_segments(self.state.audio,0,a)+slice_segments(self.state.audio,b,self.state.length))
+        length = max(sum(s.length for s in segs),sum(s.length for s in audio))
+        return self.commit(label,replace(self.state,drawings=remove_key_range(self.state.drawings,a,b,True) if self.state.drawings_linked else self.state.drawings,segments=segs,audio_segments=audio,position=min(a,max(0,length-1)),selection=None,loop_range=None))
 
     @selected_tracks
     def paste(self, include_audio=True):
         if not self.clipboard: return False
         at = max(0,min(self.state.position,self.state.length))
         size = sum(s.length for s in self.clipboard)
-        segs = compact(slice_segments(self.state.segments,0,at)+self.clipboard+slice_segments(self.state.segments,at,self.state.length))
-        return self.commit('Coller les images',replace(self.state,drawings=insert_keys(self.state.drawings,at,size,self.drawing_clipboard) if self.state.drawings_linked else self.state.drawings,segments=segs,audio_segments=compact(slice_segments(self.state.audio,0,at)+((self.audio_clipboard or self.clipboard) if include_audio else (Segment(None,0,size),))+slice_segments(self.state.audio,at,self.state.length)),selection=(at,at+size),loop_range=None))
+        segs = compact(slice_window(self.state.segments,0,at)+self.clipboard+slice_segments(self.state.segments,at,self.state.length))
+        return self.commit('Coller les images',replace(self.state,drawings=insert_keys(self.state.drawings,at,size,self.drawing_clipboard) if self.state.drawings_linked else self.state.drawings,segments=segs,audio_segments=compact(slice_window(self.state.audio,0,at)+((self.audio_clipboard or self.clipboard) if include_audio else (Segment(None,0,size),))+slice_segments(self.state.audio,at,self.state.length)),selection=(at,at+size),loop_range=None))
 
     @selected_tracks
     def append_media(self, items):
@@ -510,8 +574,8 @@ class Document:
             if Fraction(m['fps']) != self.fps: raise ValueError('Cadence incompatible.')
         self.media.update({m['id']:m for m in items})
         at=self.state.length
-        segments=self.state.segments+tuple(Segment(m['id'] if m.get('has_video',True) else None,0,m['frames']) for m in items)
-        return self.commit('Ajouter des médias',replace(self.state,segments=segments,audio_segments=self.state.audio+tuple(Segment(m['id'],0,m['frames']) for m in items),position=at,selection=None,loop_range=None))
+        segments=pad_to(self.state.segments,at)+tuple(Segment(m['id'] if m.get('has_video',True) else None,0,m['frames']) for m in items)
+        return self.commit('Ajouter des médias',replace(self.state,segments=segments,audio_segments=pad_to(self.state.audio,at)+tuple(Segment(m['id'],0,m['frames']) for m in items),position=at,selection=None,loop_range=None))
 
     def add_sources_to_track(self, identity, keys, destination=None):
         if any(key not in self.media for key in keys): return False
@@ -551,10 +615,10 @@ class Document:
         if not 0<=start<end<=n: return False
         at=end if destination is None else self.snap_destination(max(0,min(int(destination),n)))
         def insert(segs):
-            block=slice_segments(segs,start,end); right=slice_segments(segs,at,n)
+            block=slice_window(segs,start,end); right=slice_segments(segs,at,n)
             block=(replace(block[0],cut_before=True),)+block[1:]
             if right: right=(replace(right[0],cut_before=True),)+right[1:]
-            return compact(slice_segments(segs,0,at)+block+right)
+            return compact(slice_window(segs,0,at)+block+right)
         return self.commit('Dupliquer le média',replace(self.state,drawings=insert_keys(self.state.drawings,at,end-start,slice_keys(self.state.drawings,start,end,-start)) if self.state.drawings_linked else self.state.drawings,segments=insert(self.state.segments),audio_segments=insert(self.state.audio),position=at,selection=(at,at+end-start),loop_range=None))
 
     @selected_tracks
@@ -567,13 +631,15 @@ class Document:
         if start<=destination<=end: return False
         at=destination-(end-start) if destination>end and not leave_gap else destination
         def remove(segments):
-            return compact(slice_segments(segments,0,start)+((Segment(None,0,end-start),) if leave_gap else ())+slice_segments(segments,end,n))
+            left=slice_window(segments,0,start) if leave_gap else slice_segments(segments,0,start)
+            return compact(left+((Segment(None,0,end-start),) if leave_gap else ())+slice_segments(segments,end,n))
         video_rest=remove(self.state.segments); audio_rest=remove(self.state.audio)
         targets=[video_rest,audio_rest] if track=='linked' else [audio_rest if track=='audio' else video_rest]
-        filled=min(end-start,*(empty_duration(segments,at) for segments in targets))
+        remaining=n if leave_gap else n-(end-start)
+        filled=min(end-start,*(empty_duration(pad_to(segments,remaining),at) for segments in targets))
         def move(segments,rest):
-            block=slice_segments(segments,start,end)
-            return compact(slice_segments(rest,0,at)+block+slice_segments(rest,at+filled,n if leave_gap else n-(end-start)))
+            block=slice_window(segments,start,end)
+            return compact(slice_window(rest,0,at)+block+slice_segments(rest,at+filled,remaining))
         video=move(self.state.segments,video_rest) if track!='audio' else self.state.segments
         audio=move(self.state.audio,audio_rest) if track!='video' else self.state.audio
         length=max(sum(s.length for s in video),sum(s.length for s in audio))
@@ -608,11 +674,43 @@ class Document:
             out=[]; at=0
             for seg in segs:
                 if at<frame<at+seg.length:
-                    offset=frame-at; out.extend((replace(seg,end=seg.start+offset),replace(seg,start=seg.start+offset,cut_before=True)))
+                    offset=frame-at; out.extend((seg.sliced(0,offset),replace(seg.sliced(offset,seg.length),cut_before=True)))
                 else: out.append(seg)
                 at+=seg.length
             return tuple(out)
         return self.commit('Scinder',replace(self.state,segments=split(self.state.segments) if track!='audio' else self.state.segments,audio_segments=split(self.state.audio) if track!='video' else self.state.audio))
+
+    def reverse_clip(self,track_id,lane,frame,linked=True):
+        if lane not in ('video','audio'): return False
+        tracks=list(self.state.tracks)
+        for i,target in enumerate(tracks):
+            if target.info.id==track_id: break
+        else: return False
+        primary,other=(target.segments,target.audio) if lane=='video' else (target.audio,target.segments)
+        hit=clip_at(primary,frame)
+        if hit is None: return False
+        index,at,clip=hit
+        if clip.media is None: return False
+        changed=primary[:index]+(replace(clip,reversed=not clip.reversed),)+primary[index+1:]
+        if linked and other is primary:
+            other=changed
+        elif linked:
+            stop=at+clip.length
+            parts=slice_segments(other,at,stop)
+            offset=0
+            for part in parts:
+                if part.media!=clip.media or part.reversed!=clip.reversed or part.source_frame(0)!=clip.source_frame(offset):
+                    break
+                offset+=part.length
+            if offset==clip.length:
+                # Cut flags mark the boundary BEFORE each segment in timeline order.
+                cut_flags=[part.cut_before for part in parts]
+                cut_flags=[cut_flags[0],*reversed(cut_flags[1:])]
+                middle=tuple(replace(part,reversed=not part.reversed,cut_before=cut) for part,cut in zip(reversed(parts),cut_flags))
+                other=slice_segments(other,0,at)+middle+slice_segments(other,stop,target.length)
+        video,audio=(changed,other) if lane=='video' else (other,changed)
+        tracks[i]=replace(target,segments=video,audio_segments=None if video==audio else audio)
+        return self.commit('Inverser le média',with_tracks(self.state,tracks),preserve_clip_selection=True)
 
     @selected_tracks
     def mute_range(self,start,end,track):
@@ -641,7 +739,8 @@ class Document:
                 if a>at: out+=slice_segments(segs,at,a)
                 at=max(at,b)
             return compact(out+slice_segments(segs,at,self.state.length))
-        video=keep(self.state.segments); audio=keep(self.state.audio); length=sum(s.length for s in video)
+        video=keep(self.state.segments); audio=keep(self.state.audio)
+        length=max(sum(s.length for s in video),sum(s.length for s in audio))
         drawings=self.state.drawings
         if self.state.drawings_linked:
             merged=[]
@@ -674,19 +773,27 @@ class Document:
         frames=int(frames)
         if frames<=0: return False
         at=self.snap_destination(self.state.position); n=self.state.length
-        def insert(segs): return compact(slice_segments(segs,0,at)+(Segment(None,0,frames),)+slice_segments(segs,at,n))
+        def insert(segs): return compact(slice_window(segs,0,at)+(Segment(None,0,frames),)+slice_segments(segs,at,n))
         return self.commit('Insérer un vide',replace(self.state,drawings=insert_keys(self.state.drawings,at,frames) if self.state.drawings_linked else self.state.drawings,segments=insert(self.state.segments),audio_segments=insert(self.state.audio),position=at,selection=(at,at+frames),loop_range=None))
 
-    def move_drawings(self,start,end,destination):
+    def move_drawings(self,start,end,destination,*,follow_selection=True):
         keys=relocate_keys(self.state.drawings,start,end,destination,self.state.length)
         if keys==self.state.drawings: return False
         at=max(0,min(destination,self.state.length-(end-start)))
-        selection=(at,at+end-start) if self.state.selection else None
+        selection=self.state.selection
+        if follow_selection and selection==(start,end):
+            selection=(at,at+end-start)
         return self.commit('Déplacer les clés de dessin',replace(self.state,drawings=keys,position=at,selection=selection))
 
-    def resize_drawing(self,start,new_start,new_end):
+    def resize_drawing(self,start,new_start,new_end,*,follow_selection=True):
         keys=resize_key(self.state.drawings,start,new_start,new_end,self.state.length)
-        return self.commit('Redimensionner la plage de dessin',replace(self.state,drawings=keys))
+        if keys==self.state.drawings: return False
+        selection=self.state.selection
+        if follow_selection and selection and selection[0]==start:
+            index=bisect_left(self.state.drawings,start,key=lambda key:key.start)
+            if selection[1]==self.state.drawings[index].end:
+                selection=(keys[index].start,keys[index].end)
+        return self.commit('Redimensionner la plage de dessin',replace(self.state,drawings=keys,selection=selection))
 
     def delete_drawings(self,start,end):
         return self.commit('Supprimer la plage de dessin',replace(self.state,drawings=remove_key_range(self.state.drawings,start,end)))
@@ -729,16 +836,11 @@ class Document:
         return self.commit('Régler l’exposition', replace(state, bypassed_exposures=tuple(sorted(saved.items()))))
 
     def to_data(self, all_media=False):
-        return {'format':'cadence-studio','version':self.format_version(),'fps':str(self.fps),'media':[m for k,m in self.media.items() if all_media or any(s.media==k for s in self.state.all_segments)],'state':asdict(self.state),'comparison':self.review,'drawing_transfer_id':self.drawing_transfer_id}
+        used={s.media for s in self.state.all_segments}
+        return {'format':'cadence-studio','version':self.format_version(all_media=all_media),'fps':str(self.fps),'media':[m for k,m in self.media.items() if all_media or k in used],'state':asdict(self.state,dict_factory=project_fields),'comparison':self.review,'drawing_transfer_id':self.drawing_transfer_id}
 
-    def format_version(self):
-        if self.state.has_image_adjustments: return 20
-        if self.state.marker_styles: return 19
-        if self.state.marker_notes: return 18
-        if self.state.marker_names: return 17
-        if self.state.second_track is not None or not self.state.track_info.audio_enabled or self.review.get('reference_track'): return 16
-        used={s.media for s in self.state.segments+self.state.audio}
-        return 15 if len(self.review.get('references',[]))>1 else 14 if self.review.get('reference_cadence') or any(m.get('cadence') for k,m in self.media.items() if k in used) else 13 if any(m.get('has_video') is False for m in self.media.values()) else 12 if self.state.frame_markers else 11
+    def format_version(self,*,all_media=False):
+        return project_version(self.state,self.media,self.review,all_media=all_media)
 
     def save(self, path):
         from project_io import write_project
@@ -755,8 +857,8 @@ class Document:
         return cls.from_data(data,str(path))
 
     @classmethod
-    def from_data(cls, data, project_path=None):
-        if data.get('format') != 'cadence-studio' or data.get('version') not in range(1,21):
+    def from_data(cls, data, project_path=None, *, legacy_session=False):
+        if data.get('format') != 'cadence-studio' or data.get('version') not in range(1,24):
             raise ValueError('Ce fichier n’est pas un projet Cadence compatible.')
         doc = cls(Fraction(data['fps']))
         identity=data.get('drawing_transfer_id')
@@ -775,7 +877,7 @@ class Document:
         st = data['state']
         segs = tuple(Segment(**s) for s in st['segments'])
         audio=tuple(Segment(**s) for s in st['audio_segments']) if st.get('audio_segments') is not None else None
-        if audio is not None and sum(s.length for s in audio)!=sum(s.length for s in segs): raise ValueError('Durées audio et vidéo incohérentes.')
+        if data['version'] < 22 and audio is not None and sum(s.length for s in audio)!=sum(s.length for s in segs): raise ValueError('Durées audio et vidéo incohérentes.')
         def info(value,default):
             if value is None: return default
             if not isinstance(value,dict) or set(value)-{'id','name','audio_expanded','audio_enabled'}: raise ValueError('Piste média invalide.')
@@ -793,15 +895,20 @@ class Document:
                 tuple(Segment(**s) for s in value['segments']),
                 tuple(Segment(**s) for s in value['audio_segments']) if value.get('audio_segments') is not None else None,
                 float(value.get('exposure',0)),bool(value.get('flip_h',False)),bool(value.get('flip_v',False)))
-            if second.info.id==first_info.id or not -10<=second.exposure<=10 or sum(s.length for s in second.audio)!=second.length:
+            if (second.info.id==first_info.id or not -10<=second.exposure<=10 or
+                    (data['version'] < 22 and second.audio_length!=second.video_length)):
                 raise ValueError('Seconde piste média invalide.')
+        # 2.0.17 wrote valid curves with an older version only in automatic session snapshots.
+        supports_warp = data['version'] >= 23 or (legacy_session and 11 <= data['version'] <= 22)
         for seg in segs+(audio or ())+((second.segments+second.audio) if second else ()):
             if seg.media is None:
                 if not 0<=seg.start<seg.end: raise ValueError('Vide invalide.')
                 continue
             if seg.media not in doc.media or not 0 <= seg.start < seg.end <= doc.media[seg.media]['frames']:
                 raise ValueError('Plage de média invalide dans le projet.')
-        length = max(sum(s.length for s in segs),second.length if second else 0)
+            if seg.warp and (not supports_warp or any(max(x,y) >= doc.media[seg.media]['frames'] for x,y,_ in seg.warp)):
+                raise ValueError('Courbe temporelle invalide.')
+        length = max(sum(s.length for s in segs),sum(s.length for s in (audio or ())),second.length if second else 0)
         sel = st.get('selection')
         if sel and not 0 <= sel[0] < sel[1] <= length: sel = None
         loop = st.get('loop_range')
@@ -890,7 +997,7 @@ class TimelinePCM:
                 self.maps[seg.media] = np.memmap(path,dtype='<i2',mode='r').reshape(-1,2)
             a,b = sample_at(at,fps),sample_at(at+seg.length,fps)
             sa,sb = sample_at(seg.start,fps),sample_at(seg.end,fps)
-            self.regions.append((a,b,seg.media,sa,sb))
+            self.regions.append((a,b,seg.media,sa,sb,seg.reversed))
             at += seg.length
         self.samples = sample_at(at,fps)
         self.starts = tuple(region[0] for region in self.regions)
@@ -902,11 +1009,13 @@ class TimelinePCM:
         out = np.zeros((count,2),dtype='<i2')
         first=bisect_right(self.ends,start); last=bisect_left(self.starts,start+count)
         for index in range(first,last):
-            a,b,key,sa,sb=self.regions[index]
+            a,b,key,sa,sb,backwards=self.regions[index]
             l,r = max(a,start),min(b,start+count)
             if r <= l: continue
             # Source/destination spans differ by at most one rounding sample.
-            indices = sa + ((np.arange(l,r,dtype=np.int64)-a)*(sb-sa)//max(1,b-a))
+            position=np.arange(l,r,dtype=np.int64)
+            offset=b-1-position if backwards else position-a
+            indices = sa + offset*(sb-sa)//max(1,b-a)
             data = self.maps[key]
             valid = (indices >= 0) & (indices < len(data))
             out[l-start:r-start][valid] = data[indices[valid]]

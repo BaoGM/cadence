@@ -7,9 +7,9 @@ Cadence is a Windows video review and annotation application for animation. Its 
 - Frame stepping, looping, audio scrubbing and drawing keys. Markers support frame ranges, formatted comments, checkboxes and CSV or OpenTimelineIO interchange.
 - Reference sequences with side-by-side, stacked, overlay, difference and wipe comparison.
 - Drawing, text, vector shapes, selections and onion skins.
-- Video and audio editing, linked tracks, undo and redo.
+- Non-destructive trimming, reverse playback and per-clip Time Warp with editable curves, hold, blend, optical flow, RIFE and optional NVIDIA interpolation.
 - Configurable playback and editing workspaces, movable panels and editable shortcuts.
-- MP4, MOV, GIF, WAV and MP3 export.
+- Review movies, audio and studio image sequence export.
 - Screen capture, with optional system audio, microphone and input indicators.
 - Optional timeline synchronisation and drawing transfer with Blender and Maya.
 - Background updates for per-user and writable portable installations, with signed package verification and rollback after an unsuccessful start.
@@ -19,7 +19,7 @@ Cadence is a Windows video review and annotation application for animation. Its 
 
 ## Installation
 
-Windows 10 or 11, 64-bit. The unsigned [Cadence 2.0.12 Windows release](https://github.com/BaoGM/cadence/releases/tag/v2.0.12-windows-studio2) includes an installer, a portable archive, checksums and corresponding sources.
+Windows 10 or 11, 64-bit. The unsigned [Cadence 2.0.18 Windows release](https://github.com/BaoGM/cadence/releases/tag/v2.0.18-windows-studio2) includes an installer, a portable archive, checksums and corresponding sources.
 
 The default installation is per user. Cadence 2.0 installs alongside Windows 1.x and stores its preferences, library and cache in `%LOCALAPPDATA%/CadenceStudio-2`. For a portable copy, extract the complete archive and run `Cadence.exe`.
 

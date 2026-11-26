@@ -1,0 +1,10 @@
+Cadence 2.0.18 — Windows
+
+Lecture et Édition
+Les commandes Piste média, Ouvrir des médias, Enregistrer et Exporter sont accessibles dans les deux modes. Les menus Affichage et le clic droit utilisent une seule entrée Liste de lecture pour le panneau gauche. Les références et la comparaison A/B restent accessibles dans ce panneau. Dans Dessin, cliquer sur Exposition permet de comparer le réglage avec l’image neutre.
+
+Montage et Time Warp
+Les poignées permettent de raccourcir ou de rallonger un clip en conservant les images sources masquées. Les vignettes suivent les limites visibles. Time Warp, dans le bandeau déplié de la timeline, ouvre une courbe par clip et une comparaison avec le mouvement original. Les poses, le fondu, la compensation de mouvement, RIFE 4.6 intégré et NVIDIA NvOFFRUC externe sont disponibles. Les montages contenant une courbe Time Warp utilisent le format de projet 23.
+
+Windows
+Cette version comprend les corrections de restauration des sessions contenant du Time Warp. La livraison inclut un installateur, une version portable, un descripteur de mise à jour signé, les sources et les licences correspondantes.

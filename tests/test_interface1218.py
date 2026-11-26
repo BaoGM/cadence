@@ -16,12 +16,19 @@ def test_panel_menu_timeline_commands(window,application):
     w.refresh();menu=w.createPopupMenu()
     assert action(menu,'timeline_simple').isCheckable()
     action(menu,'units_frames').trigger();assert t.units=='frames'
-    action(menu,'add_marker').trigger();assert w.doc.state.frame_markers==(5,)
-    menu.deleteLater();menu=w.createPopupMenu();assert not action(menu,'add_marker').isEnabled()
+    action(menu,'add_marker').trigger()
+    assert w.doc.state.frame_markers==(3,) and w.doc.state.marker_notes==((3,9,''),)
+    menu.deleteLater();menu=w.createPopupMenu()
+    previous=w.doc.state
+    action(menu,'add_marker').trigger();assert w.doc.state==previous
     action(menu,'delete_keys').trigger();assert not w.doc.state.drawings and w.doc.state.selection==(3,12)
     action(menu,'delete_markers').trigger();assert not w.doc.state.frame_markers
     action(menu,'timeline_simple').trigger();assert t.simple
     menu.deleteLater()
+    w.doc.state=replace(w.doc.state,position=5,selection=None);w.refresh()
+    menu=w.createPopupMenu();action(menu,'add_marker').trigger();menu.deleteLater()
+    assert w.doc.state.frame_markers==(5,)
+    menu=w.createPopupMenu();assert not action(menu,'add_marker').isEnabled();menu.deleteLater()
 
 def test_all_tracks_units_and_lane_heights(window,application):
     w=window;t=w.timeline;w.doc.state=replace(w.doc.state,drawings=(DrawingKey(4,9,(Mark(),)),));w.refresh()
@@ -71,6 +78,6 @@ def test_english_new_commands_and_categories(application,tmp_path,monkeypatch):
         for data,text in [('timeline_simple','Simplified timeline'),('units_time','Timecode'),('units_frames','Frames'),('add_marker','Add frame marker'),('delete_markers','Delete frame markers'),('delete_keys','Delete keyframes')]:
             assert action(menu,data).text()==text
         d=ShortcutDialog(w.action_registry,w.preferences,w);d.ensure_keys()
-        assert [d.key_tabs.tabText(i) for i in range(d.key_tabs.count())]==['File','Edit','Playback','View','Compare','Drawing','Tools','Help','3D synchronization']
+        assert [d.key_tabs.tabText(i) for i in range(d.key_tabs.count())]==['File','Edit','Playback','View','References','Drawing','Tools','Help','3D synchronization']
         d.reject();d.deleteLater();menu.deleteLater()
     finally:w.close();application.processEvents()

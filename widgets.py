@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, Signal, QRectF, QPointF, QEvent, QVariantAnimatio
 from PySide6.QtGui import QColor, QPainter, QPen, QFont, QImage, QPainterPath, QPainterPathStroker, QPolygonF
 from PySide6.QtWidgets import QApplication, QWidget, QDoubleSpinBox, QSpinBox, QMenu, QPushButton
 from native_render import preview_levels
-from model import locate
+from model import clip_at, locate
 from drag import ContinuousDrag
 from drawing_timeline import DrawingTimeline
 from timeline_drop import ClipDragPreview
@@ -22,23 +22,14 @@ def adjustment_button(label):
     button.setChecked(True)
     button.setCursor(Qt.PointingHandCursor)
     button.setStyleSheet('QPushButton {padding:3px 7px;color:#91a2b0;border:1px solid #394956;border-radius:4px;}'
+                         'QPushButton[compact="true"] {padding:3px 2px;}'
                          'QPushButton:checked {background:#233b3e;color:#8ce7da;}'
                          'QPushButton:hover,QPushButton:focus {border-color:#69d9c8;}')
     return button
 
-def paint_frame_number(p,frame,center,y,bounds,active=False,compact=False):
-    p.save(); p.resetTransform(); p.setClipping(False)
-    if compact:
-        from timeline_skin import font
-        p.setFont(font(10,True))
-    else: p.setFont(QFont('Segoe UI',11,QFont.Weight.Bold) if active else QFont('Segoe UI',8))
-    text=str(frame); width=p.fontMetrics().horizontalAdvance(text)+10
-    height=p.fontMetrics().height()+2
-    x=max(bounds.left(),min(center-width/2,bounds.right()-width))
-    y=max(bounds.top(),min(y,bounds.bottom()-height))
-    area=QRectF(x,y,width,height)
-    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QColor('#243a3d' if active else '#24303b') if compact else QColor(12,15,20,205)); p.drawRoundedRect(area,3,3)
-    p.setPen(QColor('#a2e9da' if compact else '#ffffff') if active else QColor('#b8c3d1')); p.drawText(area,Qt.AlignmentFlag.AlignCenter,text); p.restore()
+def paint_frame_number(p,text,area,active=False):
+    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QColor('#243a3d' if active else '#24303b')); p.drawRoundedRect(area,3,3)
+    p.setPen(QColor('#a2e9da' if active else '#b8c3d1')); p.drawText(area,Qt.AlignmentFlag.AlignCenter,text)
     return area
 
 class ScrubMixin:
@@ -334,6 +325,14 @@ class Viewer(QWidget):
         if self.nav: self._canvas_drag.finish(restore=restore)
         if self.origin is not None: self._video_drag.finish(restore=restore); self.scrubActiveChanged.emit(False)
         self.nav=None; self.origin=None; self.setCursor(Qt.CursorShape.CrossCursor if getattr(getattr(self,'draw_controller',None),'enabled',False) else Qt.CursorShape.OpenHandCursor)
+    def cancel_navigation(self):
+        if self.nav:
+            _,_,self.pan,self.angle,self.zoom=self.nav
+            self.update()
+        elif self.origin is None:
+            return False
+        self.finish_navigation()
+        return True
     def mouseReleaseEvent(self,e): self.finish_navigation()
     def setCursor(self,cursor):
         if hasattr(self,'cursor_guard'): self.cursor_guard.set_cursor(cursor)
@@ -359,10 +358,15 @@ class Timeline(TrackRows,QWidget):
     mediaAudioExpanded=Signal(str,bool)
     mediaAudioEnabled=Signal(str,bool)
     mediaTransferred=Signal(str,str,int,int,int,bool)
+    mediaTrimmed=Signal(str,str,int,bool,int,bool)
+    trimPreviewChanged=Signal(object)
+    mediaEdgeFocused=Signal(int)
+    mediaReversed=Signal(str,str,int,bool)
     mediaReferenceRequested=Signal(str)
     cadenceRequested=Signal(int,int)
     scrubStarted=Signal()
     scrubFinished=Signal()
+    scrubCancelled=Signal()
     seek=Signal(int)
     selected=Signal(int,int)
     clipsPicked=Signal(object,str,int)
@@ -390,10 +394,12 @@ class Timeline(TrackRows,QWidget):
         from timeline_index import SegmentIndex
         self.track_indices={'video':SegmentIndex(),'audio':SegmentIndex()}
         self.simple=False; self.selection_track='video'; self.drawing_track=DrawingTimeline(self)
-        self.zoom=1.; self.view_start=0.; self.nav=None; self.hover_x=None; self.external_scrubbing=False
+        self.zoom=1.; self.view_start=0.; self.nav=None; self.hover_x=None; self.transport_hover_x=None; self.external_scrubbing=False
         self.units='frames'; self.gesture=None; self.move_span=None; self.drop_frame=None; self.ghost_x=None; self.animated_x=None; self.linked=True; self.leave_gap=False
         self.drag_animation=QVariantAnimation(self); self.drag_animation.setDuration(110); self.drag_animation.setEasingCurve(QEasingCurve.Type.OutCubic); self.drag_animation.valueChanged.connect(self.animate_drop)
         self.clip_preview=ClipDragPreview(self)
+        from timeline_trim import TimelineTrim
+        self.clip_trim=TimelineTrim(self)
         from timeline_thumbnails import ClipThumbnails
         self.thumbnails=ClipThumbnails(self)
         from timeline_gestures import MarkerDrag
@@ -415,6 +421,10 @@ class Timeline(TrackRows,QWidget):
         if changed or lifting: self.clip_preview.describe_target()
         self.update()
     def set_document(self,state,media,fps):
+        if self.clip_trim.plan and (not state or self.clip_trim.plan.track not in state.tracks):
+            self.cancel_clip_drag()
+        elif not self.clip_trim.plan and self.clip_trim.frame and (not state or self.clip_trim.frame.track not in state.tracks):
+            self.clip_trim.clear_preview(redraw=False)
         if self.state and not state:
             self.marker_hover.cancel()
         notes_changed=self.state and state and (
@@ -434,14 +444,15 @@ class Timeline(TrackRows,QWidget):
         if self.units=='frames': return str(frame)
         ms=round(frame/self.fps*1000)
         return f'{ms//60000:02}:{ms//1000%60:02}.{ms%1000:03}'
-    def span(self): return max(1,(self.state.length if self.state else 1)/self.zoom)
+    def view_length(self): return self.clip_trim.visible_length(self.state.length) if self.state else 1
+    def span(self): return max(1,self.view_length()/self.zoom)
     def ensure_visible(self,frame):
         if not self.state or self.zoom<=1: return
         span=self.span()
         if frame<self.view_start or frame>=self.view_start+span:
             self.view_start=frame-span*.1 if frame>=self.view_start+span else frame-span*.9
             self.clamp_view(); self.update()
-    def clamp_view(self): self.view_start=max(0,min(self.view_start,max(0,(self.state.length if self.state else 0)-self.span()))); self.viewportChanged.emit()
+    def clamp_view(self): self.view_start=max(0,min(self.view_start,max(0,self.view_length()-self.span()))); self.viewportChanged.emit()
     def reset_view(self): self.zoom=1.; self.view_start=0.; self.clamp_view(); self.update()
     def track_y(self,track): return self.media_track_y(track)
     def showEvent(self,event):
@@ -468,10 +479,14 @@ class Timeline(TrackRows,QWidget):
         return float(boundary) if abs(frame-boundary)<1e-9 else frame
     def x_for(self,frame): return self.track_left()+(frame-self.view_start)/self.span()*self.track_width()
     def frame_for(self,x): return max(0,min(self.state.length-1,int(self.raw_frame(x))))
+    def hover_position(self):
+        return self.transport_hover_x if self.transport_hover_x is not None else self.hover_x
     def hover_frame(self):
-        if self.hover_x is None or not self.state or not self.state.length or self.anchor is not None or self.nav or self.drawing_track.mode: return None
-        if not self.track_left()<=self.hover_x<=self.track_right(): return None
-        return self.frame_for(self.hover_x)
+        x=self.hover_position()
+        if x is None or not self.state or not self.state.length or self.anchor is not None or self.nav or self.drawing_track.mode: return None
+        if self.clip_trim.frame is not None: return None
+        if not self.track_left()<=x<=self.track_right(): return None
+        return self.frame_for(x)
     def set_external_scrubbing(self,active): self.external_scrubbing=active; self.update()
     def frame_indicator(self):
         if not self.state or not self.state.length or self.nav: return None
@@ -481,26 +496,32 @@ class Timeline(TrackRows,QWidget):
             frame=self.range_frame
         else:
             frame=self.hover_frame()
-            return (frame,self.hover_x) if frame is not None else None
+            return (frame,self.hover_position()) if frame is not None else None
         return frame,self.x_for(frame)
-    def paint_frame_indicator(self,p):
-        if not self.state or not self.state.length: return
-        current=max(0,min(self.state.position,self.state.length-1)); x=self.x_for(current)
-        top=self.ruler_y(); bounds=QRectF(self.track_left(),top,self.track_width(),24)
-        current_area=None
-        if bounds.left()<=x<=bounds.right(): current_area=paint_frame_number(p,self.tick_label(current),x,top+1,bounds,active=True,compact=True)
-        indicator=self.frame_indicator()
-        if indicator is not None:
-            frame,hx=indicator
-            text=self.tick_label(frame)
-            p.save(); p.setFont(QFont('Segoe UI',8)); width=p.fontMetrics().horizontalAdvance(text)+10; p.restore()
-            left=max(bounds.left(),min(hx-width/2,bounds.right()-width))
-            area=QRectF(left,top+3,width,21)
-            if frame!=current and (current_area is None or not current_area.adjusted(-5,0,5,0).intersects(area)):
-                paint_frame_number(p,text,hx,top+3,bounds,compact=True)
+    def frame_readouts(self,metrics):
+        if not self.state or not self.state.length: return []
+        current=min(self.state.position,self.view_length()-1)
+        current_x=self.x_for(self.state.position)
+        entries=[]
+        def add(frame,x,active):
+            text=self.tick_label(frame); width=metrics.horizontalAdvance(text)+10
+            left=max(self.track_header_width()+1,min(x-width/2,self.width()-width-1))
+            area=QRectF(left,self.ruler_y()+1,width,metrics.height()+2)
+            if not entries or not entries[0][1].adjusted(-4,0,4,0).intersects(area):
+                entries.append((text,area,active))
+        if self.track_left()<=current_x<=self.track_right(): add(current,current_x,True)
+        hover=self.frame_indicator()
+        if hover is not None and hover[0]!=current: add(*hover,False)
+        return entries
+    def paint_frame_indicator(self,p,readouts=None):
+        from timeline_skin import font
+        p.save(); p.setFont(font(10,True)); p.setClipping(False)
+        for text,area,active in self.frame_readouts(p.fontMetrics()) if readouts is None else readouts:
+            paint_frame_number(p,text,area,active=active)
+        p.restore()
     def paint_current_highlight(self,p,bar_path=None):
         if not self.state or not self.state.length: return
-        frame=max(0,min(self.state.position,self.state.length-1))
+        frame=max(0,min(self.state.position,self.view_length()-1))
         left=self.track_left(); right=left+self.track_width(); x=self.x_for(frame)
         if not left<=x<=right: return
         width=max(3,self.x_for(frame+1)-x)
@@ -522,6 +543,7 @@ class Timeline(TrackRows,QWidget):
         p.fillRect(QRectF(x1,y,x2-x1,h),QColor(218,249,245,76)); p.restore()
     def leaveEvent(self,event):
         self.hover_marker=None; self.hover_point=None; self.drawing_track.hover_handle=None
+        if self.clip_trim.plan is None: self.clip_trim.hover(None)
         self.hover_x=None; self.update(); super().leaveEvent(event)
     def wheelEvent(self,e):
         if not self.state or not self.state.length: return
@@ -578,6 +600,7 @@ class Timeline(TrackRows,QWidget):
         painter=QPainter(self)
         try:
             paint(self,painter)
+            self.clip_trim.paint(painter)
         finally:
             painter.end()
     def context_target(self,x,y,use_selection=True):
@@ -590,10 +613,10 @@ class Timeline(TrackRows,QWidget):
         frame=self.frame_for(x)
         if use_selection and self.state.selection and self.state.selection[0]<=frame<self.state.selection[1]:
             return (*self.state.selection,track)
-        at=0
-        for seg in (self.active_media.segments if track=='video' else self.active_media.audio):
-            if at<=frame<at+seg.length: return (at,at+seg.length,track)
-            at+=seg.length
+        hit=clip_at(self.active_media.segments if track=='video' else self.active_media.audio,frame)
+        if hit:
+            _,start,segment=hit
+            return start,start+segment.length,track
     def contextMenuEvent(self,event):
         menu=self.context_menu(event.pos()); menu.exec(event.globalPos()); menu.deleteLater()
     def add_timeline_mode(self,menu):
@@ -634,10 +657,19 @@ class Timeline(TrackRows,QWidget):
             action.triggered.connect(lambda checked=False,t=target_track:self.deleteRequested.emit(a,b,t))
         menu.addSeparator()
         action=menu.addAction(tr('Supprimer le média')); action.triggered.connect(lambda:self.deleteMediaRequested.emit(a,b))
-        da,db,dt=self.context_target(pos.x(),pos.y(),False)
-        key=locate(self.active_media.segments,da)[0]
-        action=menu.addAction(tr('Changer la cadence…')); action.setEnabled(key is not None and self.media.get(key,{}).get('has_video',True)); action.triggered.connect(lambda:self.cadenceRequested.emit(da,db))
-        action=menu.addAction(tr('Dupliquer le média')); action.setEnabled(locate(self.active_media.audio if dt=='audio' else self.active_media.segments,da)[0] is not None); action.triggered.connect(lambda:self.duplicated.emit(da,db,-1))
+        frame=self.frame_for(pos.x())
+        current=self.active_media
+        hit=clip_at(current.audio if track=='audio' else current.segments,frame)
+        if hit:
+            _,da,segment=hit
+            db=da+segment.length
+            key=locate(current.segments,da)[0]
+            action=menu.addAction(tr('Changer la cadence…')); action.setEnabled(key is not None and self.media.get(key,{}).get('has_video',True)); action.triggered.connect(lambda:self.cadenceRequested.emit(da,db))
+            action=menu.addAction(tr('Dupliquer le média')); action.setEnabled(segment.media is not None); action.triggered.connect(lambda:self.duplicated.emit(da,db,-1))
+            if segment.media is not None:
+                action=menu.addAction(tr('Lecture inversée'))
+                action.setData('reverse_clip'); action.setCheckable(True); action.setChecked(segment.reversed)
+                action.triggered.connect(lambda:self.mediaReversed.emit(current.info.id,track,frame,self.linked))
         menu.addSeparator()
         action=menu.addAction(tr('Désactiver / Activer '+('la vidéo' if track=='video' else 'l’audio'))); action.triggered.connect(lambda:self.muteRequested.emit(a,b,track))
         action=menu.addAction(tr('Scinder')); action.triggered.connect(lambda:self.splitRequested.emit(track))
@@ -688,7 +720,7 @@ class Timeline(TrackRows,QWidget):
             self.gesture=self.update_range_drag(self.range_frame,modifiers)
         e.accept(); return True
     def keyPressEvent(self,e):
-        if e.key()==Qt.Key.Key_Escape and self.gesture in ('move','copy','transfer'):
+        if e.key()==Qt.Key.Key_Escape and self.gesture in ('move','copy','transfer','trim'):
             self.cancel_clip_drag(); e.accept(); return
         if not self.range_key_event(e,True): super().keyPressEvent(e)
     def event(self,e):
@@ -704,7 +736,7 @@ class Timeline(TrackRows,QWidget):
                 text=escape(' · '.join(filter(None,(marker[1],self.tick_label(marker[0])))))
                 QToolTip.showText(e.globalPos(),'<span>'+text+'</span>',self)
                 return True
-        if getattr(self,'gesture',None) in ('move','copy','transfer'):
+        if getattr(self,'gesture',None) in ('move','copy','transfer','trim'):
             if e.type()==QEvent.Type.ShortcutOverride and e.key()==Qt.Key.Key_Escape:
                 e.accept(); return True
             if e.type() in (QEvent.Type.WindowDeactivate,QEvent.Type.Hide,QEvent.Type.FocusOut):
@@ -713,7 +745,34 @@ class Timeline(TrackRows,QWidget):
     def cancel_clip_drag(self):
         self._timeline_drag.finish()
         self.clear_clip_drag()
-    def clear_clip_drag(self):
+    def cancel_pointer_edit(self):
+        if self.marker_drag.source is not None:
+            self.marker_drag.finish()
+        elif self.drawing_track.mode:
+            if self.range_active: self.scrubCancelled.emit()
+            self.drawing_track.cancel()
+        elif getattr(self,'media_title_drag',None) is not None:
+            self.media_title_drag=None
+        elif self.nav:
+            self.view_start=self.nav[1]; self.nav=None
+            self._timeline_drag.finish(); self.clamp_view(); self.update()
+        elif self.anchor is not None:
+            if getattr(self,'range_active',False): self.scrubCancelled.emit()
+            self.cancel_clip_drag()
+        elif getattr(self,'band_scrub',None) and self.band_scrub.pressed is not None:
+            self.band_scrub.pressed=None
+            self.scrubCancelled.emit(); self.finish_range_drag()
+        else:
+            return False
+        return True
+    def clear_clip_drag(self,restore_preview=True):
+        if self.clip_trim.plan:
+            self.clip_trim.plan=None
+            if restore_preview: self.view_start=self.clip_trim.original_view
+            self.clip_trim.clear_preview(restore_preview)
+            self.clamp_view()
+            self.unsetCursor()
+            self.update()
         self.cross_origin=None; self.cross_target=None; self.anchor=None; self.gesture=None
         self.move_span=None; self.drop_frame=None; self.ghost_x=None; self.animated_x=None
         self.drag_animation.stop(); self.clip_preview.clear(); self.finish_range_drag()
@@ -721,6 +780,8 @@ class Timeline(TrackRows,QWidget):
         if not self.range_key_event(e,False): super().keyReleaseEvent(e)
     def mousePressEvent(self,e):
         self._ctrl_snapshot=None
+        if not self.clip_trim.plan and (e.modifiers() or e.button()!=Qt.LeftButton):
+            self.clip_trim.hover(None)
         if e.button()==Qt.LeftButton and self.state and e.modifiers() in (Qt.ControlModifier,Qt.ControlModifier|Qt.ShiftModifier):
             self._ctrl_snapshot=(e.position(),e.modifiers(),self.selected_clip_spans())
             if e.modifiers()&Qt.ShiftModifier and (self.simple_track_rect().contains(e.position()) if self.simple else self.media_row_at(e.position().y()) is not None):
@@ -733,6 +794,7 @@ class Timeline(TrackRows,QWidget):
         if not self.state or not self.state.length or e.button()!=Qt.MouseButton.LeftButton: return
         self.setFocus()
         frame=self.frame_for(e.position().x()); self.anchor=frame; self.drag_frame=self.raw_frame(e.position().x()); self.drag_scale=self.span()/self.track_width(); self._timeline_drag=ContinuousDrag(e.globalPosition())
+        if self.clip_trim.start(e): return
         self.begin_cross_drag(e)
         if e.modifiers()&Qt.KeyboardModifier.AltModifier and e.modifiers()&Qt.KeyboardModifier.ShiftModifier:
             target=self.context_target(e.position().x(),e.position().y(),False)
@@ -753,6 +815,8 @@ class Timeline(TrackRows,QWidget):
         else:
             self.begin_range_drag(frame); self.gesture=self.update_range_drag(frame,e.modifiers())
     def mouseMoveEvent(self,e):
+        if self.clip_trim.plan:
+            self.clip_trim.move(e); return
         if getattr(self,'media_title_drag',None) is not None: return
         if self.nav:
             self.view_start=self.nav[1]-self._timeline_drag.move(e.globalPosition()).x()*self.drag_scale; self.clamp_view(); self.update(); return
@@ -761,7 +825,10 @@ class Timeline(TrackRows,QWidget):
         marker=marker_at(self,e.position())
         if not e.buttons(): self.marker_hover.hover(marker,e.position())
         self.hover_marker=marker[0] if marker else None
+        edge = self.clip_trim.hit(e.position()) if not (marker or e.buttons() or e.modifiers()) else None
+        self.clip_trim.hover(edge)
         if marker: self.setCursor(Qt.CursorShape.PointingHandCursor)
+        elif edge: self.setCursor(Qt.CursorShape.SizeHorCursor)
         self.hover_x=e.position().x()
         if self.anchor is None: self.update(); return
         raw=max(0,min(self.state.length,self.drag_frame+self._timeline_drag.move(e.globalPosition()).x()*self.drag_scale))
@@ -771,6 +838,8 @@ class Timeline(TrackRows,QWidget):
         elif self.gesture in ('move','copy'): self.target_drop(self.x_for(raw))
     def mouseReleaseEvent(self,e):
         if e.button() not in (Qt.MouseButton.LeftButton,Qt.MouseButton.MiddleButton): return
+        if self.clip_trim.plan and e.button()==Qt.LeftButton:
+            self.clip_trim.release(e); return
         if self.release_media_title(e): return
         drag=getattr(self,'_timeline_drag',None)
         if getattr(self,'cross_origin',None) and not e.modifiers() & Qt.AltModifier:

@@ -58,16 +58,19 @@ def validate(data,registry):
     aliases['Affichage/Liste de lecture et médias']='Affichage/Afficher la liste de lecture'
     aliases['Dessin/Afficher les outils de dessin']='Affichage/Afficher les outils de dessin'
     aliases['Dessin/Copier la clé au curseur']='Dessin/Dupliquer la clé au curseur'
-    aliases['Comparaison/Afficher les réglages']='Affichage/Afficher les réglages de comparaison'
-    aliases['Comparaison/Ouvrir une référence B…']='Comparaison/Ajouter des références B…'
+    aliases['Comparaison/Afficher les réglages']='Affichage/Afficher les références'
+    aliases['Affichage/Afficher les réglages de comparaison']='Affichage/Afficher les références'
+    aliases['Comparaison/Ouvrir une référence B…']='Références/Ajouter des références B…'
+    for key in registry:
+        if key.startswith('Références/'): aliases['Comparaison/'+key.split('/',1)[1]]=key
     aliases['Édition/Raccourcis et navigation…']='Fichier/Options…'
     for title in ('Clé précédente','Clé suivante'): aliases['Dessin/'+title]='Lecture/'+title
     aliases['Lecture/Basculer le pas image / clé']='Lecture/Basculer le pas clé / image'
     for old,new in [('Copier la clé','Copier les clés'),('Couper la clé','Couper les clés'),('Coller la clé','Coller les clés')]: aliases['Dessin/'+old]='Dessin/'+new
     for old,new in aliases.items():
         if old in supplied and new not in supplied: supplied[new]=supplied[old]
-    if supplied.get('Comparaison/Activer la comparaison')=='C' and 'Outils/Recadrer le clip' not in supplied:
-        supplied['Comparaison/Activer la comparaison']='Shift+C'
+    if supplied.get('Références/Activer la comparaison')=='C' and 'Outils/Recadrer le clip' not in supplied:
+        supplied['Références/Activer la comparaison']='Shift+C'
     supplied=migrate(supplied,registry,data.get('shortcut_defaults_revision'))
     sequences=[]
     for key,default in result['shortcuts'].items():

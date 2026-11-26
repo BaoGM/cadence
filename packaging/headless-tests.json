@@ -55,5 +55,15 @@
   "tests/test_review_comments.py",
   "tests/test_review_popup211.py",
   "tests/test_shared_update.py",
-  "tests/test_update_in_place.py"
+  "tests/test_update_in_place.py",
+  "tests/test_clip_trim215.py",
+  "tests/test_drawing_range215.py",
+  "tests/test_gesture_cancel214.py",
+  "tests/test_read_hover215.py",
+  "tests/test_reverse215.py",
+  "tests/test_reverse_menu215.py",
+  "tests/test_studio_exports.py",
+  "tests/test_thumbnail_trim218.py",
+  "tests/test_time_warp217.py",
+  "tests/test_warp_window217.py"
 ]

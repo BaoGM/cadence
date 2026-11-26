@@ -103,7 +103,16 @@ def build_change(state,media,fps,ranges,target,mode,preserve_pitch,quality,progr
                 if variant is None: pieces.append(seg); continue
                 start=rounded(seg.start*ratio); start=max(0,min(start,variant['frames']-size))
                 used=min(size,variant['frames']-start)
-                pieces.append(replace(seg,media=variant['id'],start=start,end=start+used))
+                curve=()
+                if is_video and seg.warp:
+                    from time_warp import normalized
+                    from time_warp_render import ensure_render
+                    limit=variant['frames']-1
+                    scaled={min(limit,rounded(x*ratio)):(min(limit,rounded(y*ratio)),m) for x,y,m in seg.warp}
+                    if len(scaled)>=2:
+                        curve=normalized([(x,y,m) for x,(y,m) in sorted(scaled.items())])
+                    if curve: ensure_render(variant,curve,progress,cancel)
+                pieces.append(replace(seg,media=variant['id'],start=start,end=start+used,warp=curve))
                 if used<size: pieces.append(Segment(None,0,size-used))
             cursor=b
         pieces.extend(slice_segments(track,cursor,state.length)); return compact(tuple(pieces))

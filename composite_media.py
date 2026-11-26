@@ -20,7 +20,9 @@ def frame_layers(state,media,frame,identities=None):
         for segment in track.segments:
             if at<=frame<at+segment.length:
                 if segment.media is not None and not segment.muted:
-                    result.append((track,segment,media[segment.media],segment.start+frame-at))
+                    from time_warp import video_sample
+                    info,index=video_sample(media[segment.media],segment,segment.source_frame(frame-at))
+                    result.append((track,segment,dict(info,read_alpha=True) if info.get('has_alpha') else info,index))
                 break
             at+=segment.length
     return result
@@ -42,9 +44,12 @@ class LayerFrame:
                 if geometry is not None and track.info.id in (geometry_identity if isinstance(geometry_identity,tuple) else (geometry_identity,)):
                     segment=replace(segment,crop=IDENTITY,placement=IDENTITY,rotation=0) if show_source else geometry
                 exposure=exposures.get(track.info.id,track.exposure) if exposures else track.exposure
-                rgb=exposure_lut(exposure)[rgb] if exposure else rgb
+                if exposure:
+                    rgb=rgb.copy()
+                    rgb[:,:,:3]=exposure_lut(exposure)[rgb[:,:,:3]]
                 rgb=np.ascontiguousarray(rgb)
-                image=QImage(rgb.data,rgb.shape[1],rgb.shape[0],rgb.strides[0],QImage.Format.Format_RGB888)
+                fmt=QImage.Format.Format_RGBA8888 if rgb.shape[2]==4 else QImage.Format.Format_RGB888
+                image=QImage(rgb.data,rgb.shape[1],rgb.shape[0],rgb.strides[0],fmt)
                 base=QImage(width,height,QImage.Format.Format_ARGB32_Premultiplied); base.fill(Qt.GlobalColor.transparent)
                 fit=image.size().scaled(QSize(width,height),Qt.AspectRatioMode.KeepAspectRatio)
                 p=QPainter(base); p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)

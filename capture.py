@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer, QRect, QAbstractNativeEventFilter, QEventLoop
 from PySide6.QtGui import QPainter,QColor,QPen
 from PySide6.QtWidgets import QApplication, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton, QCheckBox, QFileDialog, QMessageBox, QSystemTrayIcon, QMenu, QLineEdit
-from media import ffmpeg
+from media import Cancelled, encode_gif, ffmpeg
 from capture_feedback import CaptureFeedback,RegionOutline,start_sound,recording_icon
 
 class MonitorInfo(ctypes.Structure):
@@ -63,8 +63,12 @@ def capture_args(rect,fps,cursor,path):
         '-vf','pad=ceil(iw/2)*2:ceil(ih/2)*2','-c:v','libx264','-preset','ultrafast',
         '-crf','20','-pix_fmt','yuv420p','-movflags','+faststart',str(path)]
     if Path(path).suffix.lower()=='.gif':
-        args=args[:args.index('-vf')]+['-filter_complex','split[a][b];[a]palettegen=stats_mode=single[p];[b][p]paletteuse=new=1:dither=bayer','-loop','0',str(path)]
+        # Keep the screen's RGB text and odd dimensions while recording in real time.
+        args=args[:args.index('-vf')]+['-c:v','libx264rgb','-preset','ultrafast','-crf','0',str(gif_recording_path(path))]
     return args
+
+def gif_recording_path(output):
+    return Path(output).with_suffix('.lossless.mkv')
 
 class RegionPicker(QDialog):
     def __init__(self,screen):
@@ -117,6 +121,7 @@ class CaptureDialog(QDialog):
         from capture_inputs import CaptureInputs
         self.inputs=CaptureInputs(); self.destroyed.connect(self.inputs.deleteLater); self.finished.connect(self.inputs.stop)
         self.audio=None; self.mux_thread=None; self.mux_done=threading.Event(); self.mux_error=None
+        self.gif_cancel=threading.Event()
         self.log=None; self.owns_hotkey=not hasattr(parent,'capture_hotkey'); self.hotkey=getattr(parent,'capture_hotkey',None) or StopHotkey(self.stop); self.saved_state=parent.windowState()
         self.timer=QTimer(self); self.timer.setInterval(200); self.timer.timeout.connect(self.tick)
         root=QVBoxLayout(self)
@@ -301,7 +306,9 @@ class CaptureDialog(QDialog):
         if self.mux_thread:
             if self.mux_done.is_set():
                 self.mux_thread=None
-                if self.mux_error: self.failed('Le son n’a pas pu être ajouté. La vidéo sans son est conservée ici :\n'+str(self.path)+'\n'+self.mux_error)
+                if self.mux_error and self.path.suffix.lower()=='.gif':
+                    self.failed(tr('La capture originale est conservée ici :')+'\n'+str(gif_recording_path(self.path))+'\n'+self.mux_error)
+                elif self.mux_error: self.failed('Le son n’a pas pu être ajouté. La vidéo sans son est conservée ici :\n'+str(self.path)+'\n'+self.mux_error)
                 else: self.finish_capture()
             return
         if self.countdown:
@@ -329,6 +336,8 @@ class CaptureDialog(QDialog):
             self.video_started=time.time()
             self.record_ready.clear()
             args=capture_args(self.rect_px,self.fps.currentData(),self.include_cursor.isChecked(),self.path); args[args.index('-loglevel')+1]='info'
+            logging.info('Screen capture started: format=%s pixels=%dx%d fps=%s audio=%s',
+                         self.path.suffix,self.rect_px[2],self.rect_px[3],self.fps.currentData(),bool(self.audio))
             self.proc=subprocess.Popen([ffmpeg(),'-progress','pipe:1','-stats_period','0.1','-nostats',*args],
                 stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=self.log,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
             self.progress_thread=threading.Thread(target=self.read_progress,args=(self.proc.stdout,),daemon=True); self.progress_thread.start()
@@ -360,16 +369,49 @@ class CaptureDialog(QDialog):
         self.feedback.hide(); self.outline.hide()
         if hasattr(self,'progress_thread'): self.progress_thread.join(timeout=.2)
         self.release_hotkey(); self.tray.hide()
-        self.log.seek(0); log=self.log.read().decode('utf-8',errors='replace'); self.log.close(); self.log=None
+        self.log.seek(0)
+        first=self.log.read(8192)
+        self.log.seek(max(len(first),self.log.seek(0,os.SEEK_END)-4096))
+        log=(first+self.log.read()).decode('utf-8',errors='replace'); self.log.close(); self.log=None
         self.proc.stdin.close(); self.proc=None
-        if code==0 and self.path.exists() and self.path.stat().st_size>0:
-            if self.audio:
+        gif=self.path.suffix.lower()=='.gif'
+        recorded=gif_recording_path(self.path) if gif else self.path
+        size=recorded.stat().st_size if recorded.exists() else 0
+        logging.info('Screen capture recorder ended: format=%s exit=%s bytes=%d',self.path.suffix,code,size)
+        if code==0 and size>0:
+            if gif:
+                self.restore(); self.show()
+                self.status.setText(tr('Encodage GIF')); self.cancel.setText(tr('Annuler')); self.cancel.setEnabled(True)
+                self.mux_thread=threading.Thread(target=self.finish_gif,daemon=True)
+                self.mux_thread.start(); self.timer.start()
+            elif self.audio:
                 match=re.search(r'start:\s*([\d.]+)',log)
                 epoch=float(match[1]) if match else self.video_started
                 self.status.setText(tr('Finalisation du son…')); self.cancel.setEnabled(False)
                 self.mux_thread=threading.Thread(target=self.finish_audio,args=(epoch,),daemon=True); self.mux_thread.start(); self.timer.start()
             else: self.finish_capture()
         else: self.failed('La capture n’a pas pu être finalisée.\n'+log[-2500:])
+    def finish_gif(self):
+        source=gif_recording_path(self.path)
+        partial=self.path.with_name(self.path.stem+'.'+uuid.uuid4().hex[:8]+'.partial.gif')
+        start=time.monotonic()
+        try:
+            encode_gif(['-i',str(source)],[],'0:v:0',partial,cancel=self.gif_cancel)
+            if self.gif_cancel.is_set(): raise Cancelled()
+            partial.rename(self.path)
+            logging.info('Screen capture GIF ready: elapsed=%.3fs bytes=%d',time.monotonic()-start,self.path.stat().st_size)
+            try: source.unlink()
+            except OSError: logging.warning('Could not remove lossless capture after GIF conversion',exc_info=True)
+        except Cancelled:
+            self.mux_error=tr('Opération annulée.')
+            logging.info('Screen capture GIF conversion cancelled')
+        except Exception as error:
+            logging.exception('Screen capture GIF conversion failed')
+            self.mux_error=str(error) or type(error).__name__
+        finally:
+            try: partial.unlink(missing_ok=True)
+            except OSError: logging.warning('Could not remove incomplete GIF capture',exc_info=True)
+            self.mux_done.set()
     def finish_audio(self,epoch):
         try:
             from capture_audio import mux_audio
@@ -395,7 +437,9 @@ class CaptureDialog(QDialog):
         self.restore(); QMessageBox.warning(self,tr('Capture'),tr(message)); self.done(QDialog.DialogCode.Rejected)
     def reject(self):
         self.inputs.stop()
-        if self.mux_thread: return
+        if self.mux_thread:
+            if self.path.suffix.lower()=='.gif': self.gif_cancel.set()
+            return
         if not self.quick and not self.armed and self.initial_settings!=self.settings_values():
             try: self.save_settings()
             except OSError as e: QMessageBox.warning(self,tr('Capture'),tr(str(e))); return

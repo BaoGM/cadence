@@ -110,27 +110,28 @@ def test_double_click_selects_clicked_clip_or_track(window, application, simple,
 @pytest.mark.parametrize('mode', ['read', 'edit'])
 def test_locked_sidebar_divider_remains_draggable(window, application, mode):
     w = window; w.workspaces.switch(mode)
-    w.library.show(); w.comparison_panel.show(); w.set_layout_editable(False)
+    w.show_references(); w.set_layout_editable(False)
     w.resize(1360, 890); application.processEvents()
-    before = w.library.height()
-    point = QPoint(w.library.geometry().center().x(), (w.library.geometry().bottom()+w.comparison_panel.y())//2)
-    QTest.mousePress(w, Qt.MouseButton.LeftButton, pos=point)
-    QTest.mouseMove(w, point+QPoint(0, -60), 30)
+    before = w.reference_split.sizes()[0]
+    handle = w.reference_split.handle(1)
+    point = handle.rect().center()
+    QTest.mousePress(handle, Qt.MouseButton.LeftButton, pos=point)
+    QTest.mouseMove(handle, point+QPoint(0, -60), 30)
     QTest.qWait(50)
-    QTest.mouseRelease(w, Qt.MouseButton.LeftButton, pos=point+QPoint(0, -60))
+    QTest.mouseRelease(handle, Qt.MouseButton.LeftButton, pos=point+QPoint(0, -60))
     application.processEvents()
-    assert w.library.height() < before-30
+    assert w.reference_split.sizes()[0] < before-30
     assert not w.layout_editable
 
 
 def test_tools_remain_narrow_without_sidebar_panels(window, application):
     w = window
-    w.library.hide(); w.comparison_panel.hide(); application.processEvents()
+    w.library.hide(); application.processEvents()
     assert w.edit_toolbar.width() <= 64
     assert w.centralWidget().x() <= 74
     w.resize(1600, 900); application.processEvents()
     assert w.edit_toolbar.width() <= 64
-    w.library.show(); w.comparison_panel.show(); application.processEvents()
+    w.show_references(); application.processEvents()
     assert w.library.width() >= 180
     assert w.edit_toolbar.width() <= 64
 

@@ -12,13 +12,14 @@ def test_hardware_open_failure_falls_back(monkeypatch):
     monkeypatch.setenv('CADENCE_HW_DECODE','d3d11va')
     monkeypatch.setattr(av.codec.hwaccel,'hwdevices_available',lambda:['d3d11va'])
     calls=[]; software=object()
-    def opening(path,**options):
-        calls.append(options)
-        if options: raise RuntimeError('device unavailable')
+    def opening(path, *, options, hwaccel=None):
+        assert options['protocol_whitelist'] == 'file'
+        calls.append(hwaccel)
+        if hwaccel is not None: raise RuntimeError('device unavailable')
         return software
     monkeypatch.setattr(av,'open',opening)
     assert open_preview('test.avi')==(software,False)
-    assert len(calls)==2 and not calls[-1]
+    assert len(calls)==2 and calls[0] is not None and calls[-1] is None
 
 
 def test_unsupported_codec_closes_unused_device(monkeypatch):
@@ -27,7 +28,11 @@ def test_unsupported_codec_closes_unused_device(monkeypatch):
     monkeypatch.setenv('CADENCE_HW_DECODE','d3d11va')
     monkeypatch.setattr(av.codec.hwaccel,'hwdevices_available',lambda:['d3d11va'])
     closed=[]; unused=SimpleNamespace(streams=SimpleNamespace(video=[SimpleNamespace(codec_context=SimpleNamespace(is_hwaccel=False))]),close=lambda:closed.append(True))
-    software=object(); monkeypatch.setattr(av,'open',lambda path,**kw:unused if kw else software)
+    software=object()
+    def opening(path, *, options, hwaccel=None):
+        assert options['protocol_whitelist'] == 'file'
+        return unused if hwaccel is not None else software
+    monkeypatch.setattr(av,'open',opening)
     assert open_preview('test.avi')==(software,False) and closed==[True]
 
 

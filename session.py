@@ -5,7 +5,7 @@ from dataclasses import fields
 from datetime import datetime, timezone
 from pathlib import Path
 from PySide6.QtCore import QObject, QTimer, QLockFile, QPointF
-from model import Document
+from model import Document, project_fields, project_version
 from project_io import ProjectSizeError
 from preferences import preference_path
 from workspace_modes import encoded, decoded
@@ -23,13 +23,13 @@ def read_session(path):
         raise ValueError('Fichier de session incompatible.')
     project=data.get('project_path')
     if project is not None and not isinstance(project,str): raise ValueError('Chemin de projet invalide.')
-    doc=Document.from_data(data['document'],project)
+    doc=Document.from_data(data['document'],project,legacy_session=True)
     if data.get('dirty') is True: doc.saved_signature=None
     return data,doc
 
 
 def encode_json(value):
-    return json.dumps(value,ensure_ascii=False,separators=(',',':'),default=lambda item:{field.name:getattr(item,field.name) for field in fields(item)})
+    return json.dumps(value,ensure_ascii=False,separators=(',',':'),default=lambda item:project_fields((field.name,getattr(item,field.name)) for field in fields(item)))
 
 
 class SnapshotEncoder:
@@ -59,7 +59,7 @@ def write_snapshot(path,document,view,encoder=None):
     state,media,fps,review,project,dirty=document
     payload=dict(format='cadence-session',version=1,updated=datetime.now(timezone.utc).isoformat(),
                  project_path=project,dirty=dirty,view=view)
-    document=dict(format='cadence-studio',version=20 if state.has_image_adjustments else 19 if state.marker_styles else 18 if state.marker_notes else 17 if state.marker_names else 16 if state.second_track is not None or not state.track_info.audio_enabled or review.get('reference_track') else 15 if len(review.get('references',[]))>1 else 14 if review.get('reference_cadence') or any(m.get('cadence') for m in media.values()) else 13 if any(m.get('has_video') is False for m in media.values()) else 12 if state.frame_markers else 11,
+    document=dict(format='cadence-studio',version=project_version(state,media,review,all_media=True),
                   media=list(media.values()),fps=str(fps),comparison=review)
     encoded_state=(encoder or SnapshotEncoder()).state(state)
     from project_io import PROJECT_BYTES, write_json_chunks
@@ -157,6 +157,8 @@ class SessionRecovery(QObject):
                 validate_media(media)
                 refreshed=prepare_media(media['path'],doc.fps,progress,cancel,quality=quality,cadence=media.get('cadence'),defer_audio=True)
                 refreshed['id']=key; doc.media[key]=refreshed
+            from time_warp import prepare_document
+            prepare_document(doc,progress,cancel)
             from reference_sequence import restore
             restore(doc,quality,progress,cancel)
             return doc

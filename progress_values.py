@@ -32,5 +32,5 @@ class FFmpegProgress:
         end=self.duration*1_000_000
         fraction=.99 if timestamp>=end else timestamp/end
         self.value=max(self.value,min(.99,fraction))
-        logging.info('FFmpeg progress: out_time_us=%r type=%s duration=%r fraction=%r',timestamp,type(timestamp).__name__,self.duration,self.value)
+        logging.debug('FFmpeg progress: out_time_us=%r type=%s duration=%r fraction=%r',timestamp,type(timestamp).__name__,self.duration,self.value)
         return self.value

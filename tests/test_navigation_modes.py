@@ -12,7 +12,7 @@ from navigation_modes import toggle_step
 
 def test_shortcut_only_actions_cycle_and_rebind(window,application):
     w=window; w.activateWindow(); w.viewer.setFocus(); QTest.qWait(40)
-    key='Comparaison/Mode de comparaison suivant'
+    key='Références/Mode de comparaison suivant'
     action,default=w.action_registry[key]
     menu_actions=[a for entry in w.menuBar().actions() for a in entry.menu().actions()]
     assert action not in menu_actions

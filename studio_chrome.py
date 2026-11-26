@@ -4,9 +4,9 @@ from pathlib import Path
 
 from PySide6.QtCore import QDeadlineTimer, QEvent, QObject, QPoint, QSize, Qt, QTimer
 from shiboken6 import isValid
-from PySide6.QtGui import QColor, QKeySequence, QShortcut
-from PySide6.QtWidgets import (QCheckBox, QColorDialog, QFrame, QHBoxLayout, QLabel, QLayout,
-                               QMenu, QScrollArea, QSizePolicy, QToolBar,
+from PySide6.QtGui import QAction, QColor, QKeySequence, QShortcut
+from PySide6.QtWidgets import (QColorDialog, QFrame, QHBoxLayout, QLabel, QLayout,
+                               QMenu, QSizePolicy, QToolBar,
                                QToolButton, QVBoxLayout, QWidget)
 
 from studio_icons import icon
@@ -25,6 +25,17 @@ class FileLabel(QLabel):
             self.value = value
             self.setToolTip(value)
             self.fit_text()
+            self.updateGeometry()
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        hint.setWidth(self.fontMetrics().horizontalAdvance(self.value) + 2)
+        return hint
+
+    def minimumSizeHint(self):
+        hint = super().minimumSizeHint()
+        hint.setWidth(0)
+        return hint
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -93,90 +104,31 @@ def control(name, symbol=None, caption=None, action=None, size=17):
     return b
 
 
-def build_editing_strip(w):
-    from widgets import ScrubDoubleSpinBox, adjustment_button
-    body, row = strip('studioEditing', 44, 12)
-    row.setSpacing(8)
-    contents = QWidget()
-    controls = QHBoxLayout(contents)
-    controls.setContentsMargins(0, 0, 2, 0)
-    controls.setSpacing(8)
-    controls.addWidget(glyph('settings'))
-    w.exposure_button = adjustment_button('Exposition')
-    w.exposure_button.clicked.connect(w.toggle_exposure)
-    controls.addWidget(w.exposure_button)
-    w.exp_spin = ScrubDoubleSpinBox()
-    w.exp_spin.setRange(-10, 10)
-    w.exp_spin.setDecimals(2)
-    w.exp_spin.setSingleStep(.25)
-    w.exp_spin.setSuffix(tr(' EV'))
-    w.exp_spin.setAccessibleName(tr('Exposition'))
-    w.exp_spin.setFixedSize(max(78,w.exp_spin.minimumSizeHint().width()), 27)
-    w.exp_spin.valueChanged.connect(w.exposure_spin)
-    w.exp_spin.editingFinished.connect(w.commit_exposure)
-    controls.addWidget(w.exp_spin)
-    reset = control('Réinitialiser l’exposition', 'refresh', size=15)
-    reset.clicked.connect(lambda:w.set_exposure(0))
-    controls.addWidget(reset)
-    controls.addWidget(divider())
-    w.editing_flags = QWidget()
-    flags = QHBoxLayout(w.editing_flags)
-    flags.setContentsMargins(0, 0, 0, 0)
-    flags.setSpacing(10)
-    flags.addWidget(glyph('edit'))
-    flags.addWidget(QLabel(tr('Montage')))
+def build_editing_menu(w):
     w.editing_overflow = control('Montage', 'edit', 'Montage')
+    w.editing_overflow.setObjectName('editingMenu')
     choices = QMenu(w.editing_overflow)
+    choices.setToolTipsVisible(True)
     w.editing_overflow.setMenu(choices)
     w.editing_overflow.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-    def menu_toggle(box):
-        a = choices.addAction(box.text())
-        a.setCheckable(True)
-        a.setChecked(box.isChecked())
-        a.toggled.connect(box.setChecked)
-        box.toggled.connect(a.setChecked)
     for attr, name, checked, hint in (
         ('copy_audio', 'Copier/coller le son', False, 'Décoché : les images collées sont accompagnées de silence. Cocher avant de copier pour inclure le son.'),
         ('leave_gap', 'Laisser un vide', False, 'Alt-déplacement : conserver un vide à la place du bloc déplacé.'),
         ('link_tracks', 'Audio / vidéo liés', True, 'Désactiver pour déplacer uniquement la piste saisie avec Alt.'),
         ('link_drawings', 'Dessins / vidéo liés', True, 'Les clés suivent les déplacements, coupes et insertions vidéo. Décocher pour garder le calque indépendant.'),
     ):
-        box = QCheckBox(tr(name))
-        box.setToolTip(tr(hint))
-        box.setChecked(checked)
-        setattr(w, attr, box)
-        flags.addWidget(box)
-        menu_toggle(box)
+        choice = choices.addAction(tr(name))
+        choice.setToolTip(tr(hint))
+        choice.setCheckable(True)
+        choice.setChecked(checked)
+        setattr(w, attr, choice)
     w.link_drawings.toggled.connect(w.set_drawings_linked)
-    controls.addWidget(w.editing_flags)
-    controls.addWidget(w.editing_overflow)
-    controls.addStretch()
-    w.header_scroll = QScrollArea()
-    w.header_scroll.setFrameShape(QFrame.Shape.NoFrame)
-    w.header_scroll.setWidgetResizable(True)
-    w.header_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-    w.header_scroll.setWidget(contents)
-    row.addWidget(w.header_scroll, 1)
-    row.addWidget(divider())
-    for attr, title, symbol, shortcut, callback in (
-        ('open_btn', 'Ouvrir des vidéos', 'folder', 'Ctrl+O', w.open_video),
-        ('save_btn', 'Enregistrer', 'doc', 'Ctrl+S', w.save_project),
-        ('export_btn', 'Exporter', 'export', 'Ctrl+E', w.export_dialog),
-    ):
-        b = control(title, symbol, title)
-        b.setProperty('fileCommand', True)
-        b.setToolTip(tr(title) + ' · ' + shortcut)
-        b.clicked.connect(callback)
-        row.addWidget(b)
-        setattr(w, attr, b)
-    return body
 
 
 class StudioChrome(QObject):
     def __init__(self, window):
         super().__init__(window)
         self.w = window
-        self.drawing_panel_width = window.drawing.panel.minimumWidth()
         window.drawing.panel.layout().setSizeConstraint(QLayout.SetNoConstraint)
         self.build_top()
         self.build_viewer()
@@ -245,10 +197,33 @@ class StudioChrome(QObject):
             self.mode_buttons[mode] = b
         group.setParent(frame)
         self.mode_group = group
+        self.file_group, commands = strip('studioFiles', 32, 0)
+        commands.setSpacing(4)
+        row.addWidget(self.file_group)
+        self.file_menu = control('Commandes de montage', 'more')
+        self.file_menu.setMenu(QMenu(self.file_menu))
+        self.file_menu.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.file_buttons = []
+        add_track = QAction(tr('Piste média'), w)
+        add_track.setToolTip(tr('Ajouter une seconde piste média sous la première.'))
+        add_track.triggered.connect(lambda:w.add_media_track(switch_to_editing=False))
+        for attr, title, symbol, action in (
+            ('add_track_button', 'Piste média', 'plus', add_track),
+            ('open_btn', 'Ouvrir des vidéos', 'folder', w.action_registry['Fichier/Ouvrir des vidéos…'][0]),
+            ('save_btn', 'Enregistrer', 'doc', w.action_registry['Fichier/Enregistrer'][0]),
+            ('export_btn', 'Exporter', 'export', w.action_registry['Fichier/Exporter…'][0]),
+        ):
+            button = control(title, symbol, title, action)
+            commands.addWidget(button)
+            self.file_buttons.append(button)
+            self.file_menu.menu().addAction(action)
+            setattr(w, attr, button)
+        commands.addWidget(self.file_menu)
         row.addSpacing(4)
         self.options_button=control('Options…','settings',action=w.action_registry['Fichier/Options…'][0])
         row.addWidget(self.options_button)
-        row.addWidget(control('Guide rapide', 'help', action=w.action_registry['Aide/Guide rapide'][0]))
+        self.help_button = control('Guide rapide', 'help', action=w.action_registry['Aide/Guide rapide'][0])
+        row.addWidget(self.help_button)
         self.language_divider=divider()
         row.addWidget(self.language_divider)
         self.language_button = control('Langue', caption='FR / en' if language() == 'fr' else 'EN / fr')
@@ -282,11 +257,14 @@ class StudioChrome(QObject):
             self.brand.setVisible(width>=840)
             self.format.setVisible(width>=1250)
             self.format_divider.setVisible(not self.format.isHidden())
+            self.fit_view_commands()
+            size=self.mode_group.sizeHint()
             self.view.setFixedWidth(self.viewer_row.sizeHint().width())
-            row.activate()
             center=self.top.mapFromGlobal(self.w.mapToGlobal(self.w.rect().center())).x()
+            self.fit_file_commands(center)
+            row.activate()
             left=max(self.language_button.geometry().right()+4,
-                     min(center-size.width()//2,self.view.x()-row.spacing()-size.width()))
+                     min(center-size.width()//2,self.file_group.x()-row.spacing()-size.width()))
             available=max(0,left-self.language_button.geometry().right()-13)
             self.media.setFixedWidth(min(300,available,self.media.fontMetrics().horizontalAdvance(self.media.value)+2))
         height=self.mode_group.height()
@@ -310,6 +288,7 @@ class StudioChrome(QObject):
     def build_viewer(self):
         w = self.w
         self.view, row = strip('studioView', 42, 10)
+        self.view.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.viewer_row = row
         row.setSpacing(7)
         self.side_history={}
@@ -319,7 +298,10 @@ class StudioChrome(QObject):
         self.view_divider = divider()
         row.addWidget(self.view_divider)
         self.media = FileLabel('studioSource')
-        row.addWidget(self.media, 1)
+        self.media.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+        row.addWidget(self.media)
+        row.addWidget(w.editing_overflow)
+        row.addStretch(1)
         self.format = QLabel()
         self.format.setObjectName('studioDetails')
         row.addWidget(self.format)
@@ -334,11 +316,20 @@ class StudioChrome(QObject):
         self.right_button.clicked.connect(lambda:self.toggle_side('right'))
         row.addWidget(self.right_button)
         menu = QMenu(self.view)
-        for key in ('header','drawing','comments','comparison','timecode','transport','timeline','tools'):
+        menu.addAction(w.library_action)
+        for key in ('drawing','comments','timecode','transport','timeline','tools'):
             menu.addAction(w.panel_actions[key])
         self.view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.view.customContextMenuRequested.connect(lambda point:menu.exec(self.view.mapToGlobal(point)))
-        row.addWidget(control('Plein écran vidéo', 'fit', action=w.action_registry['Affichage/Plein écran vidéo'][0]))
+        self.full_button = control('Plein écran vidéo', 'fit', action=w.action_registry['Affichage/Plein écran vidéo'][0])
+        row.addWidget(self.full_button)
+        self.view_more = control('Options de l’aperçu', 'more')
+        self.view_more.setMenu(QMenu(self.view_more))
+        for button in (self.compare_button,self.sync_button,self.full_button):
+            self.view_more.menu().addAction(button.defaultAction())
+        self.view_more.setPopupMode(QToolButton.InstantPopup)
+        row.insertWidget(row.indexOf(self.right_button),self.view_more)
+        self.view_more.hide()
         central = w.viewer_workspace.content.layout()
         central.setContentsMargins(0, 0, 0, 0)
         central.setSpacing(0)
@@ -353,13 +344,14 @@ class StudioChrome(QObject):
 
     def combine_reader_header(self, read):
         row=self.top.layout()
+        self.view.setSizePolicy(QSizePolicy.Preferred if read else QSizePolicy.Ignored, QSizePolicy.Fixed)
         if read:
             for field in (self.dock_button,self.language_button,self.media):
                 row.insertWidget(row.indexOf(self.project_icon),field)
             row.insertWidget(row.indexOf(self.options_button),self.view)
         else:
             self.viewer_row.insertWidget(0,self.dock_button)
-            self.viewer_row.insertWidget(self.viewer_row.indexOf(self.format),self.media,1)
+            self.viewer_row.insertWidget(self.viewer_row.indexOf(self.w.editing_overflow),self.media)
             row.addWidget(self.language_button)
             self.view.setMinimumWidth(0)
             self.view.setMaximumWidth(16777215)
@@ -369,14 +361,14 @@ class StudioChrome(QObject):
         for widget in (self.view,self.dock_button,self.media,self.language_button):
             widget.show()
         self.language_divider.setVisible(not read)
-        row.setSpacing(4 if read else 8)
+        row.setSpacing(3 if read else 8)
         row.setContentsMargins(6 if read else 16,0,6 if read else 16,0)
         self.responsive()
 
     def side_docks(self, side):
         area=Qt.LeftDockWidgetArea if side=='left' else Qt.RightDockWidgetArea
         w=self.w
-        return {name:dock for name,dock in (('library',w.library),('comparison',w.comparison_panel),('drawing',w.drawing.panel))
+        return {name:dock for name,dock in (('library',w.library),('drawing',w.drawing.panel))
                 if not dock.isFloating() and w.dockWidgetArea(dock)==area}
 
     def toggle_side(self,side):
@@ -397,6 +389,7 @@ class StudioChrome(QObject):
         self.side_motion.settle()
         self.video_settle.stop()
         self.video_target_size = target_size
+        self.video_stage_size = None
         self.video_deadline = QDeadlineTimer(250)
         self.stage_layout.setEnabled(False)
         w.viewer.layout_pending = True
@@ -420,6 +413,10 @@ class StudioChrome(QObject):
             widget.layout().activate()
         if self.headers.top.isVisible() and self.headers.read and not w.video_fullscreen:
             self.headers.reserve_top(self.top.height() if self.headers.narrow_header() else 0)
+        if self.stage.size() != self.video_stage_size:
+            self.video_stage_size = self.stage.size()
+            self.video_settle.start(16)
+            return
         self.stage_layout.setEnabled(True)
         self.stage_layout.invalidate()
         self.stage_layout.activate()
@@ -476,6 +473,16 @@ class StudioChrome(QObject):
         w.drawing.wheel.changed.connect(update_color)
         w.drawing.wheel.set_color('#ffd096')
         swatch.clicked.connect(choose_color)
+        tabs = w.drawing.inspector_tabs
+        self.inspector_buttons = []
+        for index, (title, symbol) in enumerate((('Outils de dessin', 'settings'), ('Commentaires', 'comment'))):
+            button = add(control(title, symbol))
+            button.setCheckable(True)
+            button.clicked.connect(lambda checked=False, page=index: self.open_inspector(page))
+            self.inspector_buttons.append(button)
+        tabs.currentChanged.connect(self.sync_inspector_buttons)
+        w.drawing.panel.visibilityChanged.connect(self.sync_inspector_buttons)
+        self.sync_inspector_buttons()
         add(control('Annuler', 'undo', action=w.undo_action))
         tools_menu = w.drawing.tools_menu
         tools.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -490,8 +497,26 @@ class StudioChrome(QObject):
         scroll.setParent(rail)
         stack.addWidget(scroll, 1)
         w.edit_toolbar.setWidget(rail)
-        for obj in (w.edit_toolbar, w.library, w.comparison_panel, w.drawing.panel, w.viewer_workspace, self.top):
+        for obj in (w.edit_toolbar, w.library, w.drawing.panel, w.viewer_workspace, self.top, self.view):
             obj.installEventFilter(self)
+
+    def open_inspector(self, index):
+        drawing = self.w.drawing
+        opening = drawing.panel.isHidden() or drawing.inspector_tabs.currentIndex() != index
+        drawing.inspector_tabs.setCurrentIndex(index)
+        if drawing.panel.isHidden() == opening:
+            if drawing.panel.isFloating():
+                self.w.set_panel('drawing', opening)
+            else:
+                self.side_motion.toggle([drawing.panel], opening)
+        if opening:
+            drawing.panel.raise_()
+        self.sync_inspector_buttons()
+
+    def sync_inspector_buttons(self, *_):
+        drawing = self.w.drawing
+        for index, button in enumerate(self.inspector_buttons):
+            button.setChecked(not drawing.panel.isHidden() and drawing.inspector_tabs.currentIndex() == index)
 
     def build_timeline(self):
         w = self.w
@@ -513,6 +538,12 @@ class StudioChrome(QObject):
         row.addSpacing(7)
         row.addWidget(self.track_count)
         row.addStretch()
+        self.warp_button=control('Time Warp','time-warp','Time Warp',size=15)
+        self.warp_button.setObjectName('timeWarpButton')
+        self.warp_button.setFixedHeight(26)
+        from time_warp_ui import open_editor
+        self.warp_button.clicked.connect(lambda:open_editor(w))
+        row.addWidget(self.warp_button)
         self.views = []
         chooser, choices = strip('studioSegment', 26, 2)
         choices.setSpacing(1)
@@ -543,6 +574,7 @@ class StudioChrome(QObject):
 
     def fold_timeline(self):
         self.collapsed = not self.collapsed
+        self.warp_button.setVisible(not self.collapsed)
         self.fold.setIcon(icon('right' if self.collapsed else 'down', size=13))
         self.w.timeline.setVisible(not self.collapsed)
         self.headers.configure(self.headers.read, self.w.timeline.simple and not self.collapsed)
@@ -591,6 +623,8 @@ class StudioChrome(QObject):
         self.track_count.setText(tr('2 pistes média') if self.w.doc.state.second_track else tr('1 piste média'))
 
     def update_media(self, media, info):
+        from time_warp import target
+        self.warp_button.setEnabled(not self.w.job and target(self.w.doc) is not None)
         self.media.set_value(media['name'] if media else tr('Aperçu'))
         if media and media.get('has_video', True):
             rate = f'{float(self.w.doc.fps):.3f}'.rstrip('0').rstrip('.')
@@ -604,7 +638,11 @@ class StudioChrome(QObject):
                     self.side_motion.settle()
                 self.responsive()
             elif obj is self.top:
+                if event.type()==QEvent.Resize and not self.headers.read:
+                    self.fit_file_commands()
                 self.center_modes()
+            elif obj is self.view and event.type()==QEvent.Resize:
+                self.fit_view_commands()
             elif (self.side_motion.measuring or self.side_motion.paths) and event.type() in (QEvent.Move,QEvent.Resize):
                 if obj is self.w.viewer_workspace:
                     self.w.compact_transport.schedule()
@@ -641,13 +679,61 @@ class StudioChrome(QObject):
         if self.w.height()<=440: y=0
         return (x,y,x,y)
 
+    def fit_file_commands(self, reader_center=None):
+        row = self.top.layout()
+        trailing = ((self.view, self.options_button, self.help_button) if reader_center is not None
+                    else (self.options_button, self.help_button, self.language_divider, self.language_button))
+        right_width = sum(widget.sizeHint().expandedTo(widget.minimumSize()).boundedTo(widget.maximumSize()).width() for widget in trailing)
+        right_width += row.contentsMargins().right() + row.spacing() * (len(trailing) + 1) + 4
+        center = reader_center if reader_center is not None else self.top.width() // 2
+        available = self.top.width() - center - self.mode_group.sizeHint().width() // 2 - right_width
+        if not hasattr(self, 'file_widths'):
+            self.file_widths = {}
+            for style in (Qt.ToolButtonTextBesideIcon, Qt.ToolButtonIconOnly):
+                for button in self.file_buttons:
+                    button.setToolButtonStyle(style)
+                    button.ensurePolished()
+                spacing = self.file_group.layout().spacing()
+                self.file_widths[style] = sum(b.sizeHint().width() for b in self.file_buttons) + spacing * (len(self.file_buttons) - 1)
+        style = Qt.ToolButtonTextBesideIcon if available >= self.file_widths[Qt.ToolButtonTextBesideIcon] else Qt.ToolButtonIconOnly
+        overflow = available < self.file_widths[Qt.ToolButtonIconOnly]
+        for button in self.file_buttons:
+            button.setVisible(not overflow)
+            button.setToolButtonStyle(style)
+        self.file_menu.setVisible(overflow)
+
+    def fit_view_commands(self):
+        editing = not self.headers.read
+        compact = editing and self.view.width() < 365
+        overflow = compact and self.view.width() < 245
+        compact_reader = not editing and self.top.width() < 780
+        key = (compact,overflow,compact_reader)
+        if key==getattr(self,'viewer_density',None):
+            return
+        self.viewer_density = key
+        menu = self.w.editing_overflow
+        menu.setToolButtonStyle(Qt.ToolButtonIconOnly if compact else Qt.ToolButtonTextBesideIcon)
+        menu.setMinimumWidth(39 if compact else 0)
+        menu.setMaximumWidth(39 if compact else 16777215)
+        self.menu_button.setToolButtonStyle(Qt.ToolButtonIconOnly if compact_reader else Qt.ToolButtonTextBesideIcon)
+        for button in self.mode_buttons.values():
+            button.setToolButtonStyle(Qt.ToolButtonTextOnly if compact_reader else Qt.ToolButtonTextBesideIcon)
+        for button in (self.dock_button,self.right_button,self.view_more):
+            button.setFixedWidth(24 if overflow or compact_reader else 30)
+        for button in (self.help_button,self.options_button,self.sync_button,self.full_button):
+            button.setFixedWidth(24 if compact_reader else 30)
+        self.view_more.setVisible(overflow)
+        for button in (self.compare_button,self.sync_button,self.full_button):
+            button.setVisible(not overflow)
+
     def responsive(self):
         small = self.w.width() <= 1000
         narrow = self.w.width() <= 760
+        tiny = self.w.width() < 710
         low = self.w.height() <= 620
         short = self.w.height() <= 440
-        self.w.drawing.panel.setMinimumWidth(200 if narrow else self.drawing_panel_width)
         read=self.headers.read
+        self.w.drawing.fit_inspector(tiny)
         if not read:
             self.brand.show()
             self.format.setVisible(not small)
@@ -661,12 +747,13 @@ class StudioChrome(QObject):
         self.breadcrumb.setVisible(not small and bool(self.breadcrumb.value) and not read)
         self.track_count.setVisible(not narrow)
         self.top.setFixedHeight(36 if short else 42 if low else 53)
-        edit_strip = self.w.header.widget()
-        strip_height = 36 if short else 44
-        if edit_strip.minimumHeight() != strip_height:
-            edit_strip.setFixedHeight(strip_height)
-            self.w.compact_playback_panels()
+        self.w.editing_overflow.setVisible(not read)
+        if not read:
+            self.top.layout().setSpacing(4 if narrow else 8)
+            self.top.layout().setContentsMargins(6 if narrow else 16,0,6 if narrow else 16,0)
+            self.fit_file_commands()
         self.view.setFixedHeight(34 if low else 42)
+        self.fit_view_commands()
         self.rail_items.setContentsMargins(0, 3 if low else 9, 0, 3 if low else 5)
         self.rail_items.setSpacing(0 if low else 3)
         geometry_band = (small, narrow)
@@ -679,11 +766,5 @@ class StudioChrome(QObject):
         self.w.sync_timeline_scroll()
         self.stage_layout.setContentsMargins(*self.stage_padding(self.headers.read))
         self.center_modes()
-        condensed = self.w.width() < 1480
         self.w.viewer.setMinimumHeight(70 if short else 90)
-        self.w.editing_flags.setVisible(not condensed)
-        self.w.editing_overflow.setVisible(condensed)
-        for button in (self.w.open_btn,self.w.save_btn,self.w.export_btn):
-            button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly if narrow
-                                      else Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.align_workspace()

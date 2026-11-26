@@ -12,7 +12,7 @@ def cache_entries():
         if folder.resolve().parent!=root: continue
         files=list(folder.iterdir())
         allowed={'media.json','preview.avi','audio.s16','waveform-v1.npy'}
-        if any(not p.is_file() or p.is_symlink() or p.stat().st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT or (p.name not in allowed and not re.fullmatch(r'(?:waveform-v1\.npy|media\.json)\.[0-9a-f]+\.tmp',p.name)) for p in files): continue
+        if any(not p.is_file() or p.is_symlink() or p.stat().st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT or (p.name not in allowed and not re.fullmatch(r'warp-[0-9a-f]{32}\.nut|(?:waveform-v1\.npy|media\.json)\.[0-9a-f]+\.tmp',p.name)) for p in files): continue
         yield folder,files
 
 def clear_cache(protected=()):

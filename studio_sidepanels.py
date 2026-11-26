@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-from PySide6.QtCore import QEasingCurve, QElapsedTimer, QRect, Qt, QVariantAnimation
+from PySide6.QtCore import QEasingCurve, QRect, Qt, QVariantAnimation
 from PySide6.QtWidgets import QLabel
 
 
@@ -17,7 +17,7 @@ class SidePanelMotion(QVariantAnimation):
         self.setEndValue(1.0)
         self.valueChanged.connect(self.advance)
         self.finished.connect(self.settle)
-        for dock in (self.window.library,self.window.comparison_panel,self.window.drawing.panel):
+        for dock in (self.window.library,self.window.drawing.panel):
             dock.visibilityChanged.connect(self.settle)
             dock.topLevelChanged.connect(self.settle)
 
@@ -38,9 +38,6 @@ class SidePanelMotion(QVariantAnimation):
         w = self.window
         if not docks:
             return
-        elapsed = QElapsedTimer()
-        elapsed.start()
-        continuing = bool(self.paths)
         self.stop()
         lateral = {dock:edge for edge in ('left','right') for dock in self.chrome.side_docks(edge).values()}
         moving = [w.viewer_workspace, *lateral]
@@ -109,10 +106,6 @@ class SidePanelMotion(QVariantAnimation):
             stage.activate()
         if self.paths:
             self.start()
-            if w.viewer.panel_raster and not continuing:
-                # Include layout measurement in the first visible step, capped
-                # at one animation tick even for a slow, thumbnail-heavy dock.
-                self.setCurrentTime(min(elapsed.elapsed(), 16))
         else:
             self.settle()
             if hasattr(surface, 'end_panel_slide'):

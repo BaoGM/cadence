@@ -28,7 +28,8 @@ _french={
 _wording=[('du canvas','de la vue'),('le canvas','la vue'),('scrubber','faire défiler'),('Scrub vidéo','Défilement vidéo'),('scrub','défilement'),('canvas','vue'),('Canvas','Vue'),('time code','code temporel'),('Shift','Maj'),('Mute / Unmute','Couper / Réactiver le son'),('Overlay - transparence','Superposition'),('Overlay','Superposition')]
 _reverse={v:k for k,v in _pairs.items()}
 _reverse.update({v:k for k,v in _french.items()})
-for name in ('Fichier','Édition','Lecture','Affichage','Comparaison','Dessin','Outils','Synchronisation 3D','Aide'):
+_menu_categories=('Fichier','Édition','Lecture','Affichage','Références','Comparaison','Dessin','Outils','Synchronisation 3D','Aide')
+for name in _menu_categories:
     _reverse[_pairs.get(name,name)]=name; _reverse[name]=name
 _reverse.update({'Undo':'Annuler','Flip horizontally':'Flop - miroir horizontal','Flip vertically':'Flip - miroir vertical'})
 
@@ -37,7 +38,7 @@ def source(text): return _reverse.get(text,text)
 
 def interface_sources():
     terms={tr(key):key for key in reversed((*_pairs,*_french))}
-    for key in ('Fichier','Édition','Lecture','Affichage','Comparaison','Dessin','Outils','Options','Options…','Pelure d’oignon'):
+    for key in (*_menu_categories,'Options','Options…','Pelure d’oignon'):
         terms[tr(key)]=key
     return terms
 
@@ -64,7 +65,7 @@ def tr(text):
     if not isinstance(text,str) or not text: return text
     if '/' in text:
         category,title=text.split('/',1)
-        if category in ('Fichier','Édition','Lecture','Affichage','Comparaison','Dessin','Outils','Synchronisation 3D','Aide'):
+        if category in _menu_categories:
             if _language=='en' and category=='Édition' and title=='Annuler': return 'Edit / Undo'
             return tr(category)+' / '+tr(title)
     if _language=='fr': return plain(text,'fr')

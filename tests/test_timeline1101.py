@@ -48,17 +48,17 @@ def test_move_clears_selection_but_duplicate_still_selects(track):
 
 def test_compact_layout_preserves_custom_arrangement(window,application):
     w=window; modes=w.workspaces
-    w.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea,w.comparison_panel)
-    application.processEvents(); original=w.library.geometry()
-    modes.fit_comparison_stack(); application.processEvents()
-    assert w.library.geometry()==original
-    modes.reset(); w.set_panel('comparison',True); application.processEvents(); modes.fit_comparison_stack(); application.processEvents()
-    panel=w.comparison_panel; scroll=panel.widget(); body=scroll.widget()
-    assert scroll.verticalScrollBar().maximum()==0
-    assert abs(panel.height()-(body.minimumSizeHint().height()+2*scroll.frameWidth()))<=3
-    modes.capture(); original=w.library.height()
+    w.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea,w.library)
+    w.show_references()
+    modes.capture(); modes.switch('read'); modes.switch('edit'); application.processEvents()
+    assert w.dockWidgetArea(w.library)==Qt.RightDockWidgetArea and w.reference_combo.isVisible()
+    modes.reset(); w.show_references(); application.processEvents()
+    assert w.dockWidgetArea(w.library)==Qt.LeftDockWidgetArea and w.reference_combo.isVisible()
+    w.reference_split.setSizes([200,250])
+    modes.capture(); original=w.reference_split.sizes()[0]/sum(w.reference_split.sizes())
     modes.switch('read'); modes.switch('edit'); application.processEvents()
-    assert abs(w.library.height()-original)<=2
+    assert w.reference_combo.isVisible()
+    assert abs(w.reference_split.sizes()[0]/sum(w.reference_split.sizes())-original)<.06
 
 
 def test_compact_layout_uses_styled_control_heights(window,application):
@@ -66,10 +66,10 @@ def test_compact_layout_uses_styled_control_heights(window,application):
     w=window; previous=application.styleSheet()
     try:
         application.setStyleSheet(STYLE); w.hide(); w.resize(1600,900)
-        w.workspaces.reset(); w.set_panel('comparison',True); w.show(); QTest.qWait(50)
-        scroll=w.comparison_panel.widget()
+        w.workspaces.reset(); w.show_references(); w.show(); QTest.qWait(50)
+        scroll=w.reference_split.widget(1)
         assert scroll.verticalScrollBar().maximum()==0
-        assert w.comparison_panel.height()>=scroll.widget().minimumSizeHint().height()
+        assert scroll.viewport().height()>=scroll.widget().minimumSizeHint().height()
         w.library_tabs.setCurrentWidget(w.playlists_panel)
         application.processEvents()
         for listing in (w.playlists_panel.tree,w.playlists_panel.files):

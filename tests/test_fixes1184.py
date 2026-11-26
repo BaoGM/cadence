@@ -211,7 +211,7 @@ def test_media_open_shows_progress_only_when_needed(window, application, monkeyp
 @pytest.mark.parametrize('mode',['read','edit','short'])
 def test_library_lists_do_not_overlap_in_small_window(window,application,mode):
     w=window; panel=w.playlists_panel
-    w.workspaces.switch('edit' if mode=='short' else mode); w.comparison_panel.hide(); w.drawing.panel.hide()
+    w.workspaces.switch('edit' if mode=='short' else mode); w.drawing.panel.hide()
     w.library.show(); w.library_tabs.setCurrentWidget(panel)
     w.resize(640,400)
     if mode=='short': panel.setFixedHeight(100)

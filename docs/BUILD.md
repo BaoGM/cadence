@@ -8,13 +8,13 @@ Use Python 3.12.14 x64, Qt 6.12.1 MSVC x64, MSVC 14.44.35207 and Windows SDK 10.
 
 Run packaging/bootstrap_python.ps1 to obtain the verified Windows runtime from Astral's python-build-standalone distribution and create an isolated build environment. Python 3.12.14 has no Windows entry in the actions/python-versions manifest; do not substitute setup-python for this step. On a Windows runner, packaging/bootstrap_windows.ps1 prepares Qt and Inno Setup and verifies the MSVC installation. The pinned Visual Studio 2022 toolset and SDK must be installed separately if absent. The script fails rather than silently substituting another toolset.
 
-For the two pinned OpenSSL DLLs, use the [portable distribution](https://github.com/BaoGM/cadence/releases/download/v2.0.12-windows-studio2/Cadence-2.0.12-Windows.zip) or rebuild from the OpenSSL-Cadence sources and recipe in the third-party bundle. A changed build requires independently verifying the resulting DLLs and updating packaging/windows-runtime.json. For a local build:
+For the two pinned OpenSSL DLLs, use the [portable distribution](https://github.com/BaoGM/cadence/releases/download/v2.0.18-windows-studio2/Cadence-2.0.18-Windows.zip) or rebuild from the OpenSSL-Cadence sources and recipe in the third-party bundle. A changed build requires independently verifying the resulting DLLs and updating packaging/windows-runtime.json. For a local build:
 
 ```powershell
 ./packaging/bootstrap_python.ps1
 .deps/build-venv/Scripts/python -m pip install --only-binary=:all: --require-hashes -r requirements-build.lock
 .deps/build-venv/Scripts/python packaging/fetch_ffmpeg.py
-.deps/build-venv/Scripts/python packaging/windows_runtime.py --tls <extracted-portable>/Cadence/_internal-2.0.12
+.deps/build-venv/Scripts/python packaging/windows_runtime.py --tls <extracted-portable>/Cadence/_internal-2.0.18
 .deps/build-venv/Scripts/python packaging/build_windows.py --msvc-root "C:/path/to/Visual Studio" --qt-root "C:/path/to/Qt"
 ```
 
@@ -24,9 +24,13 @@ The build script generates the synthetic eight-second, 24 fps test video, rebuil
 
 Application tests are grouped under `tests/`. The maintained CI selection is listed in `packaging/headless-tests.json`; packaging checks stay beside the packaging tools. The remaining historical tests are retained for focused regression investigation. They are not all asserted to be current CI tests. GPU performance, capture devices, network shares, Blender and Maya require additional validation on real systems.
 
+## RIFE interpolation on Windows
+
+The public Windows package contains the RIFE 4.6 engine. Prepare its six runtime files in an independent directory and point the CADENCE_RIFE_BUNDLE environment variable to that directory before freezing. Check every file against packaging/rife-runtime.json. The manifest lists the upstream ZIP, its digest and the exact payload. Use the unmodified x64 vcomp140.dll from the MSVC 14.44.35112 redist directory, Microsoft.VC143.OpenMP, for the runtime checked below. Use packaging/fetch_rife.py with --redist to prepare and verify the six files. The engine, model and accompanying notices keep their original licenses. NVIDIA NvOFFRUC is an optional separate installation.
+
 ## Distribution inputs
 
-Full packaging requires the matching third-party source and notice bundle. The bundle's complete file manifest and hashes are in packaging/third-party.lock.json. Use the [matching third-party sources](https://github.com/BaoGM/cadence/releases/download/v2.0.12-windows-studio2/Cadence-2.0.12-third-party-sources.zip) and its SHA-256 from the release checksums.
+Full packaging requires the matching third-party source and notice bundle. The bundle's complete file manifest and hashes are in packaging/third-party.lock.json. Use the [matching third-party sources](https://github.com/BaoGM/cadence/releases/download/v2.0.18-windows-studio2/Cadence-2.0.18-third-party-sources.zip) and its SHA-256 from the release checksums.
 
 ```powershell
 .deps/build-venv/Scripts/python packaging/fetch_release_inputs.py --archive "C:/path/to/third-party-sources.zip" --sha256 THE_VERIFIED_ARCHIVE_SHA256

@@ -13,12 +13,18 @@ from PySide6.QtWidgets import QMessageBox
 from ui_text import tr
 from updates import version_tuple
 from maintenance_identity import identify_installed_process,install_paths
+from update_desktop import launch_as_desktop_user
+from update_store import elevated_process
 
 
 SERVICE='CadenceStudio2Maintenance'
 PIPE=r'\\.\pipe\CadenceStudio2Maintenance.v1'
 COMMANDS={'STATUS','CHECK_STABLE','CHECK_PREVIEW','APPLY','READY'}
 STATES={'idle','checking','downloading','ready','waiting','applying','trial','installed','rollback','failed'}
+
+
+class MaintenanceUnavailable(OSError):
+    pass
 
 
 def configured(base):
@@ -182,6 +188,7 @@ class MachineUpdates(QObject):
             self.send(command)
 
     def watcher(self):
-        if not configured(self.manager.base): raise OSError('Maintenance service unavailable')
+        if not configured(self.manager.base): raise MaintenanceUnavailable('Maintenance service unavailable')
         app,helper=install_paths()
+        if elevated_process(): return launch_as_desktop_user(helper)
         return subprocess.Popen([str(helper)],cwd=str(helper.parent),creationflags=subprocess.CREATE_NO_WINDOW)

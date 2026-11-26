@@ -44,7 +44,7 @@ CHANGES={
     'Outils/Curseur':('D','Q'),
     'Outils/Recadrer le clip':('C','Alt+C'),
     'Affichage/Flip - miroir vertical':('V','Shift+V'),
-    'Comparaison/Intervertir A / B':('X','Alt+X'),
+    'Références/Intervertir A / B':('X','Alt+X'),
 }
 
 

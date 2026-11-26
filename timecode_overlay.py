@@ -76,7 +76,7 @@ class TimecodeOverlay(QObject):
     def eventFilter(self,obj,event):
         kind=event.type()
         if not self.locked and kind==QEvent.Type.MouseButtonPress and event.button()==Qt.MouseButton.LeftButton and self.rect().contains(event.position()):
-            self.drag=(event.position()-self.rect().topLeft(),self.viewer.cursor())
+            self.drag=(event.position()-self.rect().topLeft(),self.viewer.cursor(),self.position())
             self.viewer.setCursor(Qt.CursorShape.SizeAllCursor); event.accept(); return True
         if self.drag and kind in (QEvent.Type.MouseMove,QEvent.Type.MouseButtonRelease):
             if kind==QEvent.Type.MouseMove:

@@ -6,7 +6,9 @@ def test_python_thread_and_qt_errors_are_logged(tmp_path):
     source=Path(__file__).resolve().parents[1]
     program='''
 import diagnostics,sys,threading,logging
-diagnostics.initialize()
+from pathlib import Path
+diagnostics.initialize('test-version')
+logging.info('profile path %s', Path.home()/'example.mov')
 try: raise ValueError('main-test')
 except Exception: sys.excepthook(*sys.exc_info())
 def crash(): raise RuntimeError('thread-test')
@@ -20,4 +22,6 @@ logging.shutdown()
     result=subprocess.run([sys.executable,'-c',program],env=env,capture_output=True,text=True,timeout=15)
     assert result.returncode==0,result.stderr
     log=(tmp_path/'logs/cadence.log').read_text(encoding='utf-8')
-    assert all(text in log for text in ('main-test','thread-test','qt-test','Traceback','Startup event loop ready'))
+    assert all(text in log for text in ('main-test','thread-test','qt-test','Traceback','Startup event loop ready',
+                                        'Cadence=test-version','native_faults=faults-','GUI runtime: Qt='))
+    assert str(Path.home()/'example.mov') not in log and 'example.mov' in log

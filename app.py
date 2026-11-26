@@ -3,9 +3,12 @@ from __future__ import annotations
 import time as _startup_time
 _STARTUP=_startup_time.perf_counter()
 import sys
-VERSION='2.0.12'
+VERSION='2.0.18'
 if __name__=='__main__' and getattr(sys,'frozen',False) and not any(arg.startswith('--self-test') for arg in sys.argv):
     from pathlib import Path
+    if sys.argv[1:2] in (['--prepare-user-update'],['--probe-user-update']):
+        from update_user import prepare_requested
+        raise SystemExit(prepare_requested(VERSION,sys.argv[1:]))
     from maintenance_identity import identify_installed_process
     try: identify_installed_process()
     except OSError:
@@ -39,7 +42,7 @@ if __name__=='__main__' and '--register-associations' in sys.argv:
     raise SystemExit(0)
 if __name__=='__main__' and not any(arg.startswith('--self-test') for arg in sys.argv):
     from diagnostics import initialize
-    initialize()
+    initialize(VERSION)
     import os
     if os.environ.get('CADENCE_TRIAL_READY') or os.environ.get('CADENCE_MACHINE_TRIAL')=='1':
         try:
@@ -134,15 +137,6 @@ QLabel#studioBrand {font-size:20px;font-weight:700;color:#e9eef3;}
 QLabel#studioProject,QLabel#studioSource,QLabel#studioSection {font-size:13px;font-weight:600;color:#e3eaf1;}
 QLabel#studioClock {font-family:Consolas;font-size:16px;font-weight:600;color:#e3eaf1;}
 QLabel#studioDetails {font-size:11px;color:#9aaabb;}
-QFrame#studioEditing {background:#181f27;border:0;border-bottom:1px solid #333f4c;}
-#studioEditing QWidget {background:transparent;color:#e3eaf1;font-size:12px;}
-#studioEditing QFrame#studioDivider {background:#333f4c;}
-#studioEditing QToolButton,#studioEditing QDoubleSpinBox {background:#202a34;border:1px solid #394654;border-radius:5px;padding:2px 6px;}
-#studioEditing QToolButton:hover {background:#2a3542;border-color:#526371;}
-#studioEditing QToolButton:pressed {background:#334151;}
-#studioEditing QToolButton::menu-indicator {width:0;height:0;}
-#studioEditing QCheckBox {spacing:5px;}
-#studioEditing QScrollBar:horizontal {height:4px;background:#151c23;}
 #studioTop QToolButton,#studioView QToolButton,#studioTimeline QToolButton,#studioRail QToolButton {background:transparent;color:#e3eaf1;border:0;border-radius:5px;padding:2px 4px;}
 #studioTop QToolButton:hover,#studioView QToolButton:hover,#studioTimeline QToolButton:hover,#studioRail QToolButton:hover {background:#2a3542;}
 #studioTop QToolButton:pressed,#studioView QToolButton:pressed,#studioTimeline QToolButton:pressed,#studioRail QToolButton:pressed {background:#334151;}
@@ -151,6 +145,10 @@ QFrame#studioEditing {background:#181f27;border:0;border-bottom:1px solid #333f4
 #studioTop QToolButton#studioMode {font-weight:600;padding:3px 9px;}
 #studioTop QToolButton#studioMode:checked {background:#68e0cf;color:#0a2a28;}
 #studioTop QToolButton#studioMenuButton {border:1px solid #333f4c;padding:3px 8px;}
+QFrame#studioFiles {background:transparent;border:0;}
+#studioFiles QToolButton,#studioView QToolButton#editingMenu {border:1px solid #394654;background:#202a34;padding:2px 6px;}
+#studioFiles QToolButton:hover,#studioView QToolButton#editingMenu:hover {background:#2a3542;border-color:#526371;}
+#studioView QToolButton#editingMenu {padding-right:18px;}
 #studioSegment QToolButton {font-size:11px;border-radius:3px;padding:1px 6px;}
 #studioTop QToolButton::menu-indicator,#studioView QToolButton::menu-indicator {width:0;height:0;}
 '''
@@ -159,6 +157,7 @@ _ui_assets=(Path(__file__).resolve().parent/'assets').as_posix()
 STYLE+=f'''
 QCheckBox::indicator:checked {{image:url("{_ui_assets}/studio-check.svg");}}
 QComboBox::down-arrow {{image:url("{_ui_assets}/studio-down.svg");width:13px;height:13px;}}
+#studioView QToolButton#editingMenu::menu-indicator {{image:url("{_ui_assets}/studio-down.svg");width:11px;height:11px;subcontrol-origin:padding;subcontrol-position:center right;right:3px;}}
 '''
 
 def label(text,name=None):
@@ -225,7 +224,7 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         from capture import StopHotkey
         self.capture_dialog=None; self.capture_hotkey=StopHotkey(lambda:self.capture_screen(True))
         self.capture_hotkey.register()
-        self.resizeDocks([self.library,self.comparison_panel,self.drawing.panel],[262,262,285],Qt.Orientation.Horizontal)
+        self.resizeDocks([self.library,self.drawing.panel],[262,285],Qt.Orientation.Horizontal)
         from workspace_modes import WorkspaceModes
         self.initial_dock_state=self.saveState()
         self.workspaces=WorkspaceModes(self)
@@ -252,8 +251,8 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         install_dialog_presentation()
 
     def build_ui(self):
-        from studio_chrome import build_editing_strip
-        self.header=build_editing_strip(self)
+        from studio_chrome import build_editing_menu
+        build_editing_menu(self)
         self.viewer=Viewer(); self.viewer.scrub.connect(lambda frame:self.seek(frame,audition=True)); self.viewer.scrubStarted.connect(self.begin_scrub); self.viewer.fileDropped.connect(self.drop_paths); self.viewer.fullscreenRequested.connect(self.toggle_fullscreen); self.viewer.openRequested.connect(self.open_video)
         self.viewer_workspace=ViewerWorkspace(self,self.viewer)
         self.setCentralWidget(self.viewer_workspace)
@@ -289,6 +288,7 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         self.viewer.scrubActiveChanged.connect(self.timeline.set_external_scrubbing)
         self.viewer.scrubActiveChanged.connect(lambda active:None if active else self.end_scrub())
         self.timeline.scrubStarted.connect(self.begin_scrub); self.timeline.scrubFinished.connect(self.end_scrub)
+        self.timeline.scrubCancelled.connect(self.restore_scrub)
         self.timeline.drawingMoved.connect(lambda a,b,d:self.edit_drawing_timeline('move',a,b,d)); self.timeline.drawingResized.connect(lambda a,b,c:self.edit_drawing_timeline('resize',a,b,c)); self.timeline.drawingDelete.connect(lambda a,b:self.edit_drawing_timeline('delete',a,b))
         self.timeline_scroll_slot=QWidget()
         self.timeline_scroll_slot.setObjectName('timelineScrollSlot')
@@ -338,11 +338,15 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         view=self.menuBar().addMenu(tr('Affichage'))
         self.timeline_action=self.action(view,'Afficher la timeline',lambda checked:self.set_panel('timeline',checked),'Ctrl+2'); self.timeline_action.setCheckable(True); self.timeline_action.setChecked(True)
         self.panel_actions={'timeline':self.timeline_action}
-        for key,title,shortcut in [('header','Afficher le bandeau supérieur','Ctrl+3'),('transport','Afficher les commandes de lecture','Ctrl+5'),('timecode','Afficher le time code','Ctrl+6')]:
+        for key,title,shortcut in [('transport','Afficher les commandes de lecture','Ctrl+5'),('timecode','Afficher le time code','Ctrl+6')]:
             action=self.action(view,title,lambda checked,k=key:self.set_panel(k,checked),shortcut); action.setCheckable(True); action.setChecked(True); self.panel_actions[key]=action
         self.library_action=self.action(view,'Afficher la liste de lecture',lambda checked:self.library.setVisible(checked),'Ctrl+8'); self.library_action.setCheckable(True)
         self.library.visibilityChanged.connect(self.sync_library_action)
-        panel=self.action(view,'Afficher les réglages de comparaison',lambda checked:self.set_panel('comparison',checked),'Ctrl+9'); panel.setCheckable(True); self.panel_actions['comparison']=panel
+        panel=self.action(view,'Afficher les références',lambda checked:self.show_references() if checked else self.close_references(),'Ctrl+9')
+        panel.setCheckable(True); self.panel_actions['references']=panel
+        view.removeAction(panel)
+        self.library_tabs.currentChanged.connect(self.sync_references_action)
+        self.library.visibilityChanged.connect(self.sync_references_action)
         self.layout_action=self.action(view,'Modifier la disposition des panneaux',self.set_layout_editable); self.layout_action.setCheckable(True)
         self.reset_layout_action=self.action(view,'Réinitialiser la disposition des panneaux',self.reset_panel_layout)
         self.action(file,'Options…',self.edit_shortcuts)
@@ -364,7 +368,6 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         tools_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.edit_toolbar.setWidget(tools_scroll)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea,self.edit_toolbar)
-        self.splitDockWidget(self.library,self.comparison_panel,Qt.Orientation.Vertical)
         for title,mode,key in [('Transformer la sélection ou le clip','resize','Ctrl+T'),('Recadrer le clip','crop','Alt+C')]:
             a=self.action(self.drawing.tools_menu,title,lambda checked=False,m=mode:self.clip_tools.activate(m),key)
             a.setIcon(tool_icon(mode))
@@ -421,6 +424,10 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
                 if identity not in cached:
                     cached[identity]=prepare_media(m['path'],fps,lambda value,message:progress((index+value)/len(entries),message),cancel,quality=quality,cadence=m.get('cadence'),defer_audio=True)
                 result[group,key]=dict(cached[identity],id=key)
+            from time_warp_render import ensure_render
+            for track in self.doc.state.tracks:
+                for clip in track.segments:
+                    if clip.warp: ensure_render(result['doc',clip.media],clip.warp,progress,cancel)
             return result
         def apply(result):
             for (group,key),m in result.items():
@@ -480,9 +487,9 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         self.compact_playback_panels()
 
     def compact_playback_panels(self):
-        for dock in (self.header,self.transport_widget):
-            dock.setMinimumHeight(0); dock.setMaximumHeight(16777215)
-            dock.setFixedHeight(dock.sizeHint().height())
+        dock=self.transport_widget
+        dock.setMinimumHeight(0); dock.setMaximumHeight(16777215)
+        dock.setFixedHeight(dock.sizeHint().height())
 
     def reset_panel_layout(self):
         self.workspaces.reset()
@@ -490,19 +497,22 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
     def sync_library_action(self,visible):
         if not self.video_fullscreen:
             with QSignalBlocker(self.library_action): self.library_action.setChecked(visible)
+    def sync_references_action(self,*args):
+        if not self.video_fullscreen:
+            action=self.panel_actions['references']
+            with QSignalBlocker(action): action.setChecked(not self.library.isHidden() and self.library_tabs.currentIndex()==self.reference_tab)
     def make_panels_movable(self):
         self.setDockNestingEnabled(True)
         self.setDockOptions(self.dockOptions() & ~QMainWindow.DockOption.AnimatedDocks)
         def dock(attribute,title,area):
             content=getattr(self,attribute)
             panel=QDockWidget(tr(title),self); panel.setObjectName(attribute); panel.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas); panel.setWidget(content); self.addDockWidget(area,panel)
-            if attribute in ('header','transport_widget'): panel.setMaximumHeight(content.sizeHint().height()+30)
+            if attribute=='transport_widget': panel.setMaximumHeight(content.sizeHint().height()+30)
             setattr(self,attribute,panel); return panel
-        top=dock('header','Bandeau supérieur',Qt.DockWidgetArea.TopDockWidgetArea)
         transport=dock('transport_widget','Lecture et son',Qt.DockWidgetArea.BottomDockWidgetArea)
         transport.topLevelChanged.connect(self.compact_playback_panels)
         timeline=dock('timeline_panel','Timeline',Qt.DockWidgetArea.BottomDockWidgetArea)
-        self.resizeDocks([top,timeline],[78,150],Qt.Orientation.Vertical)
+        self.resizeDocks([timeline],[150],Qt.Orientation.Vertical)
 
     def build_library(self):
         self.library=QDockWidget(tr('Liste de lecture et médias'),self); self.library.setObjectName('library')
@@ -633,7 +643,8 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
             item=QListWidgetItem(f'{i+1}. {name} · {seg.length} '+tr('images')); item.setData(Qt.ItemDataRole.UserRole,(at,at+seg.length))
             media=self.doc.media.get(key,{})
             item.setData(MEDIA_ROLE,key); item.setData(TITLE_ROLE,name)
-            set_preview(item,media,seg.start)
+            from time_warp import video_sample
+            set_preview(item,*video_sample(media,seg,seg.source_frame(0)))
             item.setData(SYMBOL_ROLE,'film' if media.get('has_video',True) else 'wave')
             millis=round(at*1000/self.doc.fps)
             stamp=f'{millis//3600000:02}:{millis//60000%60:02}:{millis//1000%60:02}.{millis%1000:03}'
@@ -694,14 +705,18 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         if not self.video_fullscreen or name=='timecode':
             self.panel_widgets()[name].setVisible(visible)
     def panel_widgets(self):
-        return {'timeline':self.timeline_panel,'header':self.header,'transport':self.transport_widget,'timecode':self.timecode_overlay,'comparison':self.comparison_panel,'drawing':self.drawing.panel,**({'tools':self.edit_toolbar} if hasattr(self,'edit_toolbar') else {})}
+        return {'timeline':self.timeline_panel,'transport':self.transport_widget,'timecode':self.timecode_overlay,'drawing':self.drawing.panel,**({'tools':self.edit_toolbar} if hasattr(self,'edit_toolbar') else {})}
     def set_drawings_linked(self,enabled):
         self.doc.commit('Liaison dessins / vidéo',replace(self.doc.state,drawings_linked=bool(enabled))); self.refresh()
     def edit_drawing_timeline(self,operation,*args):
         if self.job: return
         self.pause(); self.drawing.finish()
-        method={'move':self.doc.move_drawings,'resize':self.doc.resize_drawing,'delete':self.doc.delete_drawings}[operation]
-        if method(*args): self.refresh(); self.request_frame()
+        if operation=='delete':
+            changed=self.doc.delete_drawings(*args)
+        else:
+            method={'move':self.doc.move_drawings,'resize':self.doc.resize_drawing}[operation]
+            changed=method(*args,follow_selection=self.timeline.selection_track=='drawing')
+        if changed: self.refresh(); self.request_frame()
     def duplicate_section(self,a,b,destination=-1):
         if self.job: return
         self.pause(); self.commit_exposure()
@@ -842,7 +857,8 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         self._task_error=on_error or self.error
         self._task_finished=on_finished
         self.job=self.task_worker
-        self.job.start_work(fn)
+        self._task_logged_quarter=-1
+        self.job.start_work(fn,title)
         if progress_delay_ms:
             self.task_progress_timer.start(progress_delay_ms)
         else:
@@ -884,7 +900,9 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         self._task_progress_message=m
         if dialog is None: return
         percent=int(value*100)
-        logging.info('Task progress: value=%r type=%s normalized=%r percent=%r percent_type=%s message=%r',p,type(p).__name__,value,percent,type(percent).__name__,m)
+        if percent//25!=getattr(self,'_task_logged_quarter',-1):
+            self._task_logged_quarter=percent//25
+            logging.info('Task progress: value=%r type=%s normalized=%r percent=%r percent_type=%s message=%r',p,type(p).__name__,value,percent,type(percent).__name__,m)
         dialog.setLabelText(tr(m))
         # A modal setValue() processes events: completion may clear self.dialog.
         # Keep this last and never touch the dialog after event processing.
@@ -964,6 +982,8 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
                 validate_media(m)
                 refreshed=prepare_media(m['path'],doc.fps,p,c,quality=quality,cadence=m.get('cadence'),defer_audio=True)
                 refreshed['id']=key; doc.media[key]=refreshed
+            from time_warp import prepare_document
+            prepare_document(doc,p,c)
             from reference_sequence import restore
             restore(doc,quality,p,c)
             return doc
@@ -988,18 +1008,18 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         except (OSError,ValueError) as error: self.error(str(error)); return
         try:
             if dialog.exec()==QDialog.DialogCode.Accepted:
-                self.start_export(dialog.selectedFiles()[0])
+                self.start_export(dialog.selectedFiles()[0],**dialog.render_options())
         finally: dialog.deleteLater()
-    def start_export(self,path):
+    def start_export(self,path,**options):
         self.commit_exposure()
         self.drawing.commit_gamma()
-        state=self.doc.state if self.drawing.export.isChecked() else replace(self.doc.state,drawings=()); media=dict(self.doc.media); fps=self.doc.fps
+        state=self.doc.state if self.drawing.export.isChecked() or options.get('drawings_only') else replace(self.doc.state,drawings=()); media=dict(self.doc.media); fps=self.doc.fps
         onion=(self.drawing.before.value(),self.drawing.after.value(),self.drawing.ghost.value()/100) if self.drawing.onion.isChecked() else None
         def completed(output):
             from review_panel import offer_rendered_markers
             offer_rendered_markers(self,output,state,fps)
             self.export_done(output)
-        self.begin_task('Export du montage',lambda p,c:export_video(state,media,fps,path,True,p,c,onion,self.export_sources),completed)
+        self.begin_task('Export du montage',lambda p,c:export_video(state,media,fps,path,True,p,c,onion,self.export_sources,**options),completed)
     def export_done(self,path):
         self.notify(f'Export terminé : {path}')
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(path).resolve().parent)))
@@ -1019,7 +1039,7 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         frame=max(0,min(st.position,max(0,n-1)))
         self.timecode_overlay.set_frame(st.position,n,self.doc.fps)
         self.update_media_info(frame)
-        for b in (self.export_btn,self.play_btn,self.exp_spin,self.exposure_button): b.setEnabled(n>0)
+        for b in (self.export_btn.defaultAction(),self.play_btn,self.exp_spin,self.exposure_button): b.setEnabled(n>0)
         self.sync_loop_button()
         for obj in (self.undo_action,): obj.setEnabled(bool(self.doc.undo_stack))
         for obj in (self.redo_action,): obj.setEnabled(bool(self.doc.redo_stack))
@@ -1073,12 +1093,17 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
             self.frame_ready(self.token,np.zeros((h,w,3),dtype=np.uint8))
         else:
             from media import prefetch_frames
-            ahead=prefetch_frames(self.doc.media[key],idx,seg.start,seg.end,self.frame_cache.budget,backward=not self.transport.running)
+            from time_warp import video_sample
+            info=self.doc.media[key]
+            ahead=prefetch_frames(info,idx,seg.start,seg.end,self.frame_cache.budget,backward=not self.transport.running,reverse=seg.reversed)
+            if seg.warp:
+                ahead=[video_sample(info,seg,i) for _,i in ahead]
             following=self.doc.state.segments[segment_number+1:segment_number+2]
             for next_seg in following:
                 if next_seg.media is not None and not next_seg.muted:
-                    ahead.extend((self.doc.media[next_seg.media],i) for i in range(next_seg.start,min(next_seg.end,next_seg.start+3)))
-            self.decoder.request(self.token,self.doc.media[key],idx,ahead)
+                    ahead.extend(video_sample(self.doc.media[next_seg.media],next_seg,next_seg.source_frame(i)) for i in range(min(3,next_seg.length)))
+            decoded,sample=video_sample(info,seg,idx)
+            self.decoder.request(self.token,decoded,sample,ahead)
     def frame_ready(self,token,arr):
         if token==self.token and not self.comparison_a_ready(token,arr): self.viewer.set_frame(arr); self.rendered_token=token
     def frame_failed(self,token,msg):
@@ -1089,7 +1114,14 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
         self.refresh_position(); self.request_frame()
         if audition: self.scrub_audio.request(self.doc.state,self.doc.media,self.doc.fps,self.doc.state.position)
     def begin_scrub(self):
+        st=self.doc.state
+        self._scrub_before=(st.position,st.selection,st.selected_clips,st.loop_range,self.selection_anchor)
         self._scrub_document=self.doc; self._resume_after_scrub=self.transport.running; self.pause()
+    def restore_scrub(self):
+        if getattr(self,'_scrub_document',None) is not self.doc: return
+        position,selection,clips,loop,self.selection_anchor=self._scrub_before
+        self.doc.state=replace(self.doc.state,position=position,selection=selection,selected_clips=clips,loop_range=loop)
+        self.scrub_audio.stop(); self.refresh_position(); self.drawing.comments.refresh(); self.request_frame()
     def end_scrub(self):
         resume=getattr(self,'_resume_after_scrub',False); self._resume_after_scrub=False
         document=getattr(self,'_scrub_document',None); self._scrub_document=None
@@ -1355,7 +1387,7 @@ class MainWindow(WorkspaceDockLayout,MediaTrackController,ComparisonMixin,QMainW
 
 def main():
     from diagnostics import initialize,install_qt_logging,startup_ready
-    initialize(); install_qt_logging()
+    initialize(VERSION); install_qt_logging()
     from video_surface import configure_graphics
     configure_graphics()
     app=QApplication(sys.argv); app.setApplicationName('Cadence 2.0'); app.setOrganizationName('CadenceStudio'); app.setStyle('Fusion'); app.setStyleSheet(STYLE)

@@ -30,19 +30,19 @@ def test_first_open_modes_reset_and_persist(application,tmp_path):
     w.library.show()
     w.workspaces.switch('edit'); application.processEvents()
     assert visible(w)==set(w.workspaces.panels) and not w.timeline.simple
-    w.set_layout_editable(True); w.header.hide(); w.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea,w.library)
+    w.set_layout_editable(True); w.transport_widget.hide(); w.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea,w.library)
     w.resize(1580,940); application.processEvents(); w.close()
     w=MainWindow(); w.show(); application.processEvents()
-    assert w.workspaces.mode=='edit' and w.header.isHidden() and w.layout_editable
+    assert w.workspaces.mode=='edit' and w.transport_widget.isHidden() and w.layout_editable
     assert w.dockWidgetArea(w.library)==Qt.DockWidgetArea.RightDockWidgetArea
     assert json.loads((tmp_path/'workspaces.json').read_text(encoding='utf-8'))['geometry']
     w.workspaces.switch('read'); assert w.library.isVisible()
     w.timecode_overlay.setVisible(False); w.workspaces.switch('edit')
-    assert w.header.isHidden() and w.dockWidgetArea(w.library)==Qt.DockWidgetArea.RightDockWidgetArea
+    assert w.transport_widget.isHidden() and w.dockWidgetArea(w.library)==Qt.DockWidgetArea.RightDockWidgetArea
     w.reset_panel_layout(); assert visible(w)==set(w.workspaces.panels) and not w.layout_editable
     w.workspaces.switch('read'); assert w.timecode_overlay.isHidden()
     w.reset_panel_layout(); assert visible(w)=={'timeline','transport'}
-    w.workspaces.switch('edit'); w.header.hide()
+    w.workspaces.switch('edit'); w.transport_widget.hide()
     from preferences import ShortcutDialog,validate
     dialog=ShortcutDialog(w.action_registry,w.preferences,w)
     from cache_ram import default_cache_mb
@@ -136,9 +136,9 @@ def test_single_selection_ctrl_center_cancel_noop_and_text_move(window):
 
 def test_close_from_fullscreen_preserves_mode_panels(application,tmp_path):
     from app import MainWindow
-    w=MainWindow(); w.show(); application.processEvents(); w.workspaces.switch('edit'); w.header.hide(); w.toggle_fullscreen(); application.processEvents(); w.close()
+    w=MainWindow(); w.show(); application.processEvents(); w.workspaces.switch('edit'); w.transport_widget.hide(); w.toggle_fullscreen(); application.processEvents(); w.close()
     w=MainWindow(); w.show(); application.processEvents()
-    assert w.workspaces.mode=='edit' and w.header.isHidden() and not w.timeline_panel.isHidden() and not w.video_fullscreen
+    assert w.workspaces.mode=='edit' and w.transport_widget.isHidden() and not w.timeline_panel.isHidden() and not w.video_fullscreen
     w.close()
 
 def test_clip_rotate_preview_and_export(application,tmp_path):

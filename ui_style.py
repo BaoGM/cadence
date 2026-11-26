@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-only
-from PySide6.QtCore import QObject,QEvent
-from PySide6.QtWidgets import QApplication,QProxyStyle,QStyle,QToolTip
+from PySide6.QtCore import QObject,QEvent,Qt
+from PySide6.QtWidgets import QApplication,QCheckBox,QProxyStyle,QStyle,QToolTip
 
 class TooltipFilter(QObject):
     enabled=True
     def eventFilter(self,watched,event):
+        if event.type()==QEvent.Type.Show and isinstance(watched,QCheckBox):
+            watched.setCursor(Qt.PointingHandCursor)
         return not self.enabled and event.type()==QEvent.Type.ToolTip
 
 def set_tooltips_enabled(enabled):
